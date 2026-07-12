@@ -1,0 +1,44 @@
+[project]
+name = "yieldrep"
+version = "0.1.0"
+description = "Research package for sovereign yield curve representation learning."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "plotly>=5.22",
+    "pyarrow>=15",
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+    "scikit-learn>=1.4",
+    "scipy>=1.12",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.10",
+    "pytest>=8.2",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+yieldrep = "yieldrep.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["yieldrep"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
