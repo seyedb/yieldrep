@@ -1,0 +1,13 @@
+data_dir: data
+reports_dir: reports
+
+sources:
+  fed_gsw:
+    country: US
+    source: fed_gsw
+    raw_file: data/raw/fed_gsw.csv
+
+  bank_of_canada:
+    country: CA
+    source: bank_of_canada
+    raw_file: data/raw/boc_zero_coupon.csv
