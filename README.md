@@ -1,4 +1,5 @@
 # yieldrep
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 `yieldrep` is a Python research project for studying whether latent representations
 of sovereign yield curves contain information beyond classical term-structure
