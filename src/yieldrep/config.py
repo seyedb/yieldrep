@@ -11,6 +11,7 @@ class SourceConfig(BaseModel):
     country: str
     source: str
     raw_file: Path
+    url: str | None = None
 
 
 class ProjectConfig(BaseModel):

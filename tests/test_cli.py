@@ -5,6 +5,34 @@ from typer.testing import CliRunner
 from yieldrep.cli import app
 
 
+def test_ingest_command_downloads_raw_file(tmp_path: Path) -> None:
+    source_file = tmp_path / "source.csv"
+    source_file.write_text("Date,Value\n2024-01-02,1.0\n", encoding="utf-8")
+    raw_file = tmp_path / "data" / "raw" / "source.csv"
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                f"data_dir: {tmp_path / 'data'}",
+                f"reports_dir: {tmp_path / 'reports'}",
+                "sources:",
+                "  test:",
+                "    country: US",
+                "    source: test",
+                f"    raw_file: {raw_file}",
+                f"    url: {source_file.as_uri()}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["ingest", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert raw_file.read_text(encoding="utf-8") == source_file.read_text(encoding="utf-8")
+    assert str(raw_file) in result.stdout
+
+
 def test_normalize_command_writes_curves_parquet(tmp_path: Path) -> None:
     raw_dir = tmp_path / "data" / "raw"
     raw_dir.mkdir(parents=True)

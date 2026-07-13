@@ -19,3 +19,5 @@ def test_load_config_reads_source_metadata() -> None:
     assert set(config.sources) == {"fed_gsw", "bank_of_canada"}
     assert config.sources["fed_gsw"].country == "US"
     assert config.sources["bank_of_canada"].raw_file == Path("data/raw/boc_zero_coupon.csv")
+    assert config.sources["fed_gsw"].url is not None
+    assert config.sources["bank_of_canada"].url is not None

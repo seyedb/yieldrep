@@ -6,8 +6,10 @@ sources:
     country: US
     source: fed_gsw
     raw_file: data/raw/fed_gsw.csv
+    url: https://www.federalreserve.gov/data/yield-curve-tables/feds200628.csv
 
   bank_of_canada:
     country: CA
     source: bank_of_canada
     raw_file: data/raw/boc_zero_coupon.csv
+    url: https://www.bankofcanada.ca/stats/results/csv?lookupPage=lookup_yield_curve.php&startRange=1986-01-01&searchRange=all
