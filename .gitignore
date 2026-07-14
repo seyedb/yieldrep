@@ -191,3 +191,11 @@ debug/
 # End of https://www.toptal.com/developers/gitignore/api/rust,python
 
 # Curated public quote captures are tracked as small reproducibility fixtures.
+
+# Generated data artifacts
+data/raw/*
+data/interim/*
+data/processed/*
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
