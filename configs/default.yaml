@@ -1,6 +1,10 @@
 data_dir: data
 reports_dir: reports
 
+pca:
+  n_components: 5
+  min_maturities: 3
+
 sources:
   fed_gsw:
     country: US

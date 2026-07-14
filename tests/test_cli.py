@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pandas as pd
 from typer.testing import CliRunner
 
 from yieldrep.cli import app
@@ -85,3 +86,49 @@ def test_normalize_command_writes_curves_parquet(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert (tmp_path / "data" / "processed" / "curves.parquet").exists()
     assert "curves.parquet" in result.stdout
+
+
+def test_build_pca_command_writes_outputs(tmp_path: Path) -> None:
+    processed_dir = tmp_path / "data" / "processed"
+    processed_dir.mkdir(parents=True)
+    dates = pd.date_range("2024-01-01", periods=4)
+    curves = pd.DataFrame(
+        [
+            {
+                "date": date,
+                "country": "US",
+                "maturity_years": maturity,
+                "yield": 3.0 + date_index * 0.1 + maturity * 0.02,
+                "source": "test",
+            }
+            for date_index, date in enumerate(dates)
+            for maturity in [1.0, 2.0, 10.0]
+        ]
+    )
+    curves.to_parquet(processed_dir / "curves.parquet", index=False)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                f"data_dir: {tmp_path / 'data'}",
+                f"reports_dir: {tmp_path / 'reports'}",
+                "pca:",
+                "  n_components: 2",
+                "  min_maturities: 3",
+                "sources:",
+                "  test:",
+                "    country: US",
+                "    source: test",
+                f"    raw_file: {tmp_path / 'raw.csv'}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["build-pca", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert (processed_dir / "pca" / "us_scores.parquet").exists()
+    assert (processed_dir / "pca" / "us_loadings.parquet").exists()
+    assert (processed_dir / "pca" / "us_variance.parquet").exists()
+    assert "us_scores.parquet" in result.stdout

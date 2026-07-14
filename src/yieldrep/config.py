@@ -14,10 +14,16 @@ class SourceConfig(BaseModel):
     url: str | None = None
 
 
+class PCAConfig(BaseModel):
+    n_components: int = 5
+    min_maturities: int = 3
+
+
 class ProjectConfig(BaseModel):
     data_dir: Path
     reports_dir: Path
     sources: dict[str, SourceConfig]
+    pca: PCAConfig = PCAConfig()
 
     @property
     def raw_dir(self) -> Path:
@@ -38,6 +44,10 @@ class ProjectConfig(BaseModel):
     @property
     def curves_path(self) -> Path:
         return self.processed_dir / "curves.parquet"
+
+    @property
+    def pca_dir(self) -> Path:
+        return self.processed_dir / "pca"
 
 
 def load_config(path: Path) -> ProjectConfig:
