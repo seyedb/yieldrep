@@ -222,6 +222,63 @@ def test_build_targets_command_writes_output(tmp_path: Path) -> None:
     assert "targets.parquet" in result.stdout
 
 
+def test_build_modeling_datasets_command_writes_outputs(tmp_path: Path) -> None:
+    processed_dir = tmp_path / "data" / "processed"
+    pca_dir = processed_dir / "pca"
+    ns_dir = processed_dir / "nelson_siegel"
+    pca_dir.mkdir(parents=True)
+    ns_dir.mkdir(parents=True)
+    dates = pd.date_range("2024-01-01", periods=2)
+    pd.DataFrame(
+        {
+            "date": dates,
+            "country": ["US", "US"],
+            "maturity_years": [2.0, 2.0],
+            "horizon_days": [1, 1],
+            "yield": [4.0, 4.1],
+            "future_yield": [4.1, 4.2],
+            "target_yield_change": [0.1, 0.1],
+        }
+    ).to_parquet(processed_dir / "targets.parquet", index=False)
+    pd.DataFrame({"date": dates, "PC1": [1.0, 1.1]}).to_parquet(
+        pca_dir / "us_scores.parquet",
+        index=False,
+    )
+    pd.DataFrame(
+        {
+            "date": dates,
+            "country": ["US", "US"],
+            "beta_level": [4.0, 4.1],
+            "beta_slope": [-1.0, -0.9],
+            "beta_curvature": [0.5, 0.4],
+            "tau": [1.5, 1.5],
+            "rmse": [0.01, 0.02],
+        }
+    ).to_parquet(ns_dir / "us_factors.parquet", index=False)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                f"data_dir: {tmp_path / 'data'}",
+                f"reports_dir: {tmp_path / 'reports'}",
+                "sources:",
+                "  test:",
+                "    country: US",
+                "    source: test",
+                f"    raw_file: {tmp_path / 'raw.csv'}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["build-modeling-datasets", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert (processed_dir / "modeling" / "pca_targets.parquet").exists()
+    assert (processed_dir / "modeling" / "nelson_siegel_targets.parquet").exists()
+    assert "pca_targets.parquet" in result.stdout
+
+
 def test_plot_pca_command_writes_html_outputs(tmp_path: Path) -> None:
     pca_dir = tmp_path / "data" / "processed" / "pca"
     pca_dir.mkdir(parents=True)

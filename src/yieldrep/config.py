@@ -75,6 +75,10 @@ class ProjectConfig(BaseModel):
     def targets_path(self) -> Path:
         return self.processed_dir / "targets.parquet"
 
+    @property
+    def modeling_dir(self) -> Path:
+        return self.processed_dir / "modeling"
+
 
 def load_config(path: Path) -> ProjectConfig:
     with path.open("r", encoding="utf-8") as handle:

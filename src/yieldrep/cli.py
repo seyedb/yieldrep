@@ -5,6 +5,7 @@ import typer
 from yieldrep.config import load_config
 from yieldrep.data.ingest import ingest_sources
 from yieldrep.data.normalize import build_curves_parquet
+from yieldrep.evaluation.datasets import build_modeling_datasets
 from yieldrep.features.nelson_siegel import build_nelson_siegel
 from yieldrep.features.pca import build_pca
 from yieldrep.features.targets import build_targets
@@ -57,6 +58,14 @@ def build_targets_command(config: Path = Path("configs/default.yaml")) -> None:
     """Build forward yield-change prediction targets."""
     project_config = load_config(config)
     typer.echo(build_targets(project_config))
+
+
+@app.command("build-modeling-datasets")
+def build_modeling_datasets_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Build supervised datasets by joining baseline features to targets."""
+    project_config = load_config(config)
+    for output_path in build_modeling_datasets(project_config):
+        typer.echo(output_path)
 
 
 @app.command("plot-pca")
