@@ -24,3 +24,4 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.sources["bank_of_canada"].url is not None
     assert config.pca.n_components == 5
     assert config.pca.min_maturities == 3
+    assert config.plots.selected_maturities == [0.25, 1.0, 2.0, 5.0, 10.0, 30.0]

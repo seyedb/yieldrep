@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SourceConfig(BaseModel):
@@ -19,11 +19,18 @@ class PCAConfig(BaseModel):
     min_maturities: int = 3
 
 
+class PlotConfig(BaseModel):
+    selected_maturities: list[float] = Field(
+        default_factory=lambda: [0.25, 1.0, 2.0, 5.0, 10.0, 30.0]
+    )
+
+
 class ProjectConfig(BaseModel):
     data_dir: Path
     reports_dir: Path
     sources: dict[str, SourceConfig]
-    pca: PCAConfig = PCAConfig()
+    pca: PCAConfig = Field(default_factory=PCAConfig)
+    plots: PlotConfig = Field(default_factory=PlotConfig)
 
     @property
     def raw_dir(self) -> Path:
