@@ -19,6 +19,11 @@ class PCAConfig(BaseModel):
     min_maturities: int = 3
 
 
+class NelsonSiegelConfig(BaseModel):
+    tau: float = 1.5
+    min_maturities: int = 3
+
+
 class PlotConfig(BaseModel):
     selected_maturities: list[float] = Field(
         default_factory=lambda: [0.25, 1.0, 2.0, 5.0, 10.0, 30.0]
@@ -30,6 +35,7 @@ class ProjectConfig(BaseModel):
     reports_dir: Path
     sources: dict[str, SourceConfig]
     pca: PCAConfig = Field(default_factory=PCAConfig)
+    nelson_siegel: NelsonSiegelConfig = Field(default_factory=NelsonSiegelConfig)
     plots: PlotConfig = Field(default_factory=PlotConfig)
 
     @property
@@ -55,6 +61,10 @@ class ProjectConfig(BaseModel):
     @property
     def pca_dir(self) -> Path:
         return self.processed_dir / "pca"
+
+    @property
+    def nelson_siegel_dir(self) -> Path:
+        return self.processed_dir / "nelson_siegel"
 
 
 def load_config(path: Path) -> ProjectConfig:
