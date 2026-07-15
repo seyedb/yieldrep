@@ -1,3 +1,21 @@
+"""Principal-component baseline for yield curve representations.
+
+PCA treats each daily curve as a vector of yields across maturities, such as
+[1Y, 2Y, 5Y, 10Y, 30Y], and finds the orthogonal linear directions that explain
+the most historical variation in those curve vectors. It is a classical
+low-dimensional representation of the curve, not a forecasting model by itself.
+
+In rates applications, the first components often resemble level, slope, and
+curvature factors, although signs are arbitrary and the exact shapes depend on
+the sample, maturities, and scaling. Scores are the date-indexed factor time
+series, loadings are the maturity-wise factor shapes, and explained variance
+measures how much historical curve variation each component captures.
+
+This baseline is useful because later learned representations should be compared
+against a strong linear benchmark before adding nonlinear autoencoders,
+Transformers, or graph models.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
