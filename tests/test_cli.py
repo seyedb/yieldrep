@@ -132,3 +132,44 @@ def test_build_pca_command_writes_outputs(tmp_path: Path) -> None:
     assert (processed_dir / "pca" / "us_loadings.parquet").exists()
     assert (processed_dir / "pca" / "us_variance.parquet").exists()
     assert "us_scores.parquet" in result.stdout
+
+
+def test_plot_pca_command_writes_html_outputs(tmp_path: Path) -> None:
+    pca_dir = tmp_path / "data" / "processed" / "pca"
+    pca_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "date": pd.date_range("2024-01-01", periods=3),
+            "PC1": [1.0, 0.5, -0.5],
+            "PC2": [0.0, 0.2, 0.1],
+            "PC3": [0.1, -0.1, 0.0],
+        }
+    ).to_parquet(pca_dir / "us_scores.parquet", index=False)
+    pd.DataFrame(
+        {
+            "component": ["PC1", "PC2", "PC3"],
+            "explained_variance_ratio": [0.8, 0.15, 0.05],
+        }
+    ).to_parquet(pca_dir / "us_variance.parquet", index=False)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                f"data_dir: {tmp_path / 'data'}",
+                f"reports_dir: {tmp_path / 'reports'}",
+                "sources:",
+                "  test:",
+                "    country: US",
+                "    source: test",
+                f"    raw_file: {tmp_path / 'raw.csv'}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["plot-pca", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert (tmp_path / "reports" / "figures" / "us_pca_explained_variance.html").exists()
+    assert (tmp_path / "reports" / "figures" / "us_pca_scores.html").exists()
+    assert "us_pca_scores.html" in result.stdout

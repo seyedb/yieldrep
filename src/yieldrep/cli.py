@@ -6,6 +6,7 @@ from yieldrep.config import load_config
 from yieldrep.data.ingest import ingest_sources
 from yieldrep.data.normalize import build_curves_parquet
 from yieldrep.features.pca import build_pca
+from yieldrep.visualization.plotly_pca import plot_pca
 
 app = typer.Typer(help="Yield curve research pipelines.")
 
@@ -36,6 +37,14 @@ def build_pca_command(config: Path = Path("configs/default.yaml")) -> None:
     """Build PCA baseline outputs from normalized curves."""
     project_config = load_config(config)
     for output_path in build_pca(project_config):
+        typer.echo(output_path)
+
+
+@app.command("plot-pca")
+def plot_pca_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Generate Plotly HTML figures from PCA outputs."""
+    project_config = load_config(config)
+    for output_path in plot_pca(project_config):
         typer.echo(output_path)
 
 

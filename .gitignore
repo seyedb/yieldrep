@@ -199,3 +199,7 @@ data/processed/*
 !data/raw/.gitkeep
 !data/interim/.gitkeep
 !data/processed/.gitkeep
+
+# Generated report artifacts
+reports/figures/*
+!reports/figures/.gitkeep
