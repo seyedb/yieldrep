@@ -24,6 +24,10 @@ class NelsonSiegelConfig(BaseModel):
     min_maturities: int = 3
 
 
+class TargetConfig(BaseModel):
+    horizons_days: list[int] = Field(default_factory=lambda: [1, 5, 20])
+
+
 class PlotConfig(BaseModel):
     selected_maturities: list[float] = Field(
         default_factory=lambda: [0.25, 1.0, 2.0, 5.0, 10.0, 30.0]
@@ -36,6 +40,7 @@ class ProjectConfig(BaseModel):
     sources: dict[str, SourceConfig]
     pca: PCAConfig = Field(default_factory=PCAConfig)
     nelson_siegel: NelsonSiegelConfig = Field(default_factory=NelsonSiegelConfig)
+    targets: TargetConfig = Field(default_factory=TargetConfig)
     plots: PlotConfig = Field(default_factory=PlotConfig)
 
     @property
@@ -65,6 +70,10 @@ class ProjectConfig(BaseModel):
     @property
     def nelson_siegel_dir(self) -> Path:
         return self.processed_dir / "nelson_siegel"
+
+    @property
+    def targets_path(self) -> Path:
+        return self.processed_dir / "targets.parquet"
 
 
 def load_config(path: Path) -> ProjectConfig:
