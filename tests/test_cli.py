@@ -220,6 +220,44 @@ def test_plot_pca_command_writes_html_outputs(tmp_path: Path) -> None:
     assert "us_pca_scores.html" in result.stdout
 
 
+def test_plot_nelson_siegel_command_writes_html_outputs(tmp_path: Path) -> None:
+    ns_dir = tmp_path / "data" / "processed" / "nelson_siegel"
+    ns_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "date": pd.date_range("2024-01-01", periods=3),
+            "country": ["US", "US", "US"],
+            "beta_level": [4.0, 4.1, 4.2],
+            "beta_slope": [-1.0, -0.9, -0.8],
+            "beta_curvature": [0.5, 0.4, 0.3],
+            "tau": [1.5, 1.5, 1.5],
+            "rmse": [0.02, 0.03, 0.01],
+        }
+    ).to_parquet(ns_dir / "us_factors.parquet", index=False)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                f"data_dir: {tmp_path / 'data'}",
+                f"reports_dir: {tmp_path / 'reports'}",
+                "sources:",
+                "  test:",
+                "    country: US",
+                "    source: test",
+                f"    raw_file: {tmp_path / 'raw.csv'}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["plot-nelson-siegel", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert (tmp_path / "reports" / "figures" / "us_nelson_siegel_factors.html").exists()
+    assert (tmp_path / "reports" / "figures" / "us_nelson_siegel_rmse.html").exists()
+    assert "us_nelson_siegel_factors.html" in result.stdout
+
+
 def test_plot_curves_command_writes_html_outputs(tmp_path: Path) -> None:
     processed_dir = tmp_path / "data" / "processed"
     processed_dir.mkdir(parents=True)
