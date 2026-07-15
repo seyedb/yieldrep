@@ -10,6 +10,21 @@ against baselines such as PCA, Nelson-Siegel factors, slope and curvature measur
 and carry/roll-down style features across forecasting, relative-value, volatility,
 and curve-state tasks.
 
+## Usage
+
+Run commands from the project root with `PYTHONPATH=src`:
+
+```bash
+PYTHONPATH=src python -m yieldrep.cli ingest --config configs/default.yaml
+PYTHONPATH=src python -m yieldrep.cli normalize --config configs/default.yaml
+PYTHONPATH=src python -m yieldrep.cli build-pca --config configs/default.yaml
+PYTHONPATH=src python -m yieldrep.cli plot-curves --config configs/default.yaml
+PYTHONPATH=src python -m yieldrep.cli plot-pca --config configs/default.yaml
+```
+
+Generated data is written under `data/`; generated figures are written under
+`reports/figures/`.
+
 ## Development Note
 
 This project is developed as a learning and research effort with AI assistance for
