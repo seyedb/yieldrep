@@ -4,6 +4,13 @@ The Nelson-Siegel model represents a yield curve with three interpretable
 loadings: level, slope, and curvature. Unlike PCA, the factor shapes are imposed
 by the parametric form rather than learned from the covariance matrix. This makes
 Nelson-Siegel a useful economic benchmark for later learned representations.
+
+For a maturity m and decay parameter tau, the curve is fitted as a linear
+combination of three fixed loading functions. The level loading is constant
+across maturities, the slope loading is strongest at the short end and decays
+with maturity, and the curvature loading is hump-shaped around intermediate
+maturities. With tau fixed, the three beta coefficients can be estimated by
+ordinary least squares for each date.
 """
 
 from __future__ import annotations
