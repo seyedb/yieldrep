@@ -9,6 +9,7 @@ from yieldrep.evaluation.datasets import build_modeling_datasets
 from yieldrep.features.nelson_siegel import build_nelson_siegel
 from yieldrep.features.pca import build_pca
 from yieldrep.features.targets import build_targets
+from yieldrep.models.baselines import evaluate_baselines
 from yieldrep.visualization.plotly_curves import plot_curves
 from yieldrep.visualization.plotly_nelson_siegel import plot_nelson_siegel
 from yieldrep.visualization.plotly_pca import plot_pca
@@ -66,6 +67,13 @@ def build_modeling_datasets_command(config: Path = Path("configs/default.yaml"))
     project_config = load_config(config)
     for output_path in build_modeling_datasets(project_config):
         typer.echo(output_path)
+
+
+@app.command("evaluate-baselines")
+def evaluate_baselines_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Evaluate simple forecasting baselines."""
+    project_config = load_config(config)
+    typer.echo(evaluate_baselines(project_config))
 
 
 @app.command("plot-pca")

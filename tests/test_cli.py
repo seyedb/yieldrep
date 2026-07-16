@@ -279,6 +279,63 @@ def test_build_modeling_datasets_command_writes_outputs(tmp_path: Path) -> None:
     assert "pca_targets.parquet" in result.stdout
 
 
+def test_evaluate_baselines_command_writes_metrics(tmp_path: Path) -> None:
+    modeling_dir = tmp_path / "data" / "processed" / "modeling"
+    modeling_dir.mkdir(parents=True)
+    dates = pd.date_range("2024-01-01", periods=12)
+    pca_rows = []
+    ns_rows = []
+    for index, date in enumerate(dates):
+        common = {
+            "date": date,
+            "country": "US",
+            "maturity_years": 2.0,
+            "horizon_days": 1,
+            "yield": 4.0,
+            "future_yield": 4.0 + index * 0.01,
+            "target_yield_change": index * 0.01,
+        }
+        pca_rows.append({**common, "PC1": float(index)})
+        ns_rows.append(
+            {
+                **common,
+                "beta_level": float(index),
+                "beta_slope": -1.0,
+                "beta_curvature": 0.5,
+                "rmse": 0.01,
+            }
+        )
+    pd.DataFrame(pca_rows).to_parquet(modeling_dir / "pca_targets.parquet", index=False)
+    pd.DataFrame(ns_rows).to_parquet(
+        modeling_dir / "nelson_siegel_targets.parquet",
+        index=False,
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                f"data_dir: {tmp_path / 'data'}",
+                f"reports_dir: {tmp_path / 'reports'}",
+                "evaluation:",
+                "  test_fraction: 0.25",
+                "  ridge_alpha: 1.0",
+                "sources:",
+                "  test:",
+                "    country: US",
+                "    source: test",
+                f"    raw_file: {tmp_path / 'raw.csv'}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["evaluate-baselines", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert (tmp_path / "data" / "processed" / "evaluation" / "baseline_metrics.parquet").exists()
+    assert "baseline_metrics.parquet" in result.stdout
+
+
 def test_plot_pca_command_writes_html_outputs(tmp_path: Path) -> None:
     pca_dir = tmp_path / "data" / "processed" / "pca"
     pca_dir.mkdir(parents=True)

@@ -12,6 +12,10 @@ nelson_siegel:
 targets:
   horizons_days: [1, 5, 20]
 
+evaluation:
+  test_fraction: 0.2
+  ridge_alpha: 1.0
+
 plots:
   selected_maturities: [0.25, 1.0, 2.0, 5.0, 10.0, 30.0]
 

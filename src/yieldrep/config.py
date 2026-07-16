@@ -28,6 +28,11 @@ class TargetConfig(BaseModel):
     horizons_days: list[int] = Field(default_factory=lambda: [1, 5, 20])
 
 
+class EvaluationConfig(BaseModel):
+    test_fraction: float = 0.2
+    ridge_alpha: float = 1.0
+
+
 class PlotConfig(BaseModel):
     selected_maturities: list[float] = Field(
         default_factory=lambda: [0.25, 1.0, 2.0, 5.0, 10.0, 30.0]
@@ -41,6 +46,7 @@ class ProjectConfig(BaseModel):
     pca: PCAConfig = Field(default_factory=PCAConfig)
     nelson_siegel: NelsonSiegelConfig = Field(default_factory=NelsonSiegelConfig)
     targets: TargetConfig = Field(default_factory=TargetConfig)
+    evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     plots: PlotConfig = Field(default_factory=PlotConfig)
 
     @property
@@ -78,6 +84,14 @@ class ProjectConfig(BaseModel):
     @property
     def modeling_dir(self) -> Path:
         return self.processed_dir / "modeling"
+
+    @property
+    def evaluation_dir(self) -> Path:
+        return self.processed_dir / "evaluation"
+
+    @property
+    def baseline_metrics_path(self) -> Path:
+        return self.evaluation_dir / "baseline_metrics.parquet"
 
 
 def load_config(path: Path) -> ProjectConfig:
