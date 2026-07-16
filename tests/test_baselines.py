@@ -1,9 +1,10 @@
+import pytest
 from pathlib import Path
 
 import pandas as pd
 
 from yieldrep.config import EvaluationConfig, ProjectConfig, SourceConfig
-from yieldrep.models.baselines import evaluate_baselines
+from yieldrep.models.baselines import date_ordered_split, evaluate_baselines
 
 
 def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
@@ -30,10 +31,40 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
     assert output_path == tmp_path / "data" / "processed" / "evaluation" / "baseline_metrics.parquet"
     assert set(metrics["representation"]) == {"pca", "nelson_siegel"}
     assert set(metrics["model"]) == {"train_mean", "ridge"}
+    assert set(metrics["split_method"]) == {"date_ordered"}
     assert set(metrics["horizon_days"]) == {1, 5}
-    assert {"rmse", "mae", "directional_accuracy", "train_rows", "test_rows"}.issubset(
-        metrics.columns
-    )
+    assert {
+        "rmse",
+        "mae",
+        "directional_accuracy",
+        "train_rows",
+        "test_rows",
+        "train_dates",
+        "test_dates",
+    }.issubset(metrics.columns)
+    assert set(metrics["train_dates"]) == {9}
+    assert set(metrics["test_dates"]) == {3}
+
+
+def test_date_ordered_split_keeps_dates_disjoint() -> None:
+    data = _sample_modeling_data(feature_prefix="pca")
+
+    train, test = date_ordered_split(data, test_fraction=0.25)
+
+    train_dates = set(train["date"])
+    test_dates = set(test["date"])
+    assert train_dates.isdisjoint(test_dates)
+    assert len(train_dates) == 9
+    assert len(test_dates) == 3
+    assert len(train) == 18
+    assert len(test) == 6
+
+
+def test_date_ordered_split_rejects_invalid_fraction() -> None:
+    data = _sample_modeling_data(feature_prefix="pca")
+
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        date_ordered_split(data, test_fraction=0.0)
 
 
 def _sample_modeling_data(feature_prefix: str) -> pd.DataFrame:

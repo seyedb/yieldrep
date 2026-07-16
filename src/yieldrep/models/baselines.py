@@ -17,6 +17,7 @@ TARGET_COLUMN = "target_yield_change"
 GROUP_COLUMNS = ["country", "horizon_days"]
 PCA_FEATURES = ["PC1", "PC2", "PC3", "PC4", "PC5"]
 NELSON_SIEGEL_FEATURES = ["beta_level", "beta_slope", "beta_curvature", "rmse"]
+SPLIT_METHOD = "date_ordered"
 
 
 @dataclass(frozen=True)
@@ -64,14 +65,14 @@ def _evaluate_representation(
     for group_values, group in data.groupby(GROUP_COLUMNS, sort=True):
         country, horizon_days = group_values
         group = group.sort_values("date").dropna(subset=[*feature_columns, TARGET_COLUMN])
-        split = int(len(group) * (1.0 - config.evaluation.test_fraction))
-        if split <= 0 or split >= len(group):
+        train, test = date_ordered_split(group, test_fraction=config.evaluation.test_fraction)
+        if train.empty or test.empty:
             continue
 
-        x_train = group.iloc[:split][feature_columns].to_numpy(dtype=float)
-        y_train = group.iloc[:split][TARGET_COLUMN].to_numpy(dtype=float)
-        x_test = group.iloc[split:][feature_columns].to_numpy(dtype=float)
-        y_test = group.iloc[split:][TARGET_COLUMN].to_numpy(dtype=float)
+        x_train = train[feature_columns].to_numpy(dtype=float)
+        y_train = train[TARGET_COLUMN].to_numpy(dtype=float)
+        x_test = test[feature_columns].to_numpy(dtype=float)
+        y_test = test[TARGET_COLUMN].to_numpy(dtype=float)
 
         rows.append(
             _metric_row(
@@ -83,6 +84,8 @@ def _evaluate_representation(
                 y_pred=np.full_like(y_test, fill_value=float(np.mean(y_train))),
                 train_rows=len(y_train),
                 test_rows=len(y_test),
+                train_dates=train["date"].nunique(),
+                test_dates=test["date"].nunique(),
             )
         )
 
@@ -101,10 +104,33 @@ def _evaluate_representation(
                 y_pred=model.predict(x_test),
                 train_rows=len(y_train),
                 test_rows=len(y_test),
+                train_dates=train["date"].nunique(),
+                test_dates=test["date"].nunique(),
             )
         )
 
     return rows
+
+
+def date_ordered_split(
+    data: pd.DataFrame,
+    test_fraction: float,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Split by unique dates so all maturities for a date remain together."""
+    if not 0 < test_fraction < 1:
+        raise ValueError("test_fraction must be between 0 and 1")
+
+    dates = pd.Index(sorted(pd.to_datetime(data["date"]).unique()))
+    split_index = int(len(dates) * (1.0 - test_fraction))
+    if split_index <= 0 or split_index >= len(dates):
+        return data.iloc[0:0].copy(), data.iloc[0:0].copy()
+
+    train_dates = set(dates[:split_index])
+    test_dates = set(dates[split_index:])
+    normalized_dates = pd.to_datetime(data["date"])
+    train = data.loc[normalized_dates.isin(train_dates)].copy()
+    test = data.loc[normalized_dates.isin(test_dates)].copy()
+    return train, test
 
 
 def _metric_row(
@@ -116,10 +142,13 @@ def _metric_row(
     y_pred: NDArray[np.float64],
     train_rows: int,
     test_rows: int,
+    train_dates: int,
+    test_dates: int,
 ) -> dict[str, object]:
     return {
         "representation": representation,
         "model": model,
+        "split_method": SPLIT_METHOD,
         "country": country,
         "horizon_days": horizon_days,
         "rmse": rmse(y_true, y_pred),
@@ -127,4 +156,6 @@ def _metric_row(
         "directional_accuracy": directional_accuracy(y_true, y_pred),
         "train_rows": train_rows,
         "test_rows": test_rows,
+        "train_dates": train_dates,
+        "test_dates": test_dates,
     }
