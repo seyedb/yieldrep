@@ -190,9 +190,9 @@ Directional accuracy:
 \sum_i
 \mathbf{1}
 \left[
-\operatorname{sign}(y_i)
+\mathrm{sign}(y_i)
 =
-\operatorname{sign}(\hat{y}_i)
+\mathrm{sign}(\hat{y}_i)
 \right]
 ```
 
