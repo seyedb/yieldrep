@@ -1,27 +1,31 @@
 # Methodology
 
-This project studies whether low-dimensional representations of sovereign yield
-curves contain useful information for forecasting future curve moves.
+This note defines the current research setup for yield curve representations,
+targets, and baseline evaluation.
 
 ## Curve Panel
 
-For a country \(c\), date \(t\), and maturity \(m\), let
+For country \(c\), date \(t\), and maturity \(m\), let the observed zero-coupon
+yield be:
 
-\[
+```math
 r_t^{(c,m)}
-\]
+```
 
-denote the observed zero-coupon yield. A yield curve at date \(t\) can be viewed
-as a vector across maturities:
+A yield curve at date \(t\) is the vector of yields across maturities:
 
-\[
-\mathbf{r}_t^{(c)} =
+```math
+\mathbf{r}_t^{(c)}
+=
 \left[
-r_t^{(c,m_1)}, r_t^{(c,m_2)}, \ldots, r_t^{(c,m_M)}
-\right].
-\]
+r_t^{(c,m_1)},
+r_t^{(c,m_2)},
+\ldots,
+r_t^{(c,m_M)}
+\right]
+```
 
-The normalized dataset stores this panel in long format with:
+The normalized dataset stores this panel in long format:
 
 ```text
 date, country, maturity_years, yield, source
@@ -29,37 +33,50 @@ date, country, maturity_years, yield, source
 
 ## PCA Representation
 
-Principal component analysis provides a linear statistical representation of the
-yield curve. For each country, curves are pivoted into a date-by-maturity matrix
-and standardized by maturity. PCA then finds orthogonal directions of maximum
-historical variation:
+Principal component analysis treats each daily curve as a vector and finds the
+orthogonal linear directions that explain the most historical variation.
 
-\[
-\mathbf{z}_t^{(c)} =
+For country \(c\), the PCA representation at date \(t\) is:
+
+```math
+\mathbf{z}_t^{(c)}
+=
 \left[
-PC_{1,t}^{(c)}, PC_{2,t}^{(c)}, \ldots, PC_{K,t}^{(c)}
-\right].
-\]
+PC_{1,t}^{(c)},
+PC_{2,t}^{(c)},
+\ldots,
+PC_{K,t}^{(c)}
+\right]
+```
 
-In rates applications, the first few principal components often resemble level,
-slope, and curvature factors, although signs and exact shapes are sample
-dependent. PCA is a strong classical benchmark because it is simple, linear, and
-usually explains most yield-curve variance with a small number of factors.
+In rates applications, the first few principal components often resemble:
+
+```text
+PC1  level
+PC2  slope
+PC3  curvature
+```
+
+This interpretation is approximate. Signs are arbitrary, and exact shapes depend
+on the sample window, maturities, and scaling.
 
 ## Nelson-Siegel Representation
 
-The Nelson-Siegel model imposes economically interpretable factor shapes. For
-maturity \(m\) and fixed decay parameter \(\tau\):
+Nelson-Siegel imposes three parametric factor shapes: level, slope, and
+curvature. For maturity \(m\) and fixed decay parameter \(\tau\):
 
-\[
-r(m) =
+```math
+r(m)
+=
 \beta_0
-+ \beta_1 \frac{1 - e^{-m/\tau}}{m/\tau}
++ \beta_1
+\frac{1 - e^{-m/\tau}}{m/\tau}
 + \beta_2
 \left(
-\frac{1 - e^{-m/\tau}}{m/\tau} - e^{-m/\tau}
-\right).
-\]
+\frac{1 - e^{-m/\tau}}{m/\tau}
+- e^{-m/\tau}
+\right)
+```
 
 The coefficients are interpreted as:
 
@@ -70,76 +87,119 @@ beta_curvature  intermediate-maturity hump or belly
 ```
 
 With \(\tau\) fixed, the betas are estimated by ordinary least squares for each
-country and date. The fitted residuals and RMSE are stored as diagnostics of how
-well the parametric curve matches the observed curve.
+country and date. The fitted residuals and RMSE measure how well the parametric
+curve matches the observed curve.
 
 ## Prediction Target
 
 For horizon \(h\), the current target is the forward yield change:
 
-\[
-y_{t,h}^{(c,m)} =
-r_{t+h}^{(c,m)} - r_t^{(c,m)}.
-\]
+```math
+y_{t,h}^{(c,m)}
+=
+r_{t+h}^{(c,m)}
+- r_t^{(c,m)}
+```
 
-The default horizons are 1, 5, and 20 available observations. In the current
-dataset this corresponds to business-day-style steps, not exact calendar days.
+The default horizons are 1, 5, and 20 available observations. These are
+observation steps, not exact calendar days.
 
 ## Baseline Forecasting Evaluation
 
-The current supervised evaluation joins representation features to the target:
+The supervised dataset joins representation features to the target:
 
-\[
-\hat{y}_{t,h}^{(c,m)} = f(\mathbf{x}_t^{(c)}),
-\]
+```math
+y_{t,h}^{(c,m)}
+=
+f\left(\mathbf{x}_t^{(c)}\right)
++ \varepsilon_{t,h}^{(c,m)}
+```
 
 where \(\mathbf{x}_t^{(c)}\) is either a PCA feature vector or a Nelson-Siegel
 feature vector.
 
-The first model is a naive train-mean predictor:
+Current feature sets:
 
-\[
-\hat{y} = \frac{1}{N_{\text{train}}}\sum_{i \in \text{train}} y_i.
-\]
+```text
+PCA:
+    PC1, PC2, PC3, PC4, PC5
 
-The second model is Ridge regression:
+Nelson-Siegel:
+    beta_level, beta_slope, beta_curvature, rmse
+```
 
-\[
+The naive benchmark predicts the training-sample mean:
+
+```math
+\hat{y}
+=
+\frac{1}{N_{\text{train}}}
+\sum_{i \in \text{train}} y_i
+```
+
+The linear benchmark is Ridge regression:
+
+```math
 \min_{\alpha,\beta}
 \sum_i
 \left(
-y_i - \alpha - \mathbf{x}_i^\top \beta
+y_i
+- \alpha
+- \mathbf{x}_i^\top \beta
 \right)^2
-+ \lambda \lVert \beta \rVert_2^2.
-\]
++ \lambda \lVert \beta \rVert_2^2
+```
 
-Metrics are computed on the held-out test sample:
+Ridge is ordinary least squares with an L2 penalty. The penalty helps stabilize
+coefficients when factors are correlated or noisy.
 
-\[
-RMSE = \sqrt{\frac{1}{N}\sum_i (y_i - \hat{y}_i)^2}
-\]
+## Metrics
 
-\[
-MAE = \frac{1}{N}\sum_i |y_i - \hat{y}_i|
-\]
+RMSE:
 
-\[
+```math
+RMSE
+=
+\sqrt{
+\frac{1}{N}
+\sum_i
+\left(
+y_i - \hat{y}_i
+\right)^2
+}
+```
+
+MAE:
+
+```math
+MAE
+=
+\frac{1}{N}
+\sum_i
+\left|
+y_i - \hat{y}_i
+\right|
+```
+
+Directional accuracy:
+
+```math
 \text{Directional Accuracy}
 =
 \frac{1}{N}
 \sum_i
 \mathbf{1}
 \left[
-\operatorname{sign}(y_i) =
+\operatorname{sign}(y_i)
+=
 \operatorname{sign}(\hat{y}_i)
-\right].
-\]
-
-This is a first sanity-check evaluation, not a final forecasting protocol.
+\right]
+```
 
 ## Current Limitations
 
-The current evaluation intentionally stays simple. Important next improvements:
+The current evaluation is a first sanity check, not a final forecasting protocol.
+Important next improvements:
 
 - Use date-level train/test splits so all maturities from the same date remain
   in the same split.
