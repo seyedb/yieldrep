@@ -34,8 +34,9 @@ PYTHONPATH=src python -m yieldrep.cli plot-pca --config configs/default.yaml
 Generated data is written under `data/`; generated figures are written under
 `reports/figures/`.
 
-## Development Note
+**Development Note**
 
-This project is developed as a learning and research effort with AI assistance for
-code generation, refactoring, and documentation. Design decisions, review, testing,
-and project direction are handled by the author.
+AI tools are used to assist with code generation, refactoring, and documentation.
+All research questions, architectural decisions, experimental design,
+implementation review, and interpretation of results are determined by the
+author.
