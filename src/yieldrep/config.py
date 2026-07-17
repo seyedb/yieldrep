@@ -31,6 +31,7 @@ class TargetConfig(BaseModel):
 class EvaluationConfig(BaseModel):
     test_fraction: float = 0.2
     ridge_alpha: float = 1.0
+    lag_days: list[int] = Field(default_factory=lambda: [1, 5, 20])
 
 
 class PlotConfig(BaseModel):

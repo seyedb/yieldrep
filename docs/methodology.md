@@ -115,8 +115,8 @@ f\left(\mathbf{x}_t^{(c)}\right)
 + \varepsilon_{t,h}^{(c,m)}
 ```
 
-where \(\mathbf{x}_t^{(c)}\) is either a PCA feature vector or a Nelson-Siegel
-feature vector.
+where \(\mathbf{x}_t^{(c)}\) is a baseline representation available at date
+\(t\).
 
 Current feature sets:
 
@@ -126,7 +126,23 @@ PCA:
 
 Nelson-Siegel:
     beta_level, beta_slope, beta_curvature, rmse
+
+Lagged yield changes:
+    lag_1_change, lag_5_change, lag_20_change
 ```
+
+The lagged baseline uses recent maturity-specific curve moves:
+
+```math
+\Delta_\ell r_t^{(c,m)}
+=
+r_t^{(c,m)}
+-
+r_{t-\ell}^{(c,m)}
+```
+
+These features test whether factor representations add value beyond simple
+autoregressive information in each yield point.
 
 The naive benchmark predicts the training-sample mean:
 
@@ -222,8 +238,8 @@ Important next improvements:
 
 - Add walk-forward or expanding-window validation.
 - Report finer metrics by individual maturity and market regime.
-- Add stronger classical baselines, including lagged yield changes,
-  slope/curvature features, and carry/roll-down proxies.
+- Add stronger classical baselines, including slope/curvature features and
+  carry/roll-down proxies.
 - Evaluate residual and relative-value targets, not only outright yield changes.
 - Add volatility and curve-state transition targets.
 - Only after the classical pipeline is stable, compare against learned

@@ -2,8 +2,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from yieldrep.config import ProjectConfig, SourceConfig
-from yieldrep.evaluation.datasets import build_modeling_datasets
+import pytest
+
+from yieldrep.config import EvaluationConfig, ProjectConfig, SourceConfig
+from yieldrep.evaluation.datasets import build_modeling_datasets, make_lagged_yield_change_features
 
 
 def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> None:
@@ -14,6 +16,7 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     ns_dir.mkdir(parents=True)
 
     dates = pd.date_range("2024-01-01", periods=2)
+    _sample_curves().to_parquet(processed_dir / "curves.parquet", index=False)
     pd.DataFrame(
         {
             "date": dates,
@@ -44,6 +47,7 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         data_dir=tmp_path / "data",
         reports_dir=tmp_path / "reports",
         sources={"test": SourceConfig(country="US", source="test", raw_file=tmp_path / "raw.csv")},
+        evaluation=EvaluationConfig(lag_days=[1]),
     )
 
     output_paths = build_modeling_datasets(config)
@@ -51,12 +55,36 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     assert output_paths == [
         processed_dir / "modeling" / "pca_targets.parquet",
         processed_dir / "modeling" / "nelson_siegel_targets.parquet",
+        processed_dir / "modeling" / "lagged_targets.parquet",
     ]
     pca_targets = pd.read_parquet(processed_dir / "modeling" / "pca_targets.parquet")
     ns_targets = pd.read_parquet(processed_dir / "modeling" / "nelson_siegel_targets.parquet")
+    lagged_targets = pd.read_parquet(processed_dir / "modeling" / "lagged_targets.parquet")
     assert {"PC1", "PC2", "target_yield_change"}.issubset(pca_targets.columns)
     assert {"beta_level", "beta_slope", "beta_curvature", "target_yield_change"}.issubset(
         ns_targets.columns
     )
     assert len(pca_targets) == 2
     assert len(ns_targets) == 2
+    assert {"lag_1_change", "target_yield_change"}.issubset(lagged_targets.columns)
+    assert len(lagged_targets) == 1
+
+
+def test_make_lagged_yield_change_features() -> None:
+    features = make_lagged_yield_change_features(_sample_curves(), lag_days=[1, 2])
+
+    assert features["lag_1_change"].tolist() == pytest.approx([0.1, 0.1])
+    assert features["lag_2_change"].tolist() == pytest.approx([0.2, 0.2])
+
+
+def _sample_curves() -> pd.DataFrame:
+    dates = pd.date_range("2024-01-01", periods=4)
+    return pd.DataFrame(
+        {
+            "date": dates,
+            "country": ["US"] * 4,
+            "maturity_years": [2.0] * 4,
+            "yield": [4.0, 4.1, 4.2, 4.3],
+            "source": ["test"] * 4,
+        }
+    )

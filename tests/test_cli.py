@@ -234,6 +234,15 @@ def test_build_modeling_datasets_command_writes_outputs(tmp_path: Path) -> None:
             "date": dates,
             "country": ["US", "US"],
             "maturity_years": [2.0, 2.0],
+            "yield": [4.0, 4.1],
+            "source": ["test", "test"],
+        }
+    ).to_parquet(processed_dir / "curves.parquet", index=False)
+    pd.DataFrame(
+        {
+            "date": dates,
+            "country": ["US", "US"],
+            "maturity_years": [2.0, 2.0],
             "horizon_days": [1, 1],
             "yield": [4.0, 4.1],
             "future_yield": [4.1, 4.2],
@@ -261,6 +270,8 @@ def test_build_modeling_datasets_command_writes_outputs(tmp_path: Path) -> None:
             [
                 f"data_dir: {tmp_path / 'data'}",
                 f"reports_dir: {tmp_path / 'reports'}",
+                "evaluation:",
+                "  lag_days: [1]",
                 "sources:",
                 "  test:",
                 "    country: US",
@@ -276,6 +287,7 @@ def test_build_modeling_datasets_command_writes_outputs(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert (processed_dir / "modeling" / "pca_targets.parquet").exists()
     assert (processed_dir / "modeling" / "nelson_siegel_targets.parquet").exists()
+    assert (processed_dir / "modeling" / "lagged_targets.parquet").exists()
     assert "pca_targets.parquet" in result.stdout
 
 

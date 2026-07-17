@@ -15,6 +15,7 @@ targets:
 evaluation:
   test_fraction: 0.2
   ridge_alpha: 1.0
+  lag_days: [1, 5, 20]
 
 plots:
   selected_maturities: [0.25, 1.0, 2.0, 5.0, 10.0, 30.0]

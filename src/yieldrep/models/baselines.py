@@ -41,6 +41,11 @@ def evaluate_baselines(config: ProjectConfig) -> Path:
             path=config.modeling_dir / "nelson_siegel_targets.parquet",
             features=NELSON_SIEGEL_FEATURES,
         ),
+        EvaluationSpec(
+            representation="lagged",
+            path=config.modeling_dir / "lagged_targets.parquet",
+            features=[f"lag_{lag}_change" for lag in config.evaluation.lag_days],
+        ),
     ]
 
     rows: list[dict[str, object]] = []
@@ -84,6 +89,9 @@ def _evaluate_representation(
         train, test = date_ordered_split(group, test_fraction=config.evaluation.test_fraction)
         if train.empty or test.empty:
             continue
+        country = str(group_key["country"])
+        horizon_days = int(str(group_key["horizon_days"]))
+        maturity_bucket_value = group_key.get("maturity_bucket")
 
         x_train = train[feature_columns].to_numpy(dtype=float)
         y_train = train[TARGET_COLUMN].to_numpy(dtype=float)
@@ -94,15 +102,15 @@ def _evaluate_representation(
             _metric_row(
                 representation=spec.representation,
                 model="train_mean",
-                country=str(group_key["country"]),
-                horizon_days=int(group_key["horizon_days"]),
+                country=country,
+                horizon_days=horizon_days,
                 y_true=y_test,
                 y_pred=np.full_like(y_test, fill_value=float(np.mean(y_train))),
                 train_rows=len(y_train),
                 test_rows=len(y_test),
                 train_dates=train["date"].nunique(),
                 test_dates=test["date"].nunique(),
-                maturity_bucket=group_key.get("maturity_bucket"),
+                maturity_bucket=maturity_bucket_value,
             )
         )
 
@@ -115,15 +123,15 @@ def _evaluate_representation(
             _metric_row(
                 representation=spec.representation,
                 model="ridge",
-                country=str(group_key["country"]),
-                horizon_days=int(group_key["horizon_days"]),
+                country=country,
+                horizon_days=horizon_days,
                 y_true=y_test,
                 y_pred=model.predict(x_test),
                 train_rows=len(y_train),
                 test_rows=len(y_test),
                 train_dates=train["date"].nunique(),
                 test_dates=test["date"].nunique(),
-                maturity_bucket=group_key.get("maturity_bucket"),
+                maturity_bucket=maturity_bucket_value,
             )
         )
 

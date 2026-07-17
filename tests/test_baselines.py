@@ -18,6 +18,10 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
         modeling_dir / "nelson_siegel_targets.parquet",
         index=False,
     )
+    _sample_modeling_data(feature_prefix="lagged").to_parquet(
+        modeling_dir / "lagged_targets.parquet",
+        index=False,
+    )
     config = ProjectConfig(
         data_dir=tmp_path / "data",
         reports_dir=tmp_path / "reports",
@@ -32,7 +36,7 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
     )
 
     assert output_path == tmp_path / "data" / "processed" / "evaluation" / "baseline_metrics.parquet"
-    assert set(metrics["representation"]) == {"pca", "nelson_siegel"}
+    assert set(metrics["representation"]) == {"pca", "nelson_siegel", "lagged"}
     assert set(metrics["model"]) == {"train_mean", "ridge"}
     assert set(metrics["split_method"]) == {"date_ordered"}
     assert set(metrics["horizon_days"]) == {1, 5}
@@ -48,7 +52,7 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
     assert set(metrics["train_dates"]) == {9}
     assert set(metrics["test_dates"]) == {3}
     assert set(maturity_metrics["maturity_bucket"]) == {"front_end", "belly", "long_end"}
-    assert set(maturity_metrics["representation"]) == {"pca", "nelson_siegel"}
+    assert set(maturity_metrics["representation"]) == {"pca", "nelson_siegel", "lagged"}
 
 
 def test_date_ordered_split_keeps_dates_disjoint() -> None:
@@ -95,13 +99,21 @@ def _sample_modeling_data(feature_prefix: str) -> pd.DataFrame:
                 }
                 if feature_prefix == "pca":
                     row.update({"PC1": float(index), "PC2": float(horizon)})
-                else:
+                elif feature_prefix == "ns":
                     row.update(
                         {
                             "beta_level": float(index),
                             "beta_slope": float(horizon),
                             "beta_curvature": float(index + horizon),
                             "rmse": 0.01,
+                        }
+                    )
+                else:
+                    row.update(
+                        {
+                            "lag_1_change": index * 0.001,
+                            "lag_5_change": index * 0.002,
+                            "lag_20_change": index * 0.003,
                         }
                     )
                 rows.append(row)

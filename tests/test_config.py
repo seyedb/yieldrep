@@ -37,4 +37,5 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.targets.horizons_days == [1, 5, 20]
     assert config.evaluation.test_fraction == 0.2
     assert config.evaluation.ridge_alpha == 1.0
+    assert config.evaluation.lag_days == [1, 5, 20]
     assert config.plots.selected_maturities == [0.25, 1.0, 2.0, 5.0, 10.0, 30.0]
