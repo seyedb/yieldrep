@@ -4,7 +4,12 @@ from pathlib import Path
 import pandas as pd
 
 from yieldrep.config import EvaluationConfig, ProjectConfig, SourceConfig
-from yieldrep.models.baselines import date_ordered_split, evaluate_baselines, maturity_bucket
+from yieldrep.models.baselines import (
+    date_ordered_split,
+    evaluate_baselines,
+    maturity_bucket,
+    walk_forward_splits,
+)
 
 
 def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
@@ -74,6 +79,62 @@ def test_date_ordered_split_rejects_invalid_fraction() -> None:
 
     with pytest.raises(ValueError, match="between 0 and 1"):
         date_ordered_split(data, test_fraction=0.0)
+
+
+def test_evaluate_baselines_supports_walk_forward(tmp_path: Path) -> None:
+    modeling_dir = tmp_path / "data" / "processed" / "modeling"
+    modeling_dir.mkdir(parents=True)
+    _sample_modeling_data(feature_prefix="pca").to_parquet(
+        modeling_dir / "pca_targets.parquet",
+        index=False,
+    )
+    config = ProjectConfig(
+        data_dir=tmp_path / "data",
+        reports_dir=tmp_path / "reports",
+        sources={"test": SourceConfig(country="US", source="test", raw_file=tmp_path / "raw.csv")},
+        evaluation=EvaluationConfig(
+            method="walk_forward",
+            min_train_dates=6,
+            test_window_dates=3,
+            step_dates=3,
+        ),
+    )
+
+    output_path = evaluate_baselines(config)
+    metrics = pd.read_parquet(output_path)
+
+    assert set(metrics["split_method"]) == {"walk_forward"}
+    assert set(metrics["window_id"]) == {0, 1}
+    assert set(metrics["train_dates"]) == {6, 9}
+    assert set(metrics["test_dates"]) == {3}
+
+
+def test_walk_forward_splits_use_expanding_training_window() -> None:
+    data = _sample_modeling_data(feature_prefix="pca")
+
+    splits = walk_forward_splits(
+        data,
+        min_train_dates=6,
+        test_window_dates=3,
+        step_dates=3,
+    )
+
+    assert [split.window_id for split in splits] == [0, 1]
+    assert [split.train["date"].nunique() for split in splits] == [6, 9]
+    assert [split.test["date"].nunique() for split in splits] == [3, 3]
+    assert set(splits[0].train["date"]).isdisjoint(set(splits[0].test["date"]))
+
+
+def test_walk_forward_splits_reject_invalid_windows() -> None:
+    data = _sample_modeling_data(feature_prefix="pca")
+
+    with pytest.raises(ValueError, match="min_train_dates"):
+        walk_forward_splits(
+            data,
+            min_train_dates=0,
+            test_window_dates=3,
+            step_dates=3,
+        )
 
 
 def test_maturity_bucket_maps_curve_segments() -> None:

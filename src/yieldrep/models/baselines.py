@@ -18,14 +18,20 @@ GROUP_COLUMNS = ["country", "horizon_days"]
 MATURITY_GROUP_COLUMNS = ["country", "horizon_days", "maturity_bucket"]
 PCA_FEATURES = ["PC1", "PC2", "PC3", "PC4", "PC5"]
 NELSON_SIEGEL_FEATURES = ["beta_level", "beta_slope", "beta_curvature", "rmse"]
-SPLIT_METHOD = "date_ordered"
-
 
 @dataclass(frozen=True)
 class EvaluationSpec:
     representation: str
     path: Path
     features: list[str]
+
+
+@dataclass(frozen=True)
+class SplitWindow:
+    method: str
+    window_id: int
+    train: pd.DataFrame
+    test: pd.DataFrame
 
 
 def evaluate_baselines(config: ProjectConfig) -> Path:
@@ -86,56 +92,89 @@ def _evaluate_representation(
     for group_values, group in data.groupby(group_columns, sort=True):
         group_key = dict(zip(group_columns, _as_tuple(group_values), strict=True))
         group = group.sort_values("date").dropna(subset=[*feature_columns, TARGET_COLUMN])
-        train, test = date_ordered_split(group, test_fraction=config.evaluation.test_fraction)
-        if train.empty or test.empty:
-            continue
         country = str(group_key["country"])
         horizon_days = int(str(group_key["horizon_days"]))
         maturity_bucket_value = group_key.get("maturity_bucket")
 
-        x_train = train[feature_columns].to_numpy(dtype=float)
-        y_train = train[TARGET_COLUMN].to_numpy(dtype=float)
-        x_test = test[feature_columns].to_numpy(dtype=float)
-        y_test = test[TARGET_COLUMN].to_numpy(dtype=float)
+        for split in evaluation_splits(
+            group,
+            method=config.evaluation.method,
+            test_fraction=config.evaluation.test_fraction,
+            min_train_dates=config.evaluation.min_train_dates,
+            test_window_dates=config.evaluation.test_window_dates,
+            step_dates=config.evaluation.step_dates,
+        ):
+            if split.train.empty or split.test.empty:
+                continue
 
-        rows.append(
-            _metric_row(
-                representation=spec.representation,
-                model="train_mean",
-                country=country,
-                horizon_days=horizon_days,
-                y_true=y_test,
-                y_pred=np.full_like(y_test, fill_value=float(np.mean(y_train))),
-                train_rows=len(y_train),
-                test_rows=len(y_test),
-                train_dates=train["date"].nunique(),
-                test_dates=test["date"].nunique(),
-                maturity_bucket=maturity_bucket_value,
-            )
-        )
+            x_train = split.train[feature_columns].to_numpy(dtype=float)
+            y_train = split.train[TARGET_COLUMN].to_numpy(dtype=float)
+            x_test = split.test[feature_columns].to_numpy(dtype=float)
+            y_test = split.test[TARGET_COLUMN].to_numpy(dtype=float)
 
-        model = make_pipeline(
-            StandardScaler(),
-            Ridge(alpha=config.evaluation.ridge_alpha),
-        )
-        model.fit(x_train, y_train)
-        rows.append(
-            _metric_row(
-                representation=spec.representation,
-                model="ridge",
-                country=country,
-                horizon_days=horizon_days,
-                y_true=y_test,
-                y_pred=model.predict(x_test),
-                train_rows=len(y_train),
-                test_rows=len(y_test),
-                train_dates=train["date"].nunique(),
-                test_dates=test["date"].nunique(),
-                maturity_bucket=maturity_bucket_value,
+            rows.append(
+                _metric_row(
+                    representation=spec.representation,
+                    model="train_mean",
+                    split_method=split.method,
+                    window_id=split.window_id,
+                    country=country,
+                    horizon_days=horizon_days,
+                    y_true=y_test,
+                    y_pred=np.full_like(y_test, fill_value=float(np.mean(y_train))),
+                    train_rows=len(y_train),
+                    test_rows=len(y_test),
+                    train_dates=split.train["date"].nunique(),
+                    test_dates=split.test["date"].nunique(),
+                    maturity_bucket=maturity_bucket_value,
+                )
             )
-        )
+
+            model = make_pipeline(
+                StandardScaler(),
+                Ridge(alpha=config.evaluation.ridge_alpha),
+            )
+            model.fit(x_train, y_train)
+            rows.append(
+                _metric_row(
+                    representation=spec.representation,
+                    model="ridge",
+                    split_method=split.method,
+                    window_id=split.window_id,
+                    country=country,
+                    horizon_days=horizon_days,
+                    y_true=y_test,
+                    y_pred=model.predict(x_test),
+                    train_rows=len(y_train),
+                    test_rows=len(y_test),
+                    train_dates=split.train["date"].nunique(),
+                    test_dates=split.test["date"].nunique(),
+                    maturity_bucket=maturity_bucket_value,
+                )
+            )
 
     return rows
+
+
+def evaluation_splits(
+    data: pd.DataFrame,
+    method: str,
+    test_fraction: float,
+    min_train_dates: int,
+    test_window_dates: int,
+    step_dates: int,
+) -> list[SplitWindow]:
+    if method == "date_ordered":
+        train, test = date_ordered_split(data, test_fraction=test_fraction)
+        return [SplitWindow(method=method, window_id=0, train=train, test=test)]
+    if method == "walk_forward":
+        return walk_forward_splits(
+            data,
+            min_train_dates=min_train_dates,
+            test_window_dates=test_window_dates,
+            step_dates=step_dates,
+        )
+    raise ValueError(f"Unsupported evaluation method: {method}")
 
 
 def date_ordered_split(
@@ -159,6 +198,44 @@ def date_ordered_split(
     return train, test
 
 
+def walk_forward_splits(
+    data: pd.DataFrame,
+    min_train_dates: int,
+    test_window_dates: int,
+    step_dates: int,
+) -> list[SplitWindow]:
+    """Create expanding-window chronological train/test splits."""
+    if min_train_dates <= 0:
+        raise ValueError("min_train_dates must be positive")
+    if test_window_dates <= 0:
+        raise ValueError("test_window_dates must be positive")
+    if step_dates <= 0:
+        raise ValueError("step_dates must be positive")
+
+    dates = pd.Index(sorted(pd.to_datetime(data["date"]).unique()))
+    normalized_dates = pd.to_datetime(data["date"])
+    splits: list[SplitWindow] = []
+    test_start = min_train_dates
+    window_id = 0
+    while test_start < len(dates):
+        test_end = min(test_start + test_window_dates, len(dates))
+        train_dates = set(dates[:test_start])
+        test_dates = set(dates[test_start:test_end])
+        train = data.loc[normalized_dates.isin(train_dates)].copy()
+        test = data.loc[normalized_dates.isin(test_dates)].copy()
+        splits.append(
+            SplitWindow(
+                method="walk_forward",
+                window_id=window_id,
+                train=train,
+                test=test,
+            )
+        )
+        window_id += 1
+        test_start += step_dates
+    return splits
+
+
 def maturity_bucket(maturity_years: pd.Series) -> pd.Series:
     """Map maturities into front-end, belly, and long-end buckets."""
     return pd.cut(
@@ -172,6 +249,8 @@ def maturity_bucket(maturity_years: pd.Series) -> pd.Series:
 def _metric_row(
     representation: str,
     model: str,
+    split_method: str,
+    window_id: int,
     country: str,
     horizon_days: int,
     y_true: NDArray[np.float64],
@@ -185,7 +264,8 @@ def _metric_row(
     row = {
         "representation": representation,
         "model": model,
-        "split_method": SPLIT_METHOD,
+        "split_method": split_method,
+        "window_id": window_id,
         "country": country,
         "horizon_days": horizon_days,
         "rmse": rmse(y_true, y_pred),

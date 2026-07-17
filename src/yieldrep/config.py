@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field
@@ -29,7 +29,11 @@ class TargetConfig(BaseModel):
 
 
 class EvaluationConfig(BaseModel):
+    method: Literal["date_ordered", "walk_forward"] = "date_ordered"
     test_fraction: float = 0.2
+    min_train_dates: int = 252
+    test_window_dates: int = 63
+    step_dates: int = 63
     ridge_alpha: float = 1.0
     lag_days: list[int] = Field(default_factory=lambda: [1, 5, 20])
 

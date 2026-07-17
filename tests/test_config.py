@@ -35,7 +35,11 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.nelson_siegel.tau == 1.5
     assert config.nelson_siegel.min_maturities == 3
     assert config.targets.horizons_days == [1, 5, 20]
+    assert config.evaluation.method == "date_ordered"
     assert config.evaluation.test_fraction == 0.2
+    assert config.evaluation.min_train_dates == 252
+    assert config.evaluation.test_window_dates == 63
+    assert config.evaluation.step_dates == 63
     assert config.evaluation.ridge_alpha == 1.0
     assert config.evaluation.lag_days == [1, 5, 20]
     assert config.plots.selected_maturities == [0.25, 1.0, 2.0, 5.0, 10.0, 30.0]

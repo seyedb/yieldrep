@@ -13,7 +13,11 @@ targets:
   horizons_days: [1, 5, 20]
 
 evaluation:
+  method: date_ordered
   test_fraction: 0.2
+  min_train_dates: 252
+  test_window_dates: 63
+  step_dates: 63
   ridge_alpha: 1.0
   lag_days: [1, 5, 20]
 

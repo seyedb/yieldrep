@@ -169,7 +169,7 @@ y_i
 Ridge is ordinary least squares with an L2 penalty. The penalty helps stabilize
 coefficients when factors are correlated or noisy.
 
-The current train/test split is date ordered. Within each country and forecast
+The default train/test split is date ordered. Within each country and forecast
 horizon, unique dates are sorted chronologically:
 
 ```text
@@ -179,6 +179,18 @@ test_dates  = last 20% of dates
 
 All maturities from the same date remain on the same side of the split. This
 avoids mixing observations from the same date across train and test samples.
+
+Walk-forward evaluation is also supported. Each split trains on an expanding
+history and tests on the next chronological block:
+
+```text
+window 0: train dates [0, T)      test dates [T, T + H)
+window 1: train dates [0, T + S)  test dates [T + S, T + S + H)
+```
+
+where \(T\) is the minimum number of training dates, \(H\) is the test-window
+length, and \(S\) is the step size. This better matches how forecasting models
+would be evaluated through time.
 
 Metrics are reported both overall and by maturity bucket:
 
@@ -236,7 +248,6 @@ Directional accuracy:
 The current evaluation is a first sanity check, not a final forecasting protocol.
 Important next improvements:
 
-- Add walk-forward or expanding-window validation.
 - Report finer metrics by individual maturity and market regime.
 - Add stronger classical baselines, including slope/curvature features and
   carry/roll-down proxies.
