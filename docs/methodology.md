@@ -153,6 +153,25 @@ y_i
 Ridge is ordinary least squares with an L2 penalty. The penalty helps stabilize
 coefficients when factors are correlated or noisy.
 
+The current train/test split is date ordered. Within each country and forecast
+horizon, unique dates are sorted chronologically:
+
+```text
+train_dates = first 80% of dates
+test_dates  = last 20% of dates
+```
+
+All maturities from the same date remain on the same side of the split. This
+avoids mixing observations from the same date across train and test samples.
+
+Metrics are reported both overall and by maturity bucket:
+
+```text
+front_end  maturity <= 2 years
+belly      2 years < maturity <= 10 years
+long_end   maturity > 10 years
+```
+
 ## Metrics
 
 RMSE:
@@ -201,10 +220,8 @@ Directional accuracy:
 The current evaluation is a first sanity check, not a final forecasting protocol.
 Important next improvements:
 
-- Use date-level train/test splits so all maturities from the same date remain
-  in the same split.
 - Add walk-forward or expanding-window validation.
-- Report metrics by country, maturity, horizon, and regime.
+- Report finer metrics by individual maturity and market regime.
 - Add stronger classical baselines, including lagged yield changes,
   slope/curvature features, and carry/roll-down proxies.
 - Evaluate residual and relative-value targets, not only outright yield changes.
