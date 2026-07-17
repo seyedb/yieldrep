@@ -9,7 +9,7 @@ from yieldrep.evaluation.datasets import build_modeling_datasets
 from yieldrep.features.curve import build_curve_features
 from yieldrep.features.nelson_siegel import build_nelson_siegel
 from yieldrep.features.pca import build_pca
-from yieldrep.features.targets import build_targets
+from yieldrep.features.targets import build_residual_targets, build_targets
 from yieldrep.models.baselines import evaluate_baselines
 from yieldrep.visualization.plotly_curves import plot_curves
 from yieldrep.visualization.plotly_nelson_siegel import plot_nelson_siegel
@@ -60,6 +60,13 @@ def build_targets_command(config: Path = Path("configs/default.yaml")) -> None:
     """Build forward yield-change prediction targets."""
     project_config = load_config(config)
     typer.echo(build_targets(project_config))
+
+
+@app.command("build-residual-targets")
+def build_residual_targets_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Build Nelson-Siegel residual-change prediction targets."""
+    project_config = load_config(config)
+    typer.echo(build_residual_targets(project_config))
 
 
 @app.command("build-curve-features")

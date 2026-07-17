@@ -104,6 +104,30 @@ r_{t+h}^{(c,m)}
 The default horizons are 1, 5, and 20 available observations. These are
 observation steps, not exact calendar days.
 
+The project also supports a Nelson-Siegel residual-change target. For fitted
+yield \(\hat{r}_t^{(c,m)}\), define the relative-value residual:
+
+```math
+e_t^{(c,m)}
+=
+r_t^{(c,m)}
+-
+\hat{r}_t^{(c,m)}
+```
+
+The residual target is:
+
+```math
+y_{t,h,\mathrm{resid}}^{(c,m)}
+=
+e_{t+h}^{(c,m)}
+-
+e_t^{(c,m)}
+```
+
+This target asks whether baseline representations help predict changes in
+richness or cheapness after removing the fitted Nelson-Siegel curve.
+
 ## Baseline Forecasting Evaluation
 
 The supervised dataset joins representation features to the target:
@@ -117,6 +141,9 @@ f\left(\mathbf{x}_t^{(c)}\right)
 
 where \(\mathbf{x}_t^{(c)}\) is a baseline representation available at date
 \(t\).
+
+Metrics include a target label so outright yield-change and residual-change
+tasks can be compared separately.
 
 Current feature sets:
 

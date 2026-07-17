@@ -28,6 +28,18 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
             "target_yield_change": [0.1, 0.1],
         }
     ).to_parquet(processed_dir / "targets.parquet", index=False)
+    pd.DataFrame(
+        {
+            "date": dates,
+            "country": ["US", "US"],
+            "maturity_years": [2.0, 2.0],
+            "horizon_days": [1, 1],
+            "residual": [0.01, 0.03],
+            "future_residual": [0.03, 0.02],
+            "target_residual_change": [0.02, -0.01],
+            "fitted_yield": [3.99, 4.07],
+        }
+    ).to_parquet(processed_dir / "residual_targets.parquet", index=False)
     pd.DataFrame({"date": dates, "PC1": [1.0, 1.1], "PC2": [0.1, 0.2]}).to_parquet(
         pca_dir / "us_scores.parquet",
         index=False,
@@ -68,11 +80,18 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         processed_dir / "modeling" / "nelson_siegel_targets.parquet",
         processed_dir / "modeling" / "lagged_targets.parquet",
         processed_dir / "modeling" / "curve_targets.parquet",
+        processed_dir / "modeling" / "pca_residual_targets.parquet",
+        processed_dir / "modeling" / "nelson_siegel_residual_targets.parquet",
+        processed_dir / "modeling" / "lagged_residual_targets.parquet",
+        processed_dir / "modeling" / "curve_residual_targets.parquet",
     ]
     pca_targets = pd.read_parquet(processed_dir / "modeling" / "pca_targets.parquet")
     ns_targets = pd.read_parquet(processed_dir / "modeling" / "nelson_siegel_targets.parquet")
     lagged_targets = pd.read_parquet(processed_dir / "modeling" / "lagged_targets.parquet")
     curve_targets = pd.read_parquet(processed_dir / "modeling" / "curve_targets.parquet")
+    pca_residual_targets = pd.read_parquet(
+        processed_dir / "modeling" / "pca_residual_targets.parquet"
+    )
     assert {"PC1", "PC2", "target_yield_change"}.issubset(pca_targets.columns)
     assert {"beta_level", "beta_slope", "beta_curvature", "target_yield_change"}.issubset(
         ns_targets.columns
@@ -83,6 +102,8 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     assert len(lagged_targets) == 1
     assert {"level", "slope_10y_2y", "target_yield_change"}.issubset(curve_targets.columns)
     assert len(curve_targets) == 2
+    assert {"PC1", "target_residual_change"}.issubset(pca_residual_targets.columns)
+    assert len(pca_residual_targets) == 2
 
 
 def test_make_lagged_yield_change_features() -> None:

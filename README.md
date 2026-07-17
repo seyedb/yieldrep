@@ -28,6 +28,7 @@ PYTHONPATH=src python -m yieldrep.cli ingest --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli normalize --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli build-pca --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli build-curve-features --config configs/default.yaml
+PYTHONPATH=src python -m yieldrep.cli build-residual-targets --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli plot-curves --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli plot-pca --config configs/default.yaml
 ```

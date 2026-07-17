@@ -45,6 +45,7 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
     )
 
     assert output_path == tmp_path / "data" / "processed" / "evaluation" / "baseline_metrics.parquet"
+    assert set(metrics["target"]) == {"yield_change"}
     assert set(metrics["representation"]) == {"pca", "nelson_siegel", "lagged", "curve"}
     assert set(metrics["model"]) == {"train_mean", "ridge"}
     assert set(metrics["split_method"]) == {"date_ordered"}
@@ -62,6 +63,28 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
     assert set(metrics["test_dates"]) == {3}
     assert set(maturity_metrics["maturity_bucket"]) == {"front_end", "belly", "long_end"}
     assert set(maturity_metrics["representation"]) == {"pca", "nelson_siegel", "lagged", "curve"}
+
+
+def test_evaluate_baselines_supports_residual_targets(tmp_path: Path) -> None:
+    modeling_dir = tmp_path / "data" / "processed" / "modeling"
+    modeling_dir.mkdir(parents=True)
+    _sample_modeling_data(feature_prefix="pca", target_column="target_residual_change").to_parquet(
+        modeling_dir / "pca_residual_targets.parquet",
+        index=False,
+    )
+    config = ProjectConfig(
+        data_dir=tmp_path / "data",
+        reports_dir=tmp_path / "reports",
+        sources={"test": SourceConfig(country="US", source="test", raw_file=tmp_path / "raw.csv")},
+        evaluation=EvaluationConfig(test_fraction=0.25, ridge_alpha=1.0),
+    )
+
+    output_path = evaluate_baselines(config)
+    metrics = pd.read_parquet(output_path)
+
+    assert set(metrics["target"]) == {"residual_change"}
+    assert set(metrics["representation"]) == {"pca"}
+    assert set(metrics["horizon_days"]) == {1, 5}
 
 
 def test_date_ordered_split_keeps_dates_disjoint() -> None:
@@ -147,7 +170,10 @@ def test_maturity_bucket_maps_curve_segments() -> None:
     assert buckets.tolist() == ["front_end", "front_end", "belly", "belly", "long_end"]
 
 
-def _sample_modeling_data(feature_prefix: str) -> pd.DataFrame:
+def _sample_modeling_data(
+    feature_prefix: str,
+    target_column: str = "target_yield_change",
+) -> pd.DataFrame:
     dates = pd.date_range("2024-01-01", periods=12)
     rows = []
     for horizon in [1, 5]:
@@ -160,7 +186,7 @@ def _sample_modeling_data(feature_prefix: str) -> pd.DataFrame:
                     "horizon_days": horizon,
                     "yield": 4.0,
                     "future_yield": 4.0 + index * 0.01 + maturity * 0.001,
-                    "target_yield_change": index * 0.01 + maturity * 0.001,
+                    target_column: index * 0.01 + maturity * 0.001,
                 }
                 if feature_prefix == "pca":
                     row.update({"PC1": float(index), "PC2": float(horizon)})

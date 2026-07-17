@@ -13,7 +13,6 @@ from sklearn.preprocessing import StandardScaler
 from yieldrep.config import ProjectConfig
 from yieldrep.evaluation.metrics import directional_accuracy, mae, rmse
 
-TARGET_COLUMN = "target_yield_change"
 GROUP_COLUMNS = ["country", "horizon_days"]
 MATURITY_GROUP_COLUMNS = ["country", "horizon_days", "maturity_bucket"]
 PCA_FEATURES = ["PC1", "PC2", "PC3", "PC4", "PC5"]
@@ -26,11 +25,14 @@ CURVE_FEATURES = [
     "long_slope_30y_10y",
 ]
 
+
 @dataclass(frozen=True)
 class EvaluationSpec:
     representation: str
     path: Path
     features: list[str]
+    target: str
+    target_column: str
 
 
 @dataclass(frozen=True)
@@ -43,28 +45,7 @@ class SplitWindow:
 
 def evaluate_baselines(config: ProjectConfig) -> Path:
     """Evaluate simple forecasting baselines on prepared modeling datasets."""
-    specs = [
-        EvaluationSpec(
-            representation="pca",
-            path=config.modeling_dir / "pca_targets.parquet",
-            features=PCA_FEATURES,
-        ),
-        EvaluationSpec(
-            representation="nelson_siegel",
-            path=config.modeling_dir / "nelson_siegel_targets.parquet",
-            features=NELSON_SIEGEL_FEATURES,
-        ),
-        EvaluationSpec(
-            representation="lagged",
-            path=config.modeling_dir / "lagged_targets.parquet",
-            features=[f"lag_{lag}_change" for lag in config.evaluation.lag_days],
-        ),
-        EvaluationSpec(
-            representation="curve",
-            path=config.modeling_dir / "curve_targets.parquet",
-            features=CURVE_FEATURES,
-        ),
-    ]
+    specs = _evaluation_specs(config)
 
     rows: list[dict[str, object]] = []
     maturity_rows: list[dict[str, object]] = []
@@ -103,7 +84,7 @@ def _evaluate_representation(
     rows: list[dict[str, object]] = []
     for group_values, group in data.groupby(group_columns, sort=True):
         group_key = dict(zip(group_columns, _as_tuple(group_values), strict=True))
-        group = group.sort_values("date").dropna(subset=[*feature_columns, TARGET_COLUMN])
+        group = group.sort_values("date").dropna(subset=[*feature_columns, spec.target_column])
         country = str(group_key["country"])
         horizon_days = int(str(group_key["horizon_days"]))
         maturity_bucket_value = group_key.get("maturity_bucket")
@@ -120,12 +101,13 @@ def _evaluate_representation(
                 continue
 
             x_train = split.train[feature_columns].to_numpy(dtype=float)
-            y_train = split.train[TARGET_COLUMN].to_numpy(dtype=float)
+            y_train = split.train[spec.target_column].to_numpy(dtype=float)
             x_test = split.test[feature_columns].to_numpy(dtype=float)
-            y_test = split.test[TARGET_COLUMN].to_numpy(dtype=float)
+            y_test = split.test[spec.target_column].to_numpy(dtype=float)
 
             rows.append(
                 _metric_row(
+                    target=spec.target,
                     representation=spec.representation,
                     model="train_mean",
                     split_method=split.method,
@@ -149,6 +131,7 @@ def _evaluate_representation(
             model.fit(x_train, y_train)
             rows.append(
                 _metric_row(
+                    target=spec.target,
                     representation=spec.representation,
                     model="ridge",
                     split_method=split.method,
@@ -166,6 +149,47 @@ def _evaluate_representation(
             )
 
     return rows
+
+
+def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
+    specs: list[EvaluationSpec] = []
+    for target, suffix, target_column in [
+        ("yield_change", "", "target_yield_change"),
+        ("residual_change", "_residual", "target_residual_change"),
+    ]:
+        specs.extend(
+            [
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
+                    representation="pca",
+                    path=config.modeling_dir / f"pca{suffix}_targets.parquet",
+                    features=PCA_FEATURES,
+                ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
+                    representation="nelson_siegel",
+                    path=config.modeling_dir / f"nelson_siegel{suffix}_targets.parquet",
+                    features=NELSON_SIEGEL_FEATURES,
+                ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
+                    representation="lagged",
+                    path=config.modeling_dir / f"lagged{suffix}_targets.parquet",
+                    features=[f"lag_{lag}_change" for lag in config.evaluation.lag_days],
+                ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
+                    representation="curve",
+                    path=config.modeling_dir / f"curve{suffix}_targets.parquet",
+                    features=CURVE_FEATURES,
+                ),
+            ]
+        )
+    return specs
 
 
 def evaluation_splits(
@@ -259,6 +283,7 @@ def maturity_bucket(maturity_years: pd.Series) -> pd.Series:
 
 
 def _metric_row(
+    target: str,
     representation: str,
     model: str,
     split_method: str,
@@ -274,6 +299,7 @@ def _metric_row(
     maturity_bucket: object | None = None,
 ) -> dict[str, object]:
     row = {
+        "target": target,
         "representation": representation,
         "model": model,
         "split_method": split_method,

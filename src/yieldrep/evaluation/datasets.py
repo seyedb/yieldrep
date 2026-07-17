@@ -8,33 +8,52 @@ from yieldrep.config import ProjectConfig
 
 
 def build_modeling_datasets(config: ProjectConfig) -> list[Path]:
-    """Join baseline representations to forward yield-change targets."""
+    """Join baseline representations to forward target datasets."""
     targets = pd.read_parquet(config.targets_path)
     curves = pd.read_parquet(config.curves_path)
     config.modeling_dir.mkdir(parents=True, exist_ok=True)
 
     output_paths: list[Path] = []
+    output_paths.extend(_build_target_family(config, targets, curves, suffix=""))
+
+    if config.residual_targets_path.exists():
+        residual_targets = pd.read_parquet(config.residual_targets_path)
+        output_paths.extend(
+            _build_target_family(config, residual_targets, curves, suffix="_residual")
+        )
+
+    return output_paths
+
+
+def _build_target_family(
+    config: ProjectConfig,
+    targets: pd.DataFrame,
+    curves: pd.DataFrame,
+    suffix: str,
+) -> list[Path]:
+    output_paths: list[Path] = []
+
     pca_targets = _join_pca_targets(config, targets)
     if not pca_targets.empty:
-        pca_path = config.modeling_dir / "pca_targets.parquet"
+        pca_path = config.modeling_dir / f"pca{suffix}_targets.parquet"
         pca_targets.to_parquet(pca_path, index=False)
         output_paths.append(pca_path)
 
     nelson_siegel_targets = _join_nelson_siegel_targets(config, targets)
     if not nelson_siegel_targets.empty:
-        ns_path = config.modeling_dir / "nelson_siegel_targets.parquet"
+        ns_path = config.modeling_dir / f"nelson_siegel{suffix}_targets.parquet"
         nelson_siegel_targets.to_parquet(ns_path, index=False)
         output_paths.append(ns_path)
 
     lagged_targets = _join_lagged_targets(curves, targets, config.evaluation.lag_days)
     if not lagged_targets.empty:
-        lagged_path = config.modeling_dir / "lagged_targets.parquet"
+        lagged_path = config.modeling_dir / f"lagged{suffix}_targets.parquet"
         lagged_targets.to_parquet(lagged_path, index=False)
         output_paths.append(lagged_path)
 
     curve_feature_targets = _join_curve_feature_targets(config, targets)
     if not curve_feature_targets.empty:
-        curve_path = config.modeling_dir / "curve_targets.parquet"
+        curve_path = config.modeling_dir / f"curve{suffix}_targets.parquet"
         curve_feature_targets.to_parquet(curve_path, index=False)
         output_paths.append(curve_path)
 

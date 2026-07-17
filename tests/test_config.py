@@ -13,6 +13,7 @@ def test_load_config_reads_project_paths() -> None:
     assert config.pca_dir == Path("data/processed/pca")
     assert config.nelson_siegel_dir == Path("data/processed/nelson_siegel")
     assert config.targets_path == Path("data/processed/targets.parquet")
+    assert config.residual_targets_path == Path("data/processed/residual_targets.parquet")
     assert config.curve_features_path == Path("data/processed/curve_features.parquet")
     assert config.modeling_dir == Path("data/processed/modeling")
     assert config.evaluation_dir == Path("data/processed/evaluation")
