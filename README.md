@@ -1,19 +1,23 @@
 # yieldrep
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-`yieldrep` is a Python research project for studying whether latent representations
-of sovereign yield curves contain information beyond classical term-structure
-features.
+**yieldrep** is a Python research project that investigates whether learned
+latent representations of sovereign yield curves capture information beyond
+classical term-structure features.
 
-The project uses public fixed-income data to compare learned curve representations
-against baselines such as PCA, Nelson-Siegel factors, slope and curvature measures,
-and carry/roll-down style features across forecasting, relative-value, volatility,
-and curve-state tasks.
+Using publicly available fixed-income data, the project compares learned curve
+representations with established baselines, including PCA, Nelson-Siegel factors,
+slope, curvature, carry, and roll-down features, across a range of forecasting,
+relative-value, volatility, and curve-state classification tasks.
 
-This repository is an exploratory research and learning project. It does not
-claim novel results or production trading signals; the focus is on building a
-clean, reproducible research pipeline and a credible foundation for comparing
-classical and learned yield-curve representations.
+The goal is not to claim novel trading signals or state-of-the-art predictive
+performance. Instead, the emphasis is on building a rigorous, reproducible
+research framework for systematically evaluating classical and learned
+representations of the yield curve.
+
+The project is designed to be modular, enabling new representation-learning
+models, benchmark features, and downstream evaluation tasks to be incorporated
+with minimal changes.
 
 ## Usage
 
