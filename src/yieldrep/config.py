@@ -93,6 +93,10 @@ class ProjectConfig(BaseModel):
     def baseline_metrics_path(self) -> Path:
         return self.evaluation_dir / "baseline_metrics.parquet"
 
+    @property
+    def baseline_metrics_by_maturity_path(self) -> Path:
+        return self.evaluation_dir / "baseline_metrics_by_maturity.parquet"
+
 
 def load_config(path: Path) -> ProjectConfig:
     with path.open("r", encoding="utf-8") as handle:

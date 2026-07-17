@@ -15,6 +15,7 @@ from yieldrep.evaluation.metrics import directional_accuracy, mae, rmse
 
 TARGET_COLUMN = "target_yield_change"
 GROUP_COLUMNS = ["country", "horizon_days"]
+MATURITY_GROUP_COLUMNS = ["country", "horizon_days", "maturity_bucket"]
 PCA_FEATURES = ["PC1", "PC2", "PC3", "PC4", "PC5"]
 NELSON_SIEGEL_FEATURES = ["beta_level", "beta_slope", "beta_curvature", "rmse"]
 SPLIT_METHOD = "date_ordered"
@@ -43,27 +44,42 @@ def evaluate_baselines(config: ProjectConfig) -> Path:
     ]
 
     rows: list[dict[str, object]] = []
+    maturity_rows: list[dict[str, object]] = []
     for spec in specs:
         if spec.path.exists():
-            rows.extend(_evaluate_representation(config, spec))
+            rows.extend(_evaluate_representation(config, spec, group_columns=GROUP_COLUMNS))
+            maturity_rows.extend(
+                _evaluate_representation(
+                    config,
+                    spec,
+                    group_columns=MATURITY_GROUP_COLUMNS,
+                    include_maturity_bucket=True,
+                )
+            )
 
     config.evaluation_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_parquet(config.baseline_metrics_path, index=False)
+    pd.DataFrame(maturity_rows).to_parquet(config.baseline_metrics_by_maturity_path, index=False)
     return config.baseline_metrics_path
 
 
 def _evaluate_representation(
     config: ProjectConfig,
     spec: EvaluationSpec,
+    group_columns: list[str],
+    include_maturity_bucket: bool = False,
 ) -> list[dict[str, object]]:
     data = pd.read_parquet(spec.path)
     feature_columns = [column for column in spec.features if column in data.columns]
     if not feature_columns:
         return []
+    if include_maturity_bucket:
+        data = data.copy()
+        data["maturity_bucket"] = maturity_bucket(data["maturity_years"])
 
     rows: list[dict[str, object]] = []
-    for group_values, group in data.groupby(GROUP_COLUMNS, sort=True):
-        country, horizon_days = group_values
+    for group_values, group in data.groupby(group_columns, sort=True):
+        group_key = dict(zip(group_columns, _as_tuple(group_values), strict=True))
         group = group.sort_values("date").dropna(subset=[*feature_columns, TARGET_COLUMN])
         train, test = date_ordered_split(group, test_fraction=config.evaluation.test_fraction)
         if train.empty or test.empty:
@@ -78,14 +94,15 @@ def _evaluate_representation(
             _metric_row(
                 representation=spec.representation,
                 model="train_mean",
-                country=str(country),
-                horizon_days=int(horizon_days),
+                country=str(group_key["country"]),
+                horizon_days=int(group_key["horizon_days"]),
                 y_true=y_test,
                 y_pred=np.full_like(y_test, fill_value=float(np.mean(y_train))),
                 train_rows=len(y_train),
                 test_rows=len(y_test),
                 train_dates=train["date"].nunique(),
                 test_dates=test["date"].nunique(),
+                maturity_bucket=group_key.get("maturity_bucket"),
             )
         )
 
@@ -98,14 +115,15 @@ def _evaluate_representation(
             _metric_row(
                 representation=spec.representation,
                 model="ridge",
-                country=str(country),
-                horizon_days=int(horizon_days),
+                country=str(group_key["country"]),
+                horizon_days=int(group_key["horizon_days"]),
                 y_true=y_test,
                 y_pred=model.predict(x_test),
                 train_rows=len(y_train),
                 test_rows=len(y_test),
                 train_dates=train["date"].nunique(),
                 test_dates=test["date"].nunique(),
+                maturity_bucket=group_key.get("maturity_bucket"),
             )
         )
 
@@ -133,6 +151,16 @@ def date_ordered_split(
     return train, test
 
 
+def maturity_bucket(maturity_years: pd.Series) -> pd.Series:
+    """Map maturities into front-end, belly, and long-end buckets."""
+    return pd.cut(
+        maturity_years,
+        bins=[0.0, 2.0, 10.0, float("inf")],
+        labels=["front_end", "belly", "long_end"],
+        right=True,
+    ).astype("string")
+
+
 def _metric_row(
     representation: str,
     model: str,
@@ -144,8 +172,9 @@ def _metric_row(
     test_rows: int,
     train_dates: int,
     test_dates: int,
+    maturity_bucket: object | None = None,
 ) -> dict[str, object]:
-    return {
+    row = {
         "representation": representation,
         "model": model,
         "split_method": SPLIT_METHOD,
@@ -159,3 +188,12 @@ def _metric_row(
         "train_dates": train_dates,
         "test_dates": test_dates,
     }
+    if maturity_bucket is not None:
+        row["maturity_bucket"] = str(maturity_bucket)
+    return row
+
+
+def _as_tuple(value: object) -> tuple[object, ...]:
+    if isinstance(value, tuple):
+        return value
+    return (value,)
