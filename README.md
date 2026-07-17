@@ -10,6 +10,11 @@ against baselines such as PCA, Nelson-Siegel factors, slope and curvature measur
 and carry/roll-down style features across forecasting, relative-value, volatility,
 and curve-state tasks.
 
+This repository is an exploratory research and learning project. It does not
+claim novel results or production trading signals; the focus is on building a
+clean, reproducible research pipeline and a credible foundation for comparing
+classical and learned yield-curve representations.
+
 ## Usage
 
 Run commands from the project root with `PYTHONPATH=src`:
