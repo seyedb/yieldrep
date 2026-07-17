@@ -129,7 +129,42 @@ Nelson-Siegel:
 
 Lagged yield changes:
     lag_1_change, lag_5_change, lag_20_change
+
+Engineered curve features:
+    level, slope_10y_2y, curvature_2s5s10s,
+    front_slope_2y_1y, long_slope_30y_10y
 ```
+
+The engineered curve baseline uses simple cross-sectional shape descriptors:
+
+```math
+\mathrm{level}_t
+=
+\frac{1}{M}
+\sum_j r_t^{(m_j)}
+```
+
+```math
+\mathrm{slope}_{10y,2y,t}
+=
+r_t^{(10y)}
+-
+r_t^{(2y)}
+```
+
+```math
+\mathrm{curvature}_{2s5s10s,t}
+=
+2r_t^{(5y)}
+-
+r_t^{(2y)}
+-
+r_t^{(10y)}
+```
+
+When an exact anchor maturity is unavailable, the nearest available maturity is
+used. These features are deliberately simple and interpretable; they form a
+classical hurdle for learned representations.
 
 The lagged baseline uses recent maturity-specific curve moves:
 

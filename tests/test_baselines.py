@@ -27,6 +27,10 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
         modeling_dir / "lagged_targets.parquet",
         index=False,
     )
+    _sample_modeling_data(feature_prefix="curve").to_parquet(
+        modeling_dir / "curve_targets.parquet",
+        index=False,
+    )
     config = ProjectConfig(
         data_dir=tmp_path / "data",
         reports_dir=tmp_path / "reports",
@@ -41,7 +45,7 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
     )
 
     assert output_path == tmp_path / "data" / "processed" / "evaluation" / "baseline_metrics.parquet"
-    assert set(metrics["representation"]) == {"pca", "nelson_siegel", "lagged"}
+    assert set(metrics["representation"]) == {"pca", "nelson_siegel", "lagged", "curve"}
     assert set(metrics["model"]) == {"train_mean", "ridge"}
     assert set(metrics["split_method"]) == {"date_ordered"}
     assert set(metrics["horizon_days"]) == {1, 5}
@@ -57,7 +61,7 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
     assert set(metrics["train_dates"]) == {9}
     assert set(metrics["test_dates"]) == {3}
     assert set(maturity_metrics["maturity_bucket"]) == {"front_end", "belly", "long_end"}
-    assert set(maturity_metrics["representation"]) == {"pca", "nelson_siegel", "lagged"}
+    assert set(maturity_metrics["representation"]) == {"pca", "nelson_siegel", "lagged", "curve"}
 
 
 def test_date_ordered_split_keeps_dates_disjoint() -> None:
@@ -169,12 +173,22 @@ def _sample_modeling_data(feature_prefix: str) -> pd.DataFrame:
                             "rmse": 0.01,
                         }
                     )
-                else:
+                elif feature_prefix == "lagged":
                     row.update(
                         {
                             "lag_1_change": index * 0.001,
                             "lag_5_change": index * 0.002,
                             "lag_20_change": index * 0.003,
+                        }
+                    )
+                else:
+                    row.update(
+                        {
+                            "level": 4.0 + index * 0.01,
+                            "slope_10y_2y": maturity * 0.001,
+                            "curvature_2s5s10s": horizon * 0.001,
+                            "front_slope_2y_1y": 0.1,
+                            "long_slope_30y_10y": 0.5,
                         }
                     )
                 rows.append(row)

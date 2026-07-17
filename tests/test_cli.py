@@ -222,6 +222,51 @@ def test_build_targets_command_writes_output(tmp_path: Path) -> None:
     assert "targets.parquet" in result.stdout
 
 
+def test_build_curve_features_command_writes_output(tmp_path: Path) -> None:
+    processed_dir = tmp_path / "data" / "processed"
+    processed_dir.mkdir(parents=True)
+    curves = pd.DataFrame(
+        [
+            {
+                "date": pd.Timestamp("2024-01-01"),
+                "country": "US",
+                "maturity_years": maturity,
+                "yield": yield_value,
+                "source": "test",
+            }
+            for maturity, yield_value in [
+                (1.0, 4.0),
+                (2.0, 4.1),
+                (5.0, 4.3),
+                (10.0, 4.5),
+                (30.0, 5.5),
+            ]
+        ]
+    )
+    curves.to_parquet(processed_dir / "curves.parquet", index=False)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                f"data_dir: {tmp_path / 'data'}",
+                f"reports_dir: {tmp_path / 'reports'}",
+                "sources:",
+                "  test:",
+                "    country: US",
+                "    source: test",
+                f"    raw_file: {tmp_path / 'raw.csv'}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["build-curve-features", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert (processed_dir / "curve_features.parquet").exists()
+    assert "curve_features.parquet" in result.stdout
+
+
 def test_build_modeling_datasets_command_writes_outputs(tmp_path: Path) -> None:
     processed_dir = tmp_path / "data" / "processed"
     pca_dir = processed_dir / "pca"
@@ -264,6 +309,17 @@ def test_build_modeling_datasets_command_writes_outputs(tmp_path: Path) -> None:
             "rmse": [0.01, 0.02],
         }
     ).to_parquet(ns_dir / "us_factors.parquet", index=False)
+    pd.DataFrame(
+        {
+            "date": dates,
+            "country": ["US", "US"],
+            "level": [4.0, 4.1],
+            "slope_10y_2y": [0.2, 0.3],
+            "curvature_2s5s10s": [0.0, 0.1],
+            "front_slope_2y_1y": [0.1, 0.1],
+            "long_slope_30y_10y": [0.4, 0.5],
+        }
+    ).to_parquet(processed_dir / "curve_features.parquet", index=False)
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         "\n".join(
@@ -288,6 +344,7 @@ def test_build_modeling_datasets_command_writes_outputs(tmp_path: Path) -> None:
     assert (processed_dir / "modeling" / "pca_targets.parquet").exists()
     assert (processed_dir / "modeling" / "nelson_siegel_targets.parquet").exists()
     assert (processed_dir / "modeling" / "lagged_targets.parquet").exists()
+    assert (processed_dir / "modeling" / "curve_targets.parquet").exists()
     assert "pca_targets.parquet" in result.stdout
 
 

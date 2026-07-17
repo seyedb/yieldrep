@@ -43,6 +43,17 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
             "rmse": [0.01, 0.02],
         }
     ).to_parquet(ns_dir / "us_factors.parquet", index=False)
+    pd.DataFrame(
+        {
+            "date": dates,
+            "country": ["US", "US"],
+            "level": [4.0, 4.1],
+            "slope_10y_2y": [0.2, 0.3],
+            "curvature_2s5s10s": [0.0, 0.1],
+            "front_slope_2y_1y": [0.1, 0.1],
+            "long_slope_30y_10y": [0.4, 0.5],
+        }
+    ).to_parquet(processed_dir / "curve_features.parquet", index=False)
     config = ProjectConfig(
         data_dir=tmp_path / "data",
         reports_dir=tmp_path / "reports",
@@ -56,10 +67,12 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         processed_dir / "modeling" / "pca_targets.parquet",
         processed_dir / "modeling" / "nelson_siegel_targets.parquet",
         processed_dir / "modeling" / "lagged_targets.parquet",
+        processed_dir / "modeling" / "curve_targets.parquet",
     ]
     pca_targets = pd.read_parquet(processed_dir / "modeling" / "pca_targets.parquet")
     ns_targets = pd.read_parquet(processed_dir / "modeling" / "nelson_siegel_targets.parquet")
     lagged_targets = pd.read_parquet(processed_dir / "modeling" / "lagged_targets.parquet")
+    curve_targets = pd.read_parquet(processed_dir / "modeling" / "curve_targets.parquet")
     assert {"PC1", "PC2", "target_yield_change"}.issubset(pca_targets.columns)
     assert {"beta_level", "beta_slope", "beta_curvature", "target_yield_change"}.issubset(
         ns_targets.columns
@@ -68,6 +81,8 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     assert len(ns_targets) == 2
     assert {"lag_1_change", "target_yield_change"}.issubset(lagged_targets.columns)
     assert len(lagged_targets) == 1
+    assert {"level", "slope_10y_2y", "target_yield_change"}.issubset(curve_targets.columns)
+    assert len(curve_targets) == 2
 
 
 def test_make_lagged_yield_change_features() -> None:

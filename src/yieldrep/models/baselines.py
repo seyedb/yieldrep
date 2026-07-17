@@ -18,6 +18,13 @@ GROUP_COLUMNS = ["country", "horizon_days"]
 MATURITY_GROUP_COLUMNS = ["country", "horizon_days", "maturity_bucket"]
 PCA_FEATURES = ["PC1", "PC2", "PC3", "PC4", "PC5"]
 NELSON_SIEGEL_FEATURES = ["beta_level", "beta_slope", "beta_curvature", "rmse"]
+CURVE_FEATURES = [
+    "level",
+    "slope_10y_2y",
+    "curvature_2s5s10s",
+    "front_slope_2y_1y",
+    "long_slope_30y_10y",
+]
 
 @dataclass(frozen=True)
 class EvaluationSpec:
@@ -51,6 +58,11 @@ def evaluate_baselines(config: ProjectConfig) -> Path:
             representation="lagged",
             path=config.modeling_dir / "lagged_targets.parquet",
             features=[f"lag_{lag}_change" for lag in config.evaluation.lag_days],
+        ),
+        EvaluationSpec(
+            representation="curve",
+            path=config.modeling_dir / "curve_targets.parquet",
+            features=CURVE_FEATURES,
         ),
     ]
 

@@ -32,6 +32,12 @@ def build_modeling_datasets(config: ProjectConfig) -> list[Path]:
         lagged_targets.to_parquet(lagged_path, index=False)
         output_paths.append(lagged_path)
 
+    curve_feature_targets = _join_curve_feature_targets(config, targets)
+    if not curve_feature_targets.empty:
+        curve_path = config.modeling_dir / "curve_targets.parquet"
+        curve_feature_targets.to_parquet(curve_path, index=False)
+        output_paths.append(curve_path)
+
     return output_paths
 
 
@@ -67,6 +73,14 @@ def _join_lagged_targets(
 ) -> pd.DataFrame:
     features = make_lagged_yield_change_features(curves, lag_days=lag_days)
     return targets.merge(features, on=["date", "country", "maturity_years"], how="inner")
+
+
+def _join_curve_feature_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFrame:
+    if not config.curve_features_path.exists():
+        return pd.DataFrame()
+
+    features = pd.read_parquet(config.curve_features_path)
+    return targets.merge(features, on=["date", "country"], how="inner")
 
 
 def make_lagged_yield_change_features(
