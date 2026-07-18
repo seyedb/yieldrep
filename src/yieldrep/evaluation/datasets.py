@@ -61,6 +61,12 @@ def _build_target_family(
         curve_feature_targets.to_parquet(curve_path, index=False)
         output_paths.append(curve_path)
 
+    residual_feature_targets = _join_residual_feature_targets(config, targets)
+    if not residual_feature_targets.empty:
+        residual_feature_path = config.modeling_dir / f"residual_feature{suffix}_targets.parquet"
+        residual_feature_targets.to_parquet(residual_feature_path, index=False)
+        output_paths.append(residual_feature_path)
+
     return output_paths
 
 
@@ -104,6 +110,14 @@ def _join_curve_feature_targets(config: ProjectConfig, targets: pd.DataFrame) ->
 
     features = pd.read_parquet(config.curve_features_path)
     return targets.merge(features, on=["date", "country"], how="inner")
+
+
+def _join_residual_feature_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFrame:
+    if not config.residual_features_path.exists():
+        return pd.DataFrame()
+
+    features = pd.read_parquet(config.residual_features_path)
+    return targets.merge(features, on=["date", "country", "maturity_years"], how="inner")
 
 
 def make_lagged_yield_change_features(

@@ -170,8 +170,8 @@ f\left(\mathbf{x}_t^{(c)}\right)
 where \(\mathbf{x}_t^{(c)}\) is a baseline representation available at date
 \(t\).
 
-Metrics include a target label so outright yield-change and residual-change
-tasks can be compared separately.
+Metrics include a target label so outright yield-change, residual-change, and
+volatility-change tasks can be compared separately.
 
 Current feature sets:
 
@@ -188,7 +188,30 @@ Lagged yield changes:
 Engineered curve features:
     level, slope_10y_2y, curvature_2s5s10s,
     front_slope_2y_1y, long_slope_30y_10y
+
+Residual dynamic features:
+    residual, residual_z_60, residual_z_252,
+    residual_change_1, residual_change_5, residual_vol_20
 ```
+
+The residual dynamic baseline adds local relative-value state. Residual
+z-scores standardize the Nelson-Siegel residual within a rolling window:
+
+```math
+z_{t,W}^{(c,m)}
+=
+\frac{
+e_t^{(c,m)}
+-
+\mu_{t,W}^{(c,m)}
+}{
+\sigma_{t,W}^{(c,m)}
+}
+```
+
+Residual changes capture short-term momentum or reversal in richness/cheapness,
+while residual volatility measures recent instability of the fitted-curve
+residual.
 
 The engineered curve baseline uses simple cross-sectional shape descriptors:
 

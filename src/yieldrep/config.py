@@ -100,6 +100,10 @@ class ProjectConfig(BaseModel):
         return self.processed_dir / "vol_targets.parquet"
 
     @property
+    def residual_features_path(self) -> Path:
+        return self.processed_dir / "residual_features.parquet"
+
+    @property
     def curve_features_path(self) -> Path:
         return self.processed_dir / "curve_features.parquet"
 

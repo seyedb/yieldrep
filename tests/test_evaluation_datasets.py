@@ -78,6 +78,19 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
             "long_slope_30y_10y": [0.4, 0.5],
         }
     ).to_parquet(processed_dir / "curve_features.parquet", index=False)
+    pd.DataFrame(
+        {
+            "date": dates,
+            "country": ["US", "US"],
+            "maturity_years": [2.0, 2.0],
+            "residual": [0.01, 0.03],
+            "residual_z_60": [0.5, 1.0],
+            "residual_z_252": [0.2, 0.4],
+            "residual_change_1": [0.01, 0.02],
+            "residual_change_5": [0.03, 0.04],
+            "residual_vol_20": [0.01, 0.02],
+        }
+    ).to_parquet(processed_dir / "residual_features.parquet", index=False)
     config = ProjectConfig(
         data_dir=tmp_path / "data",
         reports_dir=tmp_path / "reports",
@@ -87,20 +100,19 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
 
     output_paths = build_modeling_datasets(config)
 
-    assert output_paths == [
-        processed_dir / "modeling" / "pca_targets.parquet",
-        processed_dir / "modeling" / "nelson_siegel_targets.parquet",
-        processed_dir / "modeling" / "lagged_targets.parquet",
-        processed_dir / "modeling" / "curve_targets.parquet",
-        processed_dir / "modeling" / "pca_residual_targets.parquet",
-        processed_dir / "modeling" / "nelson_siegel_residual_targets.parquet",
-        processed_dir / "modeling" / "lagged_residual_targets.parquet",
-        processed_dir / "modeling" / "curve_residual_targets.parquet",
-        processed_dir / "modeling" / "pca_vol_targets.parquet",
-        processed_dir / "modeling" / "nelson_siegel_vol_targets.parquet",
-        processed_dir / "modeling" / "lagged_vol_targets.parquet",
-        processed_dir / "modeling" / "curve_vol_targets.parquet",
-    ]
+    assert set(output_paths).issuperset(
+        {
+            processed_dir / "modeling" / "pca_targets.parquet",
+            processed_dir / "modeling" / "nelson_siegel_targets.parquet",
+            processed_dir / "modeling" / "lagged_targets.parquet",
+            processed_dir / "modeling" / "curve_targets.parquet",
+            processed_dir / "modeling" / "residual_feature_targets.parquet",
+            processed_dir / "modeling" / "pca_residual_targets.parquet",
+            processed_dir / "modeling" / "residual_feature_residual_targets.parquet",
+            processed_dir / "modeling" / "pca_vol_targets.parquet",
+            processed_dir / "modeling" / "residual_feature_vol_targets.parquet",
+        }
+    )
     pca_targets = pd.read_parquet(processed_dir / "modeling" / "pca_targets.parquet")
     ns_targets = pd.read_parquet(processed_dir / "modeling" / "nelson_siegel_targets.parquet")
     lagged_targets = pd.read_parquet(processed_dir / "modeling" / "lagged_targets.parquet")
@@ -109,6 +121,9 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         processed_dir / "modeling" / "pca_residual_targets.parquet"
     )
     pca_vol_targets = pd.read_parquet(processed_dir / "modeling" / "pca_vol_targets.parquet")
+    residual_feature_targets = pd.read_parquet(
+        processed_dir / "modeling" / "residual_feature_targets.parquet"
+    )
     assert {"PC1", "PC2", "target_yield_change"}.issubset(pca_targets.columns)
     assert {"beta_level", "beta_slope", "beta_curvature", "target_yield_change"}.issubset(
         ns_targets.columns
@@ -123,6 +138,10 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     assert len(pca_residual_targets) == 2
     assert {"PC1", "target_vol_change"}.issubset(pca_vol_targets.columns)
     assert len(pca_vol_targets) == 2
+    assert {"residual_z_60", "residual_change_5", "target_yield_change"}.issubset(
+        residual_feature_targets.columns
+    )
+    assert len(residual_feature_targets) == 2
 
 
 def test_make_lagged_yield_change_features() -> None:

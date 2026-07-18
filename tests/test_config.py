@@ -15,6 +15,7 @@ def test_load_config_reads_project_paths() -> None:
     assert config.targets_path == Path("data/processed/targets.parquet")
     assert config.residual_targets_path == Path("data/processed/residual_targets.parquet")
     assert config.vol_targets_path == Path("data/processed/vol_targets.parquet")
+    assert config.residual_features_path == Path("data/processed/residual_features.parquet")
     assert config.modeling_dir == Path("data/processed/modeling")
     assert config.evaluation_dir == Path("data/processed/evaluation")
     assert config.baseline_metrics_path == Path("data/processed/evaluation/baseline_metrics.parquet")

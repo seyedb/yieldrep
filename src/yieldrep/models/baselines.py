@@ -25,6 +25,14 @@ CURVE_FEATURES = [
     "front_slope_2y_1y",
     "long_slope_30y_10y",
 ]
+RESIDUAL_DYNAMIC_FEATURES = [
+    "residual",
+    "residual_z_60",
+    "residual_z_252",
+    "residual_change_1",
+    "residual_change_5",
+    "residual_vol_20",
+]
 
 
 @dataclass(frozen=True)
@@ -248,6 +256,13 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                     representation="curve",
                     path=config.modeling_dir / f"curve{suffix}_targets.parquet",
                     features=CURVE_FEATURES,
+                ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
+                    representation="residual_feature",
+                    path=config.modeling_dir / f"residual_feature{suffix}_targets.parquet",
+                    features=RESIDUAL_DYNAMIC_FEATURES,
                 ),
             ]
         )

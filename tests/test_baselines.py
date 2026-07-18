@@ -31,6 +31,10 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
         modeling_dir / "curve_targets.parquet",
         index=False,
     )
+    _sample_modeling_data(feature_prefix="residual_feature").to_parquet(
+        modeling_dir / "residual_feature_targets.parquet",
+        index=False,
+    )
     config = ProjectConfig(
         data_dir=tmp_path / "data",
         reports_dir=tmp_path / "reports",
@@ -53,7 +57,13 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
 
     assert output_path == tmp_path / "data" / "processed" / "evaluation" / "baseline_metrics.parquet"
     assert set(metrics["target"]) == {"yield_change"}
-    assert set(metrics["representation"]) == {"pca", "nelson_siegel", "lagged", "curve"}
+    assert set(metrics["representation"]) == {
+        "pca",
+        "nelson_siegel",
+        "lagged",
+        "curve",
+        "residual_feature",
+    }
     assert set(metrics["model"]) == {"train_mean", "ridge"}
     assert set(metrics["split_method"]) == {"date_ordered"}
     assert set(metrics["horizon_days"]) == {1, 5}
@@ -69,13 +79,20 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
     assert set(metrics["train_dates"]) == {9}
     assert set(metrics["test_dates"]) == {3}
     assert set(maturity_metrics["maturity_bucket"]) == {"front_end", "belly", "long_end"}
-    assert set(maturity_metrics["representation"]) == {"pca", "nelson_siegel", "lagged", "curve"}
+    assert set(maturity_metrics["representation"]) == {
+        "pca",
+        "nelson_siegel",
+        "lagged",
+        "curve",
+        "residual_feature",
+    }
     assert set(maturity_point_metrics["maturity_years"]) == {1.0, 5.0, 30.0}
     assert set(maturity_point_metrics["representation"]) == {
         "pca",
         "nelson_siegel",
         "lagged",
         "curve",
+        "residual_feature",
     }
 
 
@@ -242,7 +259,7 @@ def _sample_modeling_data(
                             "lag_20_change": index * 0.003,
                         }
                     )
-                else:
+                elif feature_prefix == "curve":
                     row.update(
                         {
                             "level": 4.0 + index * 0.01,
@@ -250,6 +267,17 @@ def _sample_modeling_data(
                             "curvature_2s5s10s": horizon * 0.001,
                             "front_slope_2y_1y": 0.1,
                             "long_slope_30y_10y": 0.5,
+                        }
+                    )
+                else:
+                    row.update(
+                        {
+                            "residual": index * 0.001,
+                            "residual_z_60": index * 0.01,
+                            "residual_z_252": index * 0.005,
+                            "residual_change_1": 0.001,
+                            "residual_change_5": 0.005,
+                            "residual_vol_20": 0.002,
                         }
                     )
                 rows.append(row)
