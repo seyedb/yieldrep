@@ -3,7 +3,9 @@ from pathlib import Path
 import pandas as pd
 from typer.testing import CliRunner
 
-from yieldrep.cli import app
+import yieldrep.cli as cli
+from yieldrep.cli import app, run_baseline_pipeline
+from yieldrep.config import ProjectConfig, SourceConfig
 
 
 def test_normalize_command_writes_curves_parquet(tmp_path: Path) -> None:
@@ -133,6 +135,60 @@ def test_summarize_baselines_command_writes_csv_tables(tmp_path: Path) -> None:
     assert (tmp_path / "reports" / "tables" / "baseline_summary.csv").exists()
     assert (tmp_path / "reports" / "tables" / "baseline_by_maturity_bucket.csv").exists()
     assert (tmp_path / "reports" / "tables" / "baseline_by_maturity_point_top.csv").exists()
+
+
+def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None:
+    calls: list[str] = []
+    config = ProjectConfig(
+        data_dir=tmp_path / "data",
+        reports_dir=tmp_path / "reports",
+        sources={"test": SourceConfig(country="US", source="test", raw_file=tmp_path / "raw.csv")},
+    )
+
+    def single_step(name: str):
+        def _step(_config):
+            calls.append(name)
+            return tmp_path / f"{name}.out"
+
+        return _step
+
+    def multi_step(name: str):
+        def _step(_config):
+            calls.append(name)
+            return [tmp_path / f"{name}.out"]
+
+        return _step
+
+    monkeypatch.setattr(cli, "build_curves_parquet", single_step("normalize"))
+    monkeypatch.setattr(cli, "build_pca", multi_step("build_pca"))
+    monkeypatch.setattr(cli, "build_nelson_siegel", multi_step("build_nelson_siegel"))
+    monkeypatch.setattr(cli, "build_curve_features", single_step("build_curve_features"))
+    monkeypatch.setattr(cli, "build_residual_features", single_step("build_residual_features"))
+    monkeypatch.setattr(cli, "build_targets", single_step("build_targets"))
+    monkeypatch.setattr(cli, "build_residual_targets", single_step("build_residual_targets"))
+    monkeypatch.setattr(cli, "build_vol_targets", single_step("build_vol_targets"))
+    monkeypatch.setattr(cli, "build_modeling_datasets", multi_step("build_modeling_datasets"))
+    monkeypatch.setattr(cli, "evaluate_baselines", single_step("evaluate_baselines"))
+    monkeypatch.setattr(cli, "summarize_baselines", multi_step("summarize_baselines"))
+    monkeypatch.setattr(cli, "plot_baseline_metrics", multi_step("plot_baseline_metrics"))
+
+    output_paths = run_baseline_pipeline(config)
+
+    assert calls == [
+        "normalize",
+        "build_pca",
+        "build_nelson_siegel",
+        "build_curve_features",
+        "build_residual_features",
+        "build_targets",
+        "build_residual_targets",
+        "build_vol_targets",
+        "build_modeling_datasets",
+        "evaluate_baselines",
+        "summarize_baselines",
+        "plot_baseline_metrics",
+    ]
+    assert len(output_paths) == len(calls)
 
 
 def _write_config(tmp_path: Path, lines: list[str]) -> Path:

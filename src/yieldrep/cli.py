@@ -2,7 +2,7 @@ from pathlib import Path
 
 import typer
 
-from yieldrep.config import load_config
+from yieldrep.config import ProjectConfig, load_config
 from yieldrep.data.ingest import ingest_sources
 from yieldrep.data.normalize import build_curves_parquet
 from yieldrep.evaluation.datasets import build_modeling_datasets
@@ -93,6 +93,14 @@ def build_residual_features_command(config: Path = Path("configs/default.yaml"))
     typer.echo(build_residual_features(project_config))
 
 
+@app.command("run-baselines")
+def run_baselines_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Run the full classical baseline research pipeline."""
+    project_config = load_config(config)
+    for output_path in run_baseline_pipeline(project_config):
+        typer.echo(output_path)
+
+
 @app.command("build-modeling-datasets")
 def build_modeling_datasets_command(config: Path = Path("configs/default.yaml")) -> None:
     """Build supervised datasets by joining baseline features to targets."""
@@ -146,6 +154,24 @@ def plot_curves_command(config: Path = Path("configs/default.yaml")) -> None:
     project_config = load_config(config)
     for output_path in plot_curves(project_config):
         typer.echo(output_path)
+
+
+def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
+    """Run the standard baseline pipeline from normalized curves to reports."""
+    output_paths: list[Path] = []
+    output_paths.append(build_curves_parquet(project_config))
+    output_paths.extend(build_pca(project_config))
+    output_paths.extend(build_nelson_siegel(project_config))
+    output_paths.append(build_curve_features(project_config))
+    output_paths.append(build_residual_features(project_config))
+    output_paths.append(build_targets(project_config))
+    output_paths.append(build_residual_targets(project_config))
+    output_paths.append(build_vol_targets(project_config))
+    output_paths.extend(build_modeling_datasets(project_config))
+    output_paths.append(evaluate_baselines(project_config))
+    output_paths.extend(summarize_baselines(project_config))
+    output_paths.extend(plot_baseline_metrics(project_config))
+    return output_paths
 
 
 if __name__ == "__main__":

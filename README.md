@@ -25,16 +25,9 @@ Run commands from the project root with `PYTHONPATH=src`:
 
 ```bash
 PYTHONPATH=src python -m yieldrep.cli ingest --config configs/default.yaml
-PYTHONPATH=src python -m yieldrep.cli normalize --config configs/default.yaml
-PYTHONPATH=src python -m yieldrep.cli build-pca --config configs/default.yaml
-PYTHONPATH=src python -m yieldrep.cli build-curve-features --config configs/default.yaml
-PYTHONPATH=src python -m yieldrep.cli build-residual-features --config configs/default.yaml
-PYTHONPATH=src python -m yieldrep.cli build-residual-targets --config configs/default.yaml
-PYTHONPATH=src python -m yieldrep.cli build-vol-targets --config configs/default.yaml
-PYTHONPATH=src python -m yieldrep.cli summarize-baselines --config configs/default.yaml
+PYTHONPATH=src python -m yieldrep.cli run-baselines --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli plot-curves --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli plot-pca --config configs/default.yaml
-PYTHONPATH=src python -m yieldrep.cli plot-baseline-metrics --config configs/default.yaml
 ```
 
 Generated data is written under `data/`; generated figures are written under
