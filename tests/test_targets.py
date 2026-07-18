@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from yieldrep.config import ProjectConfig, SourceConfig, TargetConfig
-from yieldrep.features.targets import (
+from yieldrep.evaluation.targets import (
     build_residual_targets,
     build_targets,
     make_forward_residual_change_targets,

@@ -7,10 +7,10 @@ from yieldrep.data.ingest import ingest_sources
 from yieldrep.data.normalize import build_curves_parquet
 from yieldrep.evaluation.datasets import build_modeling_datasets
 from yieldrep.evaluation.reports import summarize_baselines
-from yieldrep.features.curve import build_curve_features
-from yieldrep.features.nelson_siegel import build_nelson_siegel
-from yieldrep.features.pca import build_pca
-from yieldrep.features.targets import build_residual_targets, build_targets
+from yieldrep.factors.curve import build_curve_features
+from yieldrep.factors.nelson_siegel import build_nelson_siegel
+from yieldrep.factors.pca import build_pca
+from yieldrep.evaluation.targets import build_residual_targets, build_targets
 from yieldrep.models.baselines import evaluate_baselines
 from yieldrep.visualization.plotly_baselines import plot_baseline_metrics
 from yieldrep.visualization.plotly_curves import plot_curves

@@ -23,7 +23,7 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from yieldrep.config import ProjectConfig
-from yieldrep.features.curve import curve_panel
+from yieldrep.factors.curve import curve_panel
 
 
 @dataclass(frozen=True)

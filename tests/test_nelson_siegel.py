@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from yieldrep.config import NelsonSiegelConfig, ProjectConfig, SourceConfig
-from yieldrep.features.nelson_siegel import (
+from yieldrep.factors.nelson_siegel import (
     build_nelson_siegel,
     fit_nelson_siegel,
     nelson_siegel_loadings,

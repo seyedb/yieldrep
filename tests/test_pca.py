@@ -3,8 +3,8 @@ from pathlib import Path
 import pandas as pd
 
 from yieldrep.config import PCAConfig, ProjectConfig, SourceConfig
-from yieldrep.features.curve import curve_panel
-from yieldrep.features.pca import build_pca
+from yieldrep.factors.curve import curve_panel
+from yieldrep.factors.pca import build_pca
 
 
 def test_curve_panel_pivots_one_country() -> None:

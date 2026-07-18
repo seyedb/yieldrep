@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 
 from yieldrep.config import ProjectConfig
-from yieldrep.features.curve import curve_panel
+from yieldrep.factors.curve import curve_panel
 
 
 def plot_curves(config: ProjectConfig) -> list[Path]:

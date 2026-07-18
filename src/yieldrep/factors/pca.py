@@ -25,7 +25,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
 from yieldrep.config import ProjectConfig
-from yieldrep.features.curve import curve_panel
+from yieldrep.factors.curve import curve_panel
 
 
 def build_pca(config: ProjectConfig) -> list[Path]:

@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from yieldrep.config import ProjectConfig, SourceConfig
-from yieldrep.features.curve import build_curve_features, make_curve_features
+from yieldrep.factors.curve import build_curve_features, make_curve_features
 
 
 def test_make_curve_features_builds_shape_features() -> None:
