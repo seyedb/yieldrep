@@ -21,6 +21,9 @@ def test_load_config_reads_project_paths() -> None:
     assert config.baseline_metrics_by_maturity_path == Path(
         "data/processed/evaluation/baseline_metrics_by_maturity.parquet"
     )
+    assert config.baseline_metrics_by_maturity_point_path == Path(
+        "data/processed/evaluation/baseline_metrics_by_maturity_point.parquet"
+    )
     assert config.figures_dir == Path("reports/figures")
 
 

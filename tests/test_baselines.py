@@ -43,6 +43,13 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
     maturity_metrics = pd.read_parquet(
         tmp_path / "data" / "processed" / "evaluation" / "baseline_metrics_by_maturity.parquet"
     )
+    maturity_point_metrics = pd.read_parquet(
+        tmp_path
+        / "data"
+        / "processed"
+        / "evaluation"
+        / "baseline_metrics_by_maturity_point.parquet"
+    )
 
     assert output_path == tmp_path / "data" / "processed" / "evaluation" / "baseline_metrics.parquet"
     assert set(metrics["target"]) == {"yield_change"}
@@ -63,6 +70,13 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
     assert set(metrics["test_dates"]) == {3}
     assert set(maturity_metrics["maturity_bucket"]) == {"front_end", "belly", "long_end"}
     assert set(maturity_metrics["representation"]) == {"pca", "nelson_siegel", "lagged", "curve"}
+    assert set(maturity_point_metrics["maturity_years"]) == {1.0, 5.0, 30.0}
+    assert set(maturity_point_metrics["representation"]) == {
+        "pca",
+        "nelson_siegel",
+        "lagged",
+        "curve",
+    }
 
 
 def test_evaluate_baselines_supports_residual_targets(tmp_path: Path) -> None:

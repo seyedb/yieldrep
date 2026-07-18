@@ -449,6 +449,13 @@ def test_evaluate_baselines_command_writes_metrics(tmp_path: Path) -> None:
     assert (
         tmp_path / "data" / "processed" / "evaluation" / "baseline_metrics_by_maturity.parquet"
     ).exists()
+    assert (
+        tmp_path
+        / "data"
+        / "processed"
+        / "evaluation"
+        / "baseline_metrics_by_maturity_point.parquet"
+    ).exists()
     assert "baseline_metrics.parquet" in result.stdout
 
 

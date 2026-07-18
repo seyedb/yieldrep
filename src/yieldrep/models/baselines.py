@@ -15,6 +15,7 @@ from yieldrep.evaluation.metrics import directional_accuracy, mae, rmse
 
 GROUP_COLUMNS = ["country", "horizon_days"]
 MATURITY_GROUP_COLUMNS = ["country", "horizon_days", "maturity_bucket"]
+MATURITY_POINT_GROUP_COLUMNS = ["country", "horizon_days", "maturity_years"]
 PCA_FEATURES = ["PC1", "PC2", "PC3", "PC4", "PC5"]
 NELSON_SIEGEL_FEATURES = ["beta_level", "beta_slope", "beta_curvature", "rmse"]
 CURVE_FEATURES = [
@@ -49,6 +50,7 @@ def evaluate_baselines(config: ProjectConfig) -> Path:
 
     rows: list[dict[str, object]] = []
     maturity_rows: list[dict[str, object]] = []
+    maturity_point_rows: list[dict[str, object]] = []
     for spec in specs:
         if spec.path.exists():
             rows.extend(_evaluate_representation(config, spec, group_columns=GROUP_COLUMNS))
@@ -60,10 +62,21 @@ def evaluate_baselines(config: ProjectConfig) -> Path:
                     include_maturity_bucket=True,
                 )
             )
+            maturity_point_rows.extend(
+                _evaluate_representation(
+                    config,
+                    spec,
+                    group_columns=MATURITY_POINT_GROUP_COLUMNS,
+                )
+            )
 
     config.evaluation_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_parquet(config.baseline_metrics_path, index=False)
     pd.DataFrame(maturity_rows).to_parquet(config.baseline_metrics_by_maturity_path, index=False)
+    pd.DataFrame(maturity_point_rows).to_parquet(
+        config.baseline_metrics_by_maturity_point_path,
+        index=False,
+    )
     return config.baseline_metrics_path
 
 
@@ -88,6 +101,7 @@ def _evaluate_representation(
         country = str(group_key["country"])
         horizon_days = int(str(group_key["horizon_days"]))
         maturity_bucket_value = group_key.get("maturity_bucket")
+        maturity_years_value = group_key.get("maturity_years")
 
         for split in evaluation_splits(
             group,
@@ -121,6 +135,7 @@ def _evaluate_representation(
                     train_dates=split.train["date"].nunique(),
                     test_dates=split.test["date"].nunique(),
                     maturity_bucket=maturity_bucket_value,
+                    maturity_years=maturity_years_value,
                 )
             )
 
@@ -145,6 +160,7 @@ def _evaluate_representation(
                     train_dates=split.train["date"].nunique(),
                     test_dates=split.test["date"].nunique(),
                     maturity_bucket=maturity_bucket_value,
+                    maturity_years=maturity_years_value,
                 )
             )
 
@@ -297,6 +313,7 @@ def _metric_row(
     train_dates: int,
     test_dates: int,
     maturity_bucket: object | None = None,
+    maturity_years: object | None = None,
 ) -> dict[str, object]:
     row = {
         "target": target,
@@ -316,6 +333,8 @@ def _metric_row(
     }
     if maturity_bucket is not None:
         row["maturity_bucket"] = str(maturity_bucket)
+    if maturity_years is not None:
+        row["maturity_years"] = float(str(maturity_years))
     return row
 
 

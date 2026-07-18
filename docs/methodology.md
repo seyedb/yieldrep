@@ -254,13 +254,16 @@ where \(T\) is the minimum number of training dates, \(H\) is the test-window
 length, and \(S\) is the step size. This better matches how forecasting models
 would be evaluated through time.
 
-Metrics are reported both overall and by maturity bucket:
+Metrics are reported overall, by maturity bucket, and by exact maturity point:
 
 ```text
 front_end  maturity <= 2 years
 belly      2 years < maturity <= 10 years
 long_end   maturity > 10 years
 ```
+
+The exact-maturity output helps identify whether a representation works better
+at specific points such as the front end, belly, or long end of the curve.
 
 ## Metrics
 
