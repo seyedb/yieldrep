@@ -459,6 +459,61 @@ def test_evaluate_baselines_command_writes_metrics(tmp_path: Path) -> None:
     assert "baseline_metrics.parquet" in result.stdout
 
 
+def test_summarize_baselines_command_writes_csv_tables(tmp_path: Path) -> None:
+    evaluation_dir = tmp_path / "data" / "processed" / "evaluation"
+    evaluation_dir.mkdir(parents=True)
+    metrics = pd.DataFrame(
+        {
+            "target": ["yield_change", "yield_change"],
+            "representation": ["pca", "curve"],
+            "model": ["ridge", "ridge"],
+            "split_method": ["date_ordered", "date_ordered"],
+            "window_id": [0, 0],
+            "country": ["US", "US"],
+            "horizon_days": [1, 1],
+            "rmse": [0.1, 0.2],
+            "mae": [0.05, 0.1],
+            "directional_accuracy": [0.5, 0.6],
+            "train_rows": [10, 10],
+            "test_rows": [3, 3],
+            "train_dates": [10, 10],
+            "test_dates": [3, 3],
+        }
+    )
+    metrics.to_parquet(evaluation_dir / "baseline_metrics.parquet", index=False)
+    metrics.assign(maturity_bucket=["front_end", "belly"]).to_parquet(
+        evaluation_dir / "baseline_metrics_by_maturity.parquet",
+        index=False,
+    )
+    metrics.assign(maturity_years=[2.0, 10.0]).to_parquet(
+        evaluation_dir / "baseline_metrics_by_maturity_point.parquet",
+        index=False,
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                f"data_dir: {tmp_path / 'data'}",
+                f"reports_dir: {tmp_path / 'reports'}",
+                "sources:",
+                "  test:",
+                "    country: US",
+                "    source: test",
+                f"    raw_file: {tmp_path / 'raw.csv'}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["summarize-baselines", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert (tmp_path / "reports" / "tables" / "baseline_summary.csv").exists()
+    assert (tmp_path / "reports" / "tables" / "baseline_by_maturity_bucket.csv").exists()
+    assert (tmp_path / "reports" / "tables" / "baseline_by_maturity_point_top.csv").exists()
+    assert "baseline_summary.csv" in result.stdout
+
+
 def test_plot_pca_command_writes_html_outputs(tmp_path: Path) -> None:
     pca_dir = tmp_path / "data" / "processed" / "pca"
     pca_dir.mkdir(parents=True)

@@ -202,4 +202,6 @@ data/processed/*
 
 # Generated report artifacts
 reports/figures/*
+reports/tables/*
 !reports/figures/.gitkeep
+!reports/tables/.gitkeep

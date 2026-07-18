@@ -10,6 +10,7 @@ def test_load_config_reads_project_paths() -> None:
     assert config.raw_dir == Path("data/raw")
     assert config.processed_dir == Path("data/processed")
     assert config.curves_path == Path("data/processed/curves.parquet")
+    assert config.tables_dir == Path("reports/tables")
     assert config.pca_dir == Path("data/processed/pca")
     assert config.nelson_siegel_dir == Path("data/processed/nelson_siegel")
     assert config.targets_path == Path("data/processed/targets.parquet")
@@ -23,6 +24,13 @@ def test_load_config_reads_project_paths() -> None:
     )
     assert config.baseline_metrics_by_maturity_point_path == Path(
         "data/processed/evaluation/baseline_metrics_by_maturity_point.parquet"
+    )
+    assert config.baseline_summary_table_path == Path("reports/tables/baseline_summary.csv")
+    assert config.baseline_by_maturity_bucket_table_path == Path(
+        "reports/tables/baseline_by_maturity_bucket.csv"
+    )
+    assert config.baseline_by_maturity_point_top_table_path == Path(
+        "reports/tables/baseline_by_maturity_point_top.csv"
     )
     assert config.figures_dir == Path("reports/figures")
 

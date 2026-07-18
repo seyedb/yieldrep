@@ -71,6 +71,10 @@ class ProjectConfig(BaseModel):
         return self.reports_dir / "figures"
 
     @property
+    def tables_dir(self) -> Path:
+        return self.reports_dir / "tables"
+
+    @property
     def curves_path(self) -> Path:
         return self.processed_dir / "curves.parquet"
 
@@ -113,6 +117,18 @@ class ProjectConfig(BaseModel):
     @property
     def baseline_metrics_by_maturity_point_path(self) -> Path:
         return self.evaluation_dir / "baseline_metrics_by_maturity_point.parquet"
+
+    @property
+    def baseline_summary_table_path(self) -> Path:
+        return self.tables_dir / "baseline_summary.csv"
+
+    @property
+    def baseline_by_maturity_bucket_table_path(self) -> Path:
+        return self.tables_dir / "baseline_by_maturity_bucket.csv"
+
+    @property
+    def baseline_by_maturity_point_top_table_path(self) -> Path:
+        return self.tables_dir / "baseline_by_maturity_point_top.csv"
 
 
 def load_config(path: Path) -> ProjectConfig:
