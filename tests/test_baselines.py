@@ -192,6 +192,29 @@ def test_evaluate_baselines_supports_walk_forward(tmp_path: Path) -> None:
     assert set(metrics["test_dates"]) == {3}
 
 
+def test_evaluate_baselines_supports_non_overlapping_targets(tmp_path: Path) -> None:
+    modeling_dir = tmp_path / "data" / "processed" / "modeling"
+    modeling_dir.mkdir(parents=True)
+    _sample_modeling_data(feature_prefix="pca").to_parquet(
+        modeling_dir / "pca_targets.parquet",
+        index=False,
+    )
+    config = ProjectConfig(
+        data_dir=tmp_path / "data",
+        reports_dir=tmp_path / "reports",
+        sources={"test": SourceConfig(country="US", source="test", raw_file=tmp_path / "raw.csv")},
+        evaluation=EvaluationConfig(test_fraction=0.5, non_overlapping_targets=True),
+    )
+
+    output_path = evaluate_baselines(config)
+    metrics = pd.read_parquet(output_path)
+    horizon_1 = metrics.loc[metrics["horizon_days"] == 1]
+    horizon_5 = metrics.loc[metrics["horizon_days"] == 5]
+
+    assert set(horizon_1["test_dates"]) == {6}
+    assert set(horizon_5["test_dates"]) == {2}
+
+
 def test_walk_forward_splits_use_expanding_training_window() -> None:
     data = _sample_modeling_data(feature_prefix="pca")
 

@@ -123,6 +123,8 @@ def _evaluate_regression_representation(
             min_train_dates=config.evaluation.min_train_dates,
             test_window_dates=config.evaluation.test_window_dates,
             step_dates=config.evaluation.step_dates,
+            horizon_days=horizon_days,
+            non_overlapping_targets=config.evaluation.non_overlapping_targets,
         ):
             if split.train.empty or split.test.empty:
                 continue
@@ -217,6 +219,8 @@ def _evaluate_classification_representation(
             min_train_dates=config.evaluation.min_train_dates,
             test_window_dates=config.evaluation.test_window_dates,
             step_dates=config.evaluation.step_dates,
+            horizon_days=horizon_days,
+            non_overlapping_targets=config.evaluation.non_overlapping_targets,
         ):
             if split.train.empty or split.test.empty:
                 continue
@@ -414,17 +418,24 @@ def evaluation_splits(
     min_train_dates: int,
     test_window_dates: int,
     step_dates: int,
+    horizon_days: int | None = None,
+    non_overlapping_targets: bool = False,
 ) -> list[SplitWindow]:
     if method == "date_ordered":
         train, test = date_ordered_split(data, test_fraction=test_fraction)
-        return [SplitWindow(method=method, window_id=0, train=train, test=test)]
+        split = SplitWindow(method=method, window_id=0, train=train, test=test)
+        return [_apply_non_overlapping_test_filter(split, horizon_days, non_overlapping_targets)]
     if method == "walk_forward":
-        return walk_forward_splits(
+        splits = walk_forward_splits(
             data,
             min_train_dates=min_train_dates,
             test_window_dates=test_window_dates,
             step_dates=step_dates,
         )
+        return [
+            _apply_non_overlapping_test_filter(split, horizon_days, non_overlapping_targets)
+            for split in splits
+        ]
     raise ValueError(f"Unsupported evaluation method: {method}")
 
 
@@ -485,6 +496,26 @@ def walk_forward_splits(
         window_id += 1
         test_start += step_dates
     return splits
+
+
+def _apply_non_overlapping_test_filter(
+    split: SplitWindow,
+    horizon_days: int | None,
+    non_overlapping_targets: bool,
+) -> SplitWindow:
+    if not non_overlapping_targets or horizon_days is None or horizon_days <= 1 or split.test.empty:
+        return split
+
+    dates = pd.Index(sorted(pd.to_datetime(split.test["date"]).unique()))
+    keep_dates = set(dates[::horizon_days])
+    normalized_dates = pd.to_datetime(split.test["date"])
+    filtered_test = split.test.loc[normalized_dates.isin(keep_dates)].copy()
+    return SplitWindow(
+        method=split.method,
+        window_id=split.window_id,
+        train=split.train,
+        test=filtered_test,
+    )
 
 
 def maturity_bucket(maturity_years: pd.Series) -> pd.Series:
