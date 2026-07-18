@@ -12,6 +12,7 @@ from yieldrep.features.nelson_siegel import build_nelson_siegel
 from yieldrep.features.pca import build_pca
 from yieldrep.features.targets import build_residual_targets, build_targets
 from yieldrep.models.baselines import evaluate_baselines
+from yieldrep.visualization.plotly_baselines import plot_baseline_metrics
 from yieldrep.visualization.plotly_curves import plot_curves
 from yieldrep.visualization.plotly_nelson_siegel import plot_nelson_siegel
 from yieldrep.visualization.plotly_pca import plot_pca
@@ -105,6 +106,14 @@ def plot_pca_command(config: Path = Path("configs/default.yaml")) -> None:
     """Generate Plotly HTML figures from PCA outputs."""
     project_config = load_config(config)
     for output_path in plot_pca(project_config):
+        typer.echo(output_path)
+
+
+@app.command("plot-baseline-metrics")
+def plot_baseline_metrics_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Generate Plotly HTML figures from baseline evaluation metrics."""
+    project_config = load_config(config)
+    for output_path in plot_baseline_metrics(project_config):
         typer.echo(output_path)
 
 

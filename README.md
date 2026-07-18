@@ -32,6 +32,7 @@ PYTHONPATH=src python -m yieldrep.cli build-residual-targets --config configs/de
 PYTHONPATH=src python -m yieldrep.cli summarize-baselines --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli plot-curves --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli plot-pca --config configs/default.yaml
+PYTHONPATH=src python -m yieldrep.cli plot-baseline-metrics --config configs/default.yaml
 ```
 
 Generated data is written under `data/`; generated figures are written under

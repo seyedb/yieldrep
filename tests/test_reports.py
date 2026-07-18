@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from yieldrep.config import ProjectConfig, SourceConfig
 from yieldrep.evaluation.reports import summarize_baselines, top_maturity_point_metrics
@@ -41,12 +42,8 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
 
 
 def test_top_maturity_point_metrics_rejects_invalid_top_n() -> None:
-    try:
+    with pytest.raises(ValueError, match="top_n"):
         top_maturity_point_metrics(_sample_point_metrics(), top_n=0)
-    except ValueError as error:
-        assert "top_n" in str(error)
-    else:
-        raise AssertionError("Expected ValueError")
 
 
 def _sample_metrics() -> pd.DataFrame:
