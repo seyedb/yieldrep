@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import plotly.express as px
@@ -27,7 +28,7 @@ def plot_baseline_metrics(config: ProjectConfig) -> list[Path]:
     return [summary_path, bucket_path, point_path]
 
 
-def _plot_summary(metrics: pd.DataFrame):
+def _plot_summary(metrics: pd.DataFrame) -> Any:
     summary = (
         metrics.groupby(["target", "representation", "model"], sort=True)["rmse"]
         .mean()
@@ -45,7 +46,7 @@ def _plot_summary(metrics: pd.DataFrame):
     )
 
 
-def _plot_maturity_buckets(metrics: pd.DataFrame):
+def _plot_maturity_buckets(metrics: pd.DataFrame) -> Any:
     bucket_summary = (
         metrics.groupby(["target", "maturity_bucket", "representation", "model"], sort=True)[
             "rmse"
@@ -66,7 +67,7 @@ def _plot_maturity_buckets(metrics: pd.DataFrame):
     )
 
 
-def _plot_maturity_points(metrics: pd.DataFrame):
+def _plot_maturity_points(metrics: pd.DataFrame) -> Any:
     point_summary = (
         metrics.loc[metrics["model"] == "ridge"]
         .groupby(["target", "country", "maturity_years", "representation"], sort=True)["rmse"]

@@ -6,7 +6,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
-from sklearn.linear_model import Ridge
+from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -94,6 +97,17 @@ def evaluate_baselines(config: ProjectConfig) -> Path:
     pd.DataFrame(maturity_rows).to_parquet(config.baseline_metrics_by_maturity_path, index=False)
     pd.DataFrame(maturity_point_rows).to_parquet(
         config.baseline_metrics_by_maturity_point_path,
+        index=False,
+    )
+
+    classification_rows: list[dict[str, object]] = []
+    for spec in _classification_specs(config):
+        prepared = _prepare_evaluation_data(spec)
+        if prepared is None:
+            continue
+        classification_rows.extend(_evaluate_classification_representation(config, spec, prepared))
+    pd.DataFrame(classification_rows).to_parquet(
+        config.baseline_classification_metrics_path,
         index=False,
     )
     return config.baseline_metrics_path
@@ -220,6 +234,127 @@ def _evaluate_split(
     return rows
 
 
+def _evaluate_classification_representation(
+    config: ProjectConfig,
+    spec: EvaluationSpec,
+    prepared: PreparedEvaluationData,
+) -> list[dict[str, object]]:
+    data = prepared.data
+    rows: list[dict[str, object]] = []
+    for group_values, group in data.groupby(GROUP_COLUMNS, sort=True):
+        group_key = dict(zip(GROUP_COLUMNS, _as_tuple(group_values), strict=True))
+        group = group.sort_values("date").dropna(
+            subset=[*prepared.feature_columns, spec.target_column]
+        )
+        country = str(group_key["country"])
+        horizon_days = int(str(group_key["horizon_days"]))
+
+        for split in evaluation_splits(
+            group,
+            method=config.evaluation.method,
+            test_fraction=config.evaluation.test_fraction,
+            min_train_dates=config.evaluation.min_train_dates,
+            test_window_dates=config.evaluation.test_window_dates,
+            step_dates=config.evaluation.step_dates,
+        ):
+            if split.train.empty or split.test.empty:
+                continue
+
+            x_train = split.train[prepared.feature_columns].to_numpy(dtype=float)
+            y_train = split.train[spec.target_column].astype(str).to_numpy()
+            x_test = split.test[prepared.feature_columns].to_numpy(dtype=float)
+            y_test = split.test[spec.target_column].astype(str).to_numpy()
+
+            rows.extend(
+                _evaluate_classification_split(
+                    config=config,
+                    spec=spec,
+                    split=split,
+                    country=country,
+                    horizon_days=horizon_days,
+                    x_train=x_train,
+                    y_train=y_train,
+                    x_test=x_test,
+                    y_test=y_test,
+                )
+            )
+    return rows
+
+
+def _evaluate_classification_split(
+    config: ProjectConfig,
+    spec: EvaluationSpec,
+    split: SplitWindow,
+    country: str,
+    horizon_days: int,
+    x_train: NDArray[np.float64],
+    y_train: NDArray[np.str_],
+    x_test: NDArray[np.float64],
+    y_test: NDArray[np.str_],
+) -> list[dict[str, object]]:
+    common = {
+        "target": spec.target,
+        "representation": spec.representation,
+        "split_method": split.method,
+        "window_id": split.window_id,
+        "country": country,
+        "horizon_days": horizon_days,
+        "train_rows": len(y_train),
+        "test_rows": len(y_test),
+        "train_dates": split.train["date"].nunique(),
+        "test_dates": split.test["date"].nunique(),
+    }
+
+    train_mode = DummyClassifier(strategy="most_frequent")
+    train_mode.fit(x_train, y_train)
+    rows = [
+        _classification_metric_row(
+            **common,
+            model="train_mode",
+            y_true=y_test,
+            y_pred=train_mode.predict(x_test),
+        )
+    ]
+
+    if len(np.unique(y_train)) < 2:
+        return rows
+
+    model = make_pipeline(
+        StandardScaler(),
+        LogisticRegression(
+            C=config.evaluation.logistic_c,
+            class_weight="balanced",
+            max_iter=1000,
+        ),
+    )
+    model.fit(x_train, y_train)
+    rows.append(
+        _classification_metric_row(
+            **common,
+            model="logistic_l2",
+            y_true=y_test,
+            y_pred=model.predict(x_test),
+        )
+    )
+
+    boosted = HistGradientBoostingClassifier(
+        max_iter=config.evaluation.gradient_boosting_max_iter,
+        learning_rate=0.05,
+        l2_regularization=1.0,
+        random_state=0,
+    )
+    boosted.fit(x_train, y_train)
+    rows.append(
+        _classification_metric_row(
+            **common,
+            model="hist_gradient_boosting",
+            y_true=y_test,
+            y_pred=boosted.predict(x_test),
+        )
+    )
+    return rows
+
+
 def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
     specs: list[EvaluationSpec] = []
     for target, suffix, target_column in [
@@ -267,6 +402,46 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
             ]
         )
     return specs
+
+
+def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
+    return [
+        EvaluationSpec(
+            target="future_vol_regime",
+            target_column="future_vol_regime",
+            representation="pca",
+            path=config.modeling_dir / "pca_vol_targets.parquet",
+            features=PCA_FEATURES,
+        ),
+        EvaluationSpec(
+            target="future_vol_regime",
+            target_column="future_vol_regime",
+            representation="nelson_siegel",
+            path=config.modeling_dir / "nelson_siegel_vol_targets.parquet",
+            features=NELSON_SIEGEL_FEATURES,
+        ),
+        EvaluationSpec(
+            target="future_vol_regime",
+            target_column="future_vol_regime",
+            representation="lagged",
+            path=config.modeling_dir / "lagged_vol_targets.parquet",
+            features=[f"lag_{lag}_change" for lag in config.evaluation.lag_days],
+        ),
+        EvaluationSpec(
+            target="future_vol_regime",
+            target_column="future_vol_regime",
+            representation="curve",
+            path=config.modeling_dir / "curve_vol_targets.parquet",
+            features=CURVE_FEATURES,
+        ),
+        EvaluationSpec(
+            target="future_vol_regime",
+            target_column="future_vol_regime",
+            representation="residual_feature",
+            path=config.modeling_dir / "residual_feature_vol_targets.parquet",
+            features=RESIDUAL_DYNAMIC_FEATURES,
+        ),
+    ]
 
 
 def evaluation_splits(
@@ -397,6 +572,39 @@ def _metric_row(
     if maturity_years is not None:
         row["maturity_years"] = float(str(maturity_years))
     return row
+
+
+def _classification_metric_row(
+    target: str,
+    representation: str,
+    model: str,
+    split_method: str,
+    window_id: int,
+    country: str,
+    horizon_days: int,
+    y_true: NDArray[np.str_],
+    y_pred: NDArray[np.str_],
+    train_rows: int,
+    test_rows: int,
+    train_dates: int,
+    test_dates: int,
+) -> dict[str, object]:
+    return {
+        "target": target,
+        "representation": representation,
+        "model": model,
+        "split_method": split_method,
+        "window_id": window_id,
+        "country": country,
+        "horizon_days": horizon_days,
+        "accuracy": accuracy_score(y_true, y_pred),
+        "balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
+        "macro_f1": f1_score(y_true, y_pred, average="macro", zero_division=0),
+        "train_rows": train_rows,
+        "test_rows": test_rows,
+        "train_dates": train_dates,
+        "test_dates": test_dates,
+    }
 
 
 def _as_tuple(value: object) -> tuple[object, ...]:

@@ -134,9 +134,17 @@ def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
 
     output_path = evaluate_baselines(config)
     metrics = pd.read_parquet(output_path)
+    classification_metrics = pd.read_parquet(config.baseline_classification_metrics_path)
 
     assert set(metrics["target"]) == {"vol_change"}
     assert set(metrics["representation"]) == {"pca"}
+    assert set(classification_metrics["target"]) == {"future_vol_regime"}
+    assert set(classification_metrics["model"]) == {
+        "train_mode",
+        "logistic_l2",
+        "hist_gradient_boosting",
+    }
+    assert {"accuracy", "balanced_accuracy", "macro_f1"}.issubset(classification_metrics.columns)
 
 
 def test_date_ordered_split_keeps_dates_disjoint() -> None:
@@ -240,6 +248,8 @@ def _sample_modeling_data(
                     "future_yield": 4.0 + index * 0.01 + maturity * 0.001,
                     target_column: index * 0.01 + maturity * 0.001,
                 }
+                if target_column == "target_vol_change":
+                    row["future_vol_regime"] = ["low", "medium", "high"][index % 3]
                 if feature_prefix == "pca":
                     row.update({"PC1": float(index), "PC2": float(horizon)})
                 elif feature_prefix == "ns":

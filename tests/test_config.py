@@ -19,6 +19,9 @@ def test_load_config_reads_project_paths() -> None:
     assert config.modeling_dir == Path("data/processed/modeling")
     assert config.evaluation_dir == Path("data/processed/evaluation")
     assert config.baseline_metrics_path == Path("data/processed/evaluation/baseline_metrics.parquet")
+    assert config.baseline_classification_metrics_path == Path(
+        "data/processed/evaluation/baseline_classification_metrics.parquet"
+    )
     assert config.figures_dir == Path("reports/figures")
     assert config.tables_dir == Path("reports/tables")
     assert config.baseline_summary_table_path == Path("reports/tables/baseline_summary.csv")
@@ -41,5 +44,7 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.evaluation.method == "date_ordered"
     assert config.evaluation.test_fraction == 0.2
     assert config.evaluation.ridge_alpha == 1.0
+    assert config.evaluation.logistic_c == 1.0
+    assert config.evaluation.gradient_boosting_max_iter == 100
     assert config.evaluation.lag_days == [1, 5, 20]
     assert config.plots.selected_maturities == [0.25, 1.0, 2.0, 5.0, 10.0, 30.0]

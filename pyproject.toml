@@ -39,6 +39,7 @@ src = ["src", "tests"]
 python_version = "3.11"
 strict = true
 packages = ["yieldrep"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

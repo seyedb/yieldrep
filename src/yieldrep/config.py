@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 
 
@@ -36,6 +36,8 @@ class EvaluationConfig(BaseModel):
     test_window_dates: int = 63
     step_dates: int = 63
     ridge_alpha: float = 1.0
+    logistic_c: float = 1.0
+    gradient_boosting_max_iter: int = 100
     lag_days: list[int] = Field(default_factory=lambda: [1, 5, 20])
 
 
@@ -126,6 +128,10 @@ class ProjectConfig(BaseModel):
     @property
     def baseline_metrics_by_maturity_point_path(self) -> Path:
         return self.evaluation_dir / "baseline_metrics_by_maturity_point.parquet"
+
+    @property
+    def baseline_classification_metrics_path(self) -> Path:
+        return self.evaluation_dir / "baseline_classification_metrics.parquet"
 
     @property
     def baseline_summary_table_path(self) -> Path:

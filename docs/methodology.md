@@ -153,8 +153,18 @@ y_{t,h,\mathrm{vol}}^{(c,m)}
 ```
 
 The pipeline also stores low, medium, and high future volatility-regime labels.
-Regression evaluation currently uses only the volatility-change target;
-classification metrics can be added later.
+These labels convert the volatility problem into a classification task:
+
+```math
+g_{t,h}^{(c,m)}
+\in
+\{\mathrm{low}, \mathrm{medium}, \mathrm{high}\}
+```
+
+where the classes are empirical volatility buckets for each country and
+maturity. This is a simple first version of a curve-state task: the model is not
+asked to forecast the exact volatility change, but to classify the future
+volatility environment.
 
 ## Baseline Forecasting Evaluation
 
@@ -172,6 +182,21 @@ where \(\mathbf{x}_t^{(c)}\) is a baseline representation available at date
 
 Metrics include a target label so outright yield-change, residual-change, and
 volatility-change tasks can be compared separately.
+
+For volatility-regime classification, the baseline comparison is:
+
+```math
+\hat{g}_{t,h}
+=
+\arg\max_k
+P(g_{t,h}=k \mid \mathbf{x}_t)
+```
+
+The current classical classifiers are a training-set mode baseline,
+L2-regularized multinomial logistic regression, and histogram gradient boosting.
+Logistic regression is a useful transparent hurdle; gradient boosting is the
+stronger classical ML benchmark because it can model nonlinear interactions
+between curve features without assuming a neural representation.
 
 Current feature sets:
 
