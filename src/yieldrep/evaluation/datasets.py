@@ -22,6 +22,10 @@ def build_modeling_datasets(config: ProjectConfig) -> list[Path]:
             _build_target_family(config, residual_targets, curves, suffix="_residual")
         )
 
+    if config.vol_targets_path.exists():
+        vol_targets = pd.read_parquet(config.vol_targets_path)
+        output_paths.extend(_build_target_family(config, vol_targets, curves, suffix="_vol"))
+
     return output_paths
 
 

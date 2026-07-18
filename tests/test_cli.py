@@ -266,6 +266,50 @@ def test_build_residual_targets_command_writes_output(tmp_path: Path) -> None:
     assert "residual_targets.parquet" in result.stdout
 
 
+def test_build_vol_targets_command_writes_output(tmp_path: Path) -> None:
+    processed_dir = tmp_path / "data" / "processed"
+    processed_dir.mkdir(parents=True)
+    dates = pd.date_range("2024-01-01", periods=8)
+    curves = pd.DataFrame(
+        [
+            {
+                "date": date,
+                "country": "US",
+                "maturity_years": maturity,
+                "yield": 3.0 + date_index * 0.1 + maturity * 0.01,
+                "source": "test",
+            }
+            for date_index, date in enumerate(dates)
+            for maturity in [2.0, 10.0]
+        ]
+    )
+    curves.to_parquet(processed_dir / "curves.parquet", index=False)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                f"data_dir: {tmp_path / 'data'}",
+                f"reports_dir: {tmp_path / 'reports'}",
+                "targets:",
+                "  horizons_days: [1]",
+                "  realized_vol_window: 2",
+                "sources:",
+                "  test:",
+                "    country: US",
+                "    source: test",
+                f"    raw_file: {tmp_path / 'raw.csv'}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["build-vol-targets", "--config", str(config_path)])
+
+    assert result.exit_code == 0
+    assert (processed_dir / "vol_targets.parquet").exists()
+    assert "vol_targets.parquet" in result.stdout
+
+
 def test_build_curve_features_command_writes_output(tmp_path: Path) -> None:
     processed_dir = tmp_path / "data" / "processed"
     processed_dir.mkdir(parents=True)

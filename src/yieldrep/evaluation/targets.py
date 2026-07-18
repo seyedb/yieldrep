@@ -25,6 +25,16 @@ RESIDUAL_TARGET_COLUMNS = (
     "target_residual_change",
     "fitted_yield",
 )
+VOL_TARGET_COLUMNS = (
+    "date",
+    "country",
+    "maturity_years",
+    "horizon_days",
+    "realized_vol",
+    "future_realized_vol",
+    "target_vol_change",
+    "future_vol_regime",
+)
 
 
 def build_targets(config: ProjectConfig) -> Path:
@@ -45,6 +55,20 @@ def build_residual_targets(config: ProjectConfig) -> Path:
     config.processed_dir.mkdir(parents=True, exist_ok=True)
     targets.to_parquet(config.residual_targets_path, index=False)
     return config.residual_targets_path
+
+
+def build_vol_targets(config: ProjectConfig) -> Path:
+    """Build forward realized-volatility-change targets from normalized curves."""
+    curves = pd.read_parquet(config.curves_path)
+    targets = make_forward_vol_change_targets(
+        curves,
+        horizons_days=config.targets.horizons_days,
+        realized_vol_window=config.targets.realized_vol_window,
+    )
+
+    config.processed_dir.mkdir(parents=True, exist_ok=True)
+    targets.to_parquet(config.vol_targets_path, index=False)
+    return config.vol_targets_path
 
 
 def make_forward_yield_change_targets(
@@ -86,6 +110,33 @@ def make_forward_residual_change_targets(
     return pd.concat(frames, ignore_index=True).loc[:, RESIDUAL_TARGET_COLUMNS]
 
 
+def make_forward_vol_change_targets(
+    curves: pd.DataFrame,
+    horizons_days: list[int],
+    realized_vol_window: int,
+) -> pd.DataFrame:
+    """Create future realized-volatility change targets by country and maturity."""
+    if not horizons_days:
+        raise ValueError("At least one target horizon is required")
+    if any(horizon <= 0 for horizon in horizons_days):
+        raise ValueError("Target horizons must be positive")
+    if realized_vol_window <= 1:
+        raise ValueError("realized_vol_window must be greater than 1")
+
+    base = curves.loc[:, ["date", "country", "maturity_years", "yield"]].copy()
+    base["date"] = pd.to_datetime(base["date"])
+    base = base.sort_values(["country", "maturity_years", "date"]).reset_index(drop=True)
+    grouped = base.groupby(["country", "maturity_years"], sort=False)["yield"]
+    base["yield_change"] = grouped.diff()
+    base["realized_vol"] = grouped.transform(
+        lambda series: series.diff().rolling(realized_vol_window).std()
+    )
+    base["future_vol_regime"] = _future_vol_regime(base)
+
+    frames = [_make_horizon_vol_targets(base, horizon) for horizon in horizons_days]
+    return pd.concat(frames, ignore_index=True).loc[:, VOL_TARGET_COLUMNS]
+
+
 def _make_horizon_targets(curves: pd.DataFrame, horizon_days: int) -> pd.DataFrame:
     target = curves.copy()
     grouped = target.groupby(["country", "maturity_years"], sort=False)["yield"]
@@ -105,6 +156,37 @@ def _make_horizon_residual_targets(
     target["target_residual_change"] = target["future_residual"] - target["residual"]
     target["horizon_days"] = horizon_days
     return target.dropna(subset=["future_residual", "target_residual_change"])
+
+
+def _make_horizon_vol_targets(curves: pd.DataFrame, horizon_days: int) -> pd.DataFrame:
+    target = curves.copy()
+    grouped = target.groupby(["country", "maturity_years"], sort=False)["realized_vol"]
+    target["future_realized_vol"] = grouped.shift(-horizon_days)
+    target["target_vol_change"] = target["future_realized_vol"] - target["realized_vol"]
+    target["future_vol_regime"] = target.groupby(["country", "maturity_years"], sort=False)[
+        "future_vol_regime"
+    ].shift(-horizon_days)
+    target["horizon_days"] = horizon_days
+    return target.dropna(
+        subset=["realized_vol", "future_realized_vol", "target_vol_change", "future_vol_regime"]
+    )
+
+
+def _future_vol_regime(curves: pd.DataFrame) -> pd.Series:
+    return curves.groupby(["country", "maturity_years"], sort=False)["realized_vol"].transform(
+        _vol_regime
+    )
+
+
+def _vol_regime(realized_vol: pd.Series) -> pd.Series:
+    ranked = realized_vol.rank(method="first")
+    regimes = pd.qcut(
+        ranked,
+        q=3,
+        labels=["low", "medium", "high"],
+        duplicates="drop",
+    )
+    return regimes.astype("string")
 
 
 def _read_nelson_siegel_fitted(config: ProjectConfig) -> pd.DataFrame:

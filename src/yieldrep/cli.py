@@ -10,7 +10,7 @@ from yieldrep.evaluation.reports import summarize_baselines
 from yieldrep.factors.curve import build_curve_features
 from yieldrep.factors.nelson_siegel import build_nelson_siegel
 from yieldrep.factors.pca import build_pca
-from yieldrep.evaluation.targets import build_residual_targets, build_targets
+from yieldrep.evaluation.targets import build_residual_targets, build_targets, build_vol_targets
 from yieldrep.models.baselines import evaluate_baselines
 from yieldrep.visualization.plotly_baselines import plot_baseline_metrics
 from yieldrep.visualization.plotly_curves import plot_curves
@@ -69,6 +69,13 @@ def build_residual_targets_command(config: Path = Path("configs/default.yaml")) 
     """Build Nelson-Siegel residual-change prediction targets."""
     project_config = load_config(config)
     typer.echo(build_residual_targets(project_config))
+
+
+@app.command("build-vol-targets")
+def build_vol_targets_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Build realized-volatility-change prediction targets."""
+    project_config = load_config(config)
+    typer.echo(build_vol_targets(project_config))
 
 
 @app.command("build-curve-features")

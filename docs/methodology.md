@@ -128,6 +128,34 @@ e_t^{(c,m)}
 This target asks whether baseline representations help predict changes in
 richness or cheapness after removing the fitted Nelson-Siegel curve.
 
+The project also supports a realized-volatility-change target. For rolling
+window \(W\), realized volatility is estimated from recent yield changes:
+
+```math
+\sigma_t^{(c,m)}
+=
+\mathrm{std}
+\left(
+\Delta r_{t-W+1}^{(c,m)},
+\ldots,
+\Delta r_t^{(c,m)}
+\right)
+```
+
+The volatility target is:
+
+```math
+y_{t,h,\mathrm{vol}}^{(c,m)}
+=
+\sigma_{t+h}^{(c,m)}
+-
+\sigma_t^{(c,m)}
+```
+
+The pipeline also stores low, medium, and high future volatility-regime labels.
+Regression evaluation currently uses only the volatility-change target;
+classification metrics can be added later.
+
 ## Baseline Forecasting Evaluation
 
 The supervised dataset joins representation features to the target:

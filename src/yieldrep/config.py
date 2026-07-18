@@ -26,6 +26,7 @@ class NelsonSiegelConfig(BaseModel):
 
 class TargetConfig(BaseModel):
     horizons_days: list[int] = Field(default_factory=lambda: [1, 5, 20])
+    realized_vol_window: int = 20
 
 
 class EvaluationConfig(BaseModel):
@@ -93,6 +94,10 @@ class ProjectConfig(BaseModel):
     @property
     def residual_targets_path(self) -> Path:
         return self.processed_dir / "residual_targets.parquet"
+
+    @property
+    def vol_targets_path(self) -> Path:
+        return self.processed_dir / "vol_targets.parquet"
 
     @property
     def curve_features_path(self) -> Path:

@@ -14,6 +14,7 @@ def test_load_config_reads_project_paths() -> None:
     assert config.nelson_siegel_dir == Path("data/processed/nelson_siegel")
     assert config.targets_path == Path("data/processed/targets.parquet")
     assert config.residual_targets_path == Path("data/processed/residual_targets.parquet")
+    assert config.vol_targets_path == Path("data/processed/vol_targets.parquet")
     assert config.modeling_dir == Path("data/processed/modeling")
     assert config.evaluation_dir == Path("data/processed/evaluation")
     assert config.baseline_metrics_path == Path("data/processed/evaluation/baseline_metrics.parquet")
@@ -35,6 +36,7 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.nelson_siegel.tau == 1.5
     assert config.nelson_siegel.min_maturities == 3
     assert config.targets.horizons_days == [1, 5, 20]
+    assert config.targets.realized_vol_window == 20
     assert config.evaluation.method == "date_ordered"
     assert config.evaluation.test_fraction == 0.2
     assert config.evaluation.ridge_alpha == 1.0
