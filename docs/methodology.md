@@ -281,6 +281,17 @@ r_{t-\ell}^{(c,m)}
 These features test whether factor representations add value beyond simple
 autoregressive information in each yield point.
 
+Lag diagnostics are used to interpret this baseline. For each target family, the
+project reports correlation and sign agreement for:
+
+```text
+target lag versus current target
+lagged yield-change feature versus current target
+```
+
+This separates genuine lag-feature signal from autocorrelation introduced by
+overlapping forward-return windows.
+
 The naive benchmark predicts the training-sample mean:
 
 ```math

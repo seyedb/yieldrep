@@ -6,6 +6,7 @@ from yieldrep.config import ProjectConfig, load_config
 from yieldrep.data.ingest import ingest_sources
 from yieldrep.data.normalize import build_curves_parquet
 from yieldrep.evaluation.datasets import build_modeling_datasets
+from yieldrep.evaluation.diagnostics import diagnose_lagged_baseline
 from yieldrep.evaluation.reports import summarize_baselines
 from yieldrep.evaluation.targets import build_residual_targets, build_targets, build_vol_targets
 from yieldrep.factors.curve import build_curve_features
@@ -114,6 +115,13 @@ def evaluate_baselines_command(config: Path = Path("configs/default.yaml")) -> N
     """Evaluate simple forecasting baselines."""
     project_config = load_config(config)
     typer.echo(evaluate_baselines(project_config))
+
+
+@app.command("diagnose-lagged-baseline")
+def diagnose_lagged_baseline_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Measure autocorrelation behind lagged baseline performance."""
+    project_config = load_config(config)
+    typer.echo(diagnose_lagged_baseline(project_config))
 
 
 @app.command("summarize-baselines")
