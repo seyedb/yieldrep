@@ -7,9 +7,7 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 from numpy.typing import NDArray
-from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression, Ridge
-from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -37,6 +35,7 @@ RESIDUAL_DYNAMIC_FEATURES = [
     "residual_vol_20",
 ]
 BASE_EVALUATION_COLUMNS = ["date", "country", "maturity_years", "horizon_days"]
+VOL_REGIME_LABELS = ["low", "medium", "high"]
 
 
 @dataclass(frozen=True)
@@ -140,25 +139,8 @@ def _evaluate_regression_representation(
                 x_test=x_test,
             )
             for model_name, y_pred in prediction_rows:
-                rows.append(
-                    _metric_row(
-                        target=spec.target,
-                        representation=spec.representation,
-                        model=model_name,
-                        split_method=split.method,
-                        window_id=split.window_id,
-                        country=country,
-                        horizon_days=horizon_days,
-                        y_true=y_test,
-                        y_pred=y_pred,
-                        train_rows=len(y_train),
-                        test_rows=len(y_test),
-                        train_dates=split.train["date"].nunique(),
-                        test_dates=split.test["date"].nunique(),
-                    )
-                )
-                maturity_rows.extend(
-                    _sliced_regression_metrics(
+                model_rows, model_maturity_rows, model_maturity_point_rows = (
+                    _regression_metric_rows(
                         spec=spec,
                         split=split,
                         country=country,
@@ -167,24 +149,11 @@ def _evaluate_regression_representation(
                         y_true=y_test,
                         y_pred=y_pred,
                         train_rows=len(y_train),
-                        slice_column="maturity_bucket",
-                        slice_values=maturity_bucket(split.test["maturity_years"]),
                     )
                 )
-                maturity_point_rows.extend(
-                    _sliced_regression_metrics(
-                        spec=spec,
-                        split=split,
-                        country=country,
-                        horizon_days=horizon_days,
-                        model_name=model_name,
-                        y_true=y_test,
-                        y_pred=y_pred,
-                        train_rows=len(y_train),
-                        slice_column="maturity_years",
-                        slice_values=split.test["maturity_years"],
-                    )
-                )
+                rows.extend(model_rows)
+                maturity_rows.extend(model_maturity_rows)
+                maturity_point_rows.extend(model_maturity_point_rows)
 
     return rows, maturity_rows, maturity_point_rows
 
@@ -300,14 +269,12 @@ def _evaluate_classification_split(
         "test_dates": split.test["date"].nunique(),
     }
 
-    train_mode = DummyClassifier(strategy="most_frequent")
-    train_mode.fit(x_train, y_train)
     rows = [
         _classification_metric_row(
             **common,
             model="train_mode",
             y_true=y_test,
-            y_pred=train_mode.predict(x_test),
+            y_pred=_mode_predictions(y_train, len(y_test)),
         )
     ]
 
@@ -343,6 +310,12 @@ def _limit_classification_training_rows(
     if max_rows <= 0 or len(train) <= max_rows:
         return train
     return train.tail(max_rows)
+
+
+def _mode_predictions(y_train: NDArray[np.str_], rows: int) -> NDArray[np.str_]:
+    labels, counts = np.unique(y_train, return_counts=True)
+    mode_label = labels[int(np.argmax(counts))]
+    return np.full(rows, mode_label, dtype=labels.dtype)
 
 
 def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
@@ -564,6 +537,80 @@ def _metric_row(
     return row
 
 
+def _regression_metric_rows(
+    spec: EvaluationSpec,
+    split: SplitWindow,
+    country: str,
+    horizon_days: int,
+    model_name: str,
+    y_true: NDArray[np.float64],
+    y_pred: NDArray[np.float64],
+    train_rows: int,
+) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
+    eval_frame = pd.DataFrame(
+        {
+            "date": split.test["date"].to_numpy(),
+            "maturity_years": split.test["maturity_years"].to_numpy(dtype=float),
+            "squared_error": np.square(y_true - y_pred),
+            "absolute_error": np.abs(y_true - y_pred),
+            "direction_match": np.sign(y_true) == np.sign(y_pred),
+        }
+    )
+    eval_frame["maturity_bucket"] = maturity_bucket(eval_frame["maturity_years"])
+
+    common = {
+        "target": spec.target,
+        "representation": spec.representation,
+        "model": model_name,
+        "split_method": split.method,
+        "window_id": split.window_id,
+        "country": country,
+        "horizon_days": horizon_days,
+        "train_rows": train_rows,
+        "train_dates": split.train["date"].nunique(),
+    }
+    return (
+        _aggregate_regression_metrics(eval_frame, [], common),
+        _aggregate_regression_metrics(eval_frame, ["maturity_bucket"], common),
+        _aggregate_regression_metrics(eval_frame, ["maturity_years"], common),
+    )
+
+
+def _aggregate_regression_metrics(
+    eval_frame: pd.DataFrame,
+    group_columns: list[str],
+    common: dict[str, object],
+) -> list[dict[str, object]]:
+    if group_columns:
+        grouped = eval_frame.groupby(group_columns, sort=True, observed=True)
+        summary = (
+            grouped.agg(
+                mse=("squared_error", "mean"),
+                mae=("absolute_error", "mean"),
+                directional_accuracy=("direction_match", "mean"),
+                test_rows=("squared_error", "size"),
+                test_dates=("date", "nunique"),
+            )
+            .reset_index()
+            .assign(rmse=lambda data: np.sqrt(data["mse"]))
+        )
+    else:
+        summary = pd.DataFrame(
+            [
+                {
+                    "mse": eval_frame["squared_error"].mean(),
+                    "mae": eval_frame["absolute_error"].mean(),
+                    "directional_accuracy": eval_frame["direction_match"].mean(),
+                    "test_rows": len(eval_frame),
+                    "test_dates": eval_frame["date"].nunique(),
+                }
+            ]
+        ).assign(rmse=lambda data: np.sqrt(data["mse"]))
+
+    rows = summary.drop(columns=["mse"]).to_dict("records")
+    return [{**common, **row} for row in rows]
+
+
 def _classification_metric_row(
     target: str,
     representation: str,
@@ -579,6 +626,7 @@ def _classification_metric_row(
     train_dates: int,
     test_dates: int,
 ) -> dict[str, object]:
+    accuracy, balanced_accuracy, macro_f1 = _classification_metrics(y_true, y_pred)
     return {
         "target": target,
         "representation": representation,
@@ -587,9 +635,9 @@ def _classification_metric_row(
         "window_id": window_id,
         "country": country,
         "horizon_days": horizon_days,
-        "accuracy": accuracy_score(y_true, y_pred),
-        "balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
-        "macro_f1": f1_score(y_true, y_pred, average="macro", zero_division=0),
+        "accuracy": accuracy,
+        "balanced_accuracy": balanced_accuracy,
+        "macro_f1": macro_f1,
         "train_rows": train_rows,
         "test_rows": test_rows,
         "train_dates": train_dates,
@@ -597,50 +645,52 @@ def _classification_metric_row(
     }
 
 
-def _sliced_regression_metrics(
-    spec: EvaluationSpec,
-    split: SplitWindow,
-    country: str,
-    horizon_days: int,
-    model_name: str,
-    y_true: NDArray[np.float64],
-    y_pred: NDArray[np.float64],
-    train_rows: int,
-    slice_column: str,
-    slice_values: pd.Series,
-) -> list[dict[str, object]]:
-    eval_frame = pd.DataFrame(
-        {
-            "date": split.test["date"].to_numpy(),
-            slice_column: slice_values.to_numpy(),
-            "y_true": y_true,
-            "y_pred": y_pred,
-        }
-    ).dropna(subset=[slice_column])
+def _classification_metrics(
+    y_true: NDArray[np.str_],
+    y_pred: NDArray[np.str_],
+) -> tuple[float, float, float]:
+    true_codes = _encode_vol_regimes(y_true)
+    pred_codes = _encode_vol_regimes(y_pred)
+    n_classes = len(VOL_REGIME_LABELS)
+    confusion = np.bincount(
+        true_codes * n_classes + pred_codes,
+        minlength=n_classes * n_classes,
+    ).reshape(n_classes, n_classes)
 
-    rows: list[dict[str, object]] = []
-    for slice_value, group in eval_frame.groupby(slice_column, sort=True):
-        kwargs = {"maturity_bucket": None, "maturity_years": None}
-        kwargs[slice_column] = slice_value
-        rows.append(
-            _metric_row(
-                target=spec.target,
-                representation=spec.representation,
-                model=model_name,
-                split_method=split.method,
-                window_id=split.window_id,
-                country=country,
-                horizon_days=horizon_days,
-                y_true=group["y_true"].to_numpy(dtype=float),
-                y_pred=group["y_pred"].to_numpy(dtype=float),
-                train_rows=train_rows,
-                test_rows=len(group),
-                train_dates=split.train["date"].nunique(),
-                test_dates=group["date"].nunique(),
-                **kwargs,
-            )
-        )
-    return rows
+    total = confusion.sum()
+    accuracy = float(np.trace(confusion) / total) if total else float("nan")
+
+    support = confusion.sum(axis=1)
+    predicted = confusion.sum(axis=0)
+    diagonal = np.diag(confusion)
+    recall = np.divide(diagonal, support, out=np.zeros_like(diagonal, dtype=float), where=support > 0)
+    precision = np.divide(
+        diagonal,
+        predicted,
+        out=np.zeros_like(diagonal, dtype=float),
+        where=predicted > 0,
+    )
+    f1 = np.divide(
+        2.0 * precision * recall,
+        precision + recall,
+        out=np.zeros_like(recall, dtype=float),
+        where=(precision + recall) > 0,
+    )
+
+    present_true = support > 0
+    present_either = (support + predicted) > 0
+    balanced_accuracy = float(recall[present_true].mean()) if present_true.any() else float("nan")
+    macro_f1 = float(f1[present_either].mean()) if present_either.any() else float("nan")
+    return accuracy, balanced_accuracy, macro_f1
+
+
+def _encode_vol_regimes(labels: NDArray[np.str_]) -> NDArray[np.int64]:
+    categorical = pd.Categorical(labels, categories=VOL_REGIME_LABELS)
+    codes = np.asarray(categorical.codes, dtype=np.int64)
+    if (codes < 0).any():
+        unknown = sorted(set(labels[codes < 0]))
+        raise ValueError(f"Unknown volatility regime labels: {unknown}")
+    return codes
 
 
 def _as_tuple(value: object) -> tuple[object, ...]:
