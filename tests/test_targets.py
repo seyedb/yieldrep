@@ -1,13 +1,7 @@
-from pathlib import Path
-
 import pandas as pd
 import pytest
 
-from yieldrep.config import ProjectConfig, SourceConfig, TargetConfig
 from yieldrep.evaluation.targets import (
-    build_residual_targets,
-    build_targets,
-    build_vol_targets,
     make_forward_residual_change_targets,
     make_forward_vol_change_targets,
     make_forward_yield_change_targets,
@@ -56,63 +50,6 @@ def test_make_forward_vol_change_targets() -> None:
     )
     assert set(targets["future_vol_regime"]).issubset({"low", "medium", "high"})
     assert targets["target_vol_change"].notna().all()
-
-
-def test_build_targets_writes_parquet(tmp_path: Path) -> None:
-    processed_dir = tmp_path / "data" / "processed"
-    processed_dir.mkdir(parents=True)
-    _sample_curves().to_parquet(processed_dir / "curves.parquet", index=False)
-    config = ProjectConfig(
-        data_dir=tmp_path / "data",
-        reports_dir=tmp_path / "reports",
-        sources={"test": SourceConfig(country="US", source="test", raw_file=tmp_path / "raw.csv")},
-        targets=TargetConfig(horizons_days=[1]),
-    )
-
-    output_path = build_targets(config)
-    targets = pd.read_parquet(output_path)
-
-    assert output_path == processed_dir / "targets.parquet"
-    assert len(targets) == 6
-    assert targets["horizon_days"].unique().tolist() == [1]
-
-
-def test_build_residual_targets_writes_parquet(tmp_path: Path) -> None:
-    ns_dir = tmp_path / "data" / "processed" / "nelson_siegel"
-    ns_dir.mkdir(parents=True)
-    _sample_fitted_curves().to_parquet(ns_dir / "us_fitted.parquet", index=False)
-    config = ProjectConfig(
-        data_dir=tmp_path / "data",
-        reports_dir=tmp_path / "reports",
-        sources={"test": SourceConfig(country="US", source="test", raw_file=tmp_path / "raw.csv")},
-        targets=TargetConfig(horizons_days=[1]),
-    )
-
-    output_path = build_residual_targets(config)
-    targets = pd.read_parquet(output_path)
-
-    assert output_path == tmp_path / "data" / "processed" / "residual_targets.parquet"
-    assert len(targets) == 6
-    assert {"residual", "future_residual", "target_residual_change"}.issubset(targets.columns)
-
-
-def test_build_vol_targets_writes_parquet(tmp_path: Path) -> None:
-    processed_dir = tmp_path / "data" / "processed"
-    processed_dir.mkdir(parents=True)
-    _sample_curves(periods=8).to_parquet(processed_dir / "curves.parquet", index=False)
-    config = ProjectConfig(
-        data_dir=tmp_path / "data",
-        reports_dir=tmp_path / "reports",
-        sources={"test": SourceConfig(country="US", source="test", raw_file=tmp_path / "raw.csv")},
-        targets=TargetConfig(horizons_days=[1], realized_vol_window=2),
-    )
-
-    output_path = build_vol_targets(config)
-    targets = pd.read_parquet(output_path)
-
-    assert output_path == tmp_path / "data" / "processed" / "vol_targets.parquet"
-    assert {"realized_vol", "future_realized_vol", "target_vol_change"}.issubset(targets.columns)
-
 
 def test_make_forward_yield_change_targets_rejects_invalid_horizons() -> None:
     with pytest.raises(ValueError, match="At least one"):

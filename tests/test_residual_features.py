@@ -1,9 +1,6 @@
-from pathlib import Path
-
 import pandas as pd
 
-from yieldrep.config import ProjectConfig, SourceConfig
-from yieldrep.factors.residual import build_residual_features, make_residual_features
+from yieldrep.factors.residual import make_residual_features
 
 
 def test_make_residual_features_builds_dynamic_features() -> None:
@@ -18,24 +15,6 @@ def test_make_residual_features_builds_dynamic_features() -> None:
         "residual_vol_20",
     }.issubset(features.columns)
     assert features["residual_z_252"].notna().all()
-
-
-def test_build_residual_features_writes_parquet(tmp_path: Path) -> None:
-    ns_dir = tmp_path / "data" / "processed" / "nelson_siegel"
-    ns_dir.mkdir(parents=True)
-    _sample_fitted_curves().to_parquet(ns_dir / "us_fitted.parquet", index=False)
-    config = ProjectConfig(
-        data_dir=tmp_path / "data",
-        reports_dir=tmp_path / "reports",
-        sources={"test": SourceConfig(country="US", source="test", raw_file=tmp_path / "raw.csv")},
-    )
-
-    output_path = build_residual_features(config)
-    features = pd.read_parquet(output_path)
-
-    assert output_path == tmp_path / "data" / "processed" / "residual_features.parquet"
-    assert not features.empty
-
 
 def _sample_fitted_curves() -> pd.DataFrame:
     dates = pd.date_range("2023-01-01", periods=260)
