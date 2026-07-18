@@ -45,6 +45,6 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.evaluation.test_fraction == 0.2
     assert config.evaluation.ridge_alpha == 1.0
     assert config.evaluation.logistic_c == 1.0
-    assert config.evaluation.gradient_boosting_max_iter == 100
+    assert config.evaluation.classification_max_train_rows == 2_000
     assert config.evaluation.lag_days == [1, 5, 20]
     assert config.plots.selected_maturities == [0.25, 1.0, 2.0, 5.0, 10.0, 30.0]

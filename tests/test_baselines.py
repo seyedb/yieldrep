@@ -139,11 +139,7 @@ def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
     assert set(metrics["target"]) == {"vol_change"}
     assert set(metrics["representation"]) == {"pca"}
     assert set(classification_metrics["target"]) == {"future_vol_regime"}
-    assert set(classification_metrics["model"]) == {
-        "train_mode",
-        "logistic_l2",
-        "hist_gradient_boosting",
-    }
+    assert set(classification_metrics["model"]) == {"train_mode", "logistic_l2"}
     assert {"accuracy", "balanced_accuracy", "macro_f1"}.issubset(classification_metrics.columns)
 
 

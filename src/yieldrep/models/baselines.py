@@ -5,9 +5,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 from numpy.typing import NDArray
 from sklearn.dummy import DummyClassifier
-from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
 from sklearn.pipeline import make_pipeline
@@ -36,6 +36,7 @@ RESIDUAL_DYNAMIC_FEATURES = [
     "residual_change_5",
     "residual_vol_20",
 ]
+BASE_EVALUATION_COLUMNS = ["date", "country", "maturity_years", "horizon_days"]
 
 
 @dataclass(frozen=True)
@@ -73,24 +74,12 @@ def evaluate_baselines(config: ProjectConfig) -> Path:
         if prepared is None:
             continue
 
-        rows.extend(_evaluate_representation(config, spec, prepared, group_columns=GROUP_COLUMNS))
-        maturity_rows.extend(
-            _evaluate_representation(
-                config,
-                spec,
-                prepared,
-                group_columns=MATURITY_GROUP_COLUMNS,
-                include_maturity_bucket=True,
-            )
+        spec_rows, spec_maturity_rows, spec_maturity_point_rows = (
+            _evaluate_regression_representation(config, spec, prepared)
         )
-        maturity_point_rows.extend(
-            _evaluate_representation(
-                config,
-                spec,
-                prepared,
-                group_columns=MATURITY_POINT_GROUP_COLUMNS,
-            )
-        )
+        rows.extend(spec_rows)
+        maturity_rows.extend(spec_maturity_rows)
+        maturity_point_rows.extend(spec_maturity_point_rows)
 
     config.evaluation_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_parquet(config.baseline_metrics_path, index=False)
@@ -113,28 +102,20 @@ def evaluate_baselines(config: ProjectConfig) -> Path:
     return config.baseline_metrics_path
 
 
-def _evaluate_representation(
+def _evaluate_regression_representation(
     config: ProjectConfig,
     spec: EvaluationSpec,
     prepared: PreparedEvaluationData,
-    group_columns: list[str],
-    include_maturity_bucket: bool = False,
-) -> list[dict[str, object]]:
-    data = prepared.data
-    if include_maturity_bucket:
-        data = data.copy()
-        data["maturity_bucket"] = maturity_bucket(data["maturity_years"])
-
+) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
+    data = prepared.data.dropna(subset=[*prepared.feature_columns, spec.target_column])
     rows: list[dict[str, object]] = []
-    for group_values, group in data.groupby(group_columns, sort=True):
-        group_key = dict(zip(group_columns, _as_tuple(group_values), strict=True))
-        group = group.sort_values("date").dropna(
-            subset=[*prepared.feature_columns, spec.target_column]
-        )
+    maturity_rows: list[dict[str, object]] = []
+    maturity_point_rows: list[dict[str, object]] = []
+    for group_values, group in data.groupby(GROUP_COLUMNS, sort=True):
+        group_key = dict(zip(GROUP_COLUMNS, _as_tuple(group_values), strict=True))
+        group = group.sort_values("date")
         country = str(group_key["country"])
         horizon_days = int(str(group_key["horizon_days"]))
-        maturity_bucket_value = group_key.get("maturity_bucket")
-        maturity_years_value = group_key.get("maturity_years")
 
         for split in evaluation_splits(
             group,
@@ -152,86 +133,97 @@ def _evaluate_representation(
             x_test = split.test[prepared.feature_columns].to_numpy(dtype=float)
             y_test = split.test[spec.target_column].to_numpy(dtype=float)
 
-            rows.extend(
-                _evaluate_split(
-                    config=config,
-                    spec=spec,
-                    split=split,
-                    country=country,
-                    horizon_days=horizon_days,
-                    x_train=x_train,
-                    y_train=y_train,
-                    x_test=x_test,
-                    y_test=y_test,
-                    maturity_bucket=maturity_bucket_value,
-                    maturity_years=maturity_years_value,
-                )
+            prediction_rows = _regression_predictions(
+                config=config,
+                x_train=x_train,
+                y_train=y_train,
+                x_test=x_test,
             )
+            for model_name, y_pred in prediction_rows:
+                rows.append(
+                    _metric_row(
+                        target=spec.target,
+                        representation=spec.representation,
+                        model=model_name,
+                        split_method=split.method,
+                        window_id=split.window_id,
+                        country=country,
+                        horizon_days=horizon_days,
+                        y_true=y_test,
+                        y_pred=y_pred,
+                        train_rows=len(y_train),
+                        test_rows=len(y_test),
+                        train_dates=split.train["date"].nunique(),
+                        test_dates=split.test["date"].nunique(),
+                    )
+                )
+                maturity_rows.extend(
+                    _sliced_regression_metrics(
+                        spec=spec,
+                        split=split,
+                        country=country,
+                        horizon_days=horizon_days,
+                        model_name=model_name,
+                        y_true=y_test,
+                        y_pred=y_pred,
+                        train_rows=len(y_train),
+                        slice_column="maturity_bucket",
+                        slice_values=maturity_bucket(split.test["maturity_years"]),
+                    )
+                )
+                maturity_point_rows.extend(
+                    _sliced_regression_metrics(
+                        spec=spec,
+                        split=split,
+                        country=country,
+                        horizon_days=horizon_days,
+                        model_name=model_name,
+                        y_true=y_test,
+                        y_pred=y_pred,
+                        train_rows=len(y_train),
+                        slice_column="maturity_years",
+                        slice_values=split.test["maturity_years"],
+                    )
+                )
 
-    return rows
+    return rows, maturity_rows, maturity_point_rows
 
 
 def _prepare_evaluation_data(spec: EvaluationSpec) -> PreparedEvaluationData | None:
     if not spec.path.exists():
         return None
 
-    data = pd.read_parquet(spec.path)
-    feature_columns = [column for column in spec.features if column in data.columns]
+    available_columns = set(pq.read_schema(spec.path).names)
+    if spec.target_column not in available_columns:
+        return None
+
+    feature_columns = [column for column in spec.features if column in available_columns]
     if not feature_columns:
         return None
+
+    required_columns = [*BASE_EVALUATION_COLUMNS, spec.target_column]
+    columns = _ordered_unique([*required_columns, *feature_columns])
+    if any(column not in available_columns for column in required_columns):
+        return None
+
+    data = pd.read_parquet(spec.path, columns=columns)
     return PreparedEvaluationData(data=data, feature_columns=feature_columns)
 
 
-def _evaluate_split(
+def _regression_predictions(
     config: ProjectConfig,
-    spec: EvaluationSpec,
-    split: SplitWindow,
-    country: str,
-    horizon_days: int,
     x_train: NDArray[np.float64],
     y_train: NDArray[np.float64],
     x_test: NDArray[np.float64],
-    y_test: NDArray[np.float64],
-    maturity_bucket: object | None,
-    maturity_years: object | None,
-) -> list[dict[str, object]]:
-    common = {
-        "target": spec.target,
-        "representation": spec.representation,
-        "split_method": split.method,
-        "window_id": split.window_id,
-        "country": country,
-        "horizon_days": horizon_days,
-        "train_rows": len(y_train),
-        "test_rows": len(y_test),
-        "train_dates": split.train["date"].nunique(),
-        "test_dates": split.test["date"].nunique(),
-        "maturity_bucket": maturity_bucket,
-        "maturity_years": maturity_years,
-    }
-    rows = [
-        _metric_row(
-            **common,
-            model="train_mean",
-            y_true=y_test,
-            y_pred=np.full_like(y_test, fill_value=float(np.mean(y_train))),
-        )
-    ]
-
+) -> list[tuple[str, NDArray[np.float64]]]:
+    predictions = [("train_mean", np.full(x_test.shape[0], fill_value=float(np.mean(y_train))))]
     model = make_pipeline(
         StandardScaler(),
         Ridge(alpha=config.evaluation.ridge_alpha),
     )
     model.fit(x_train, y_train)
-    rows.append(
-        _metric_row(
-            **common,
-            model="ridge",
-            y_true=y_test,
-            y_pred=model.predict(x_test),
-        )
-    )
-    return rows
+    predictions.append(("ridge", model.predict(x_test)))
+    return predictions
 
 
 def _evaluate_classification_representation(
@@ -260,8 +252,9 @@ def _evaluate_classification_representation(
             if split.train.empty or split.test.empty:
                 continue
 
-            x_train = split.train[prepared.feature_columns].to_numpy(dtype=float)
-            y_train = split.train[spec.target_column].astype(str).to_numpy()
+            train = _limit_classification_training_rows(split.train, config)
+            x_train = train[prepared.feature_columns].to_numpy(dtype=float)
+            y_train = train[spec.target_column].astype(str).to_numpy()
             x_test = split.test[prepared.feature_columns].to_numpy(dtype=float)
             y_test = split.test[spec.target_column].astype(str).to_numpy()
 
@@ -276,6 +269,7 @@ def _evaluate_classification_representation(
                     y_train=y_train,
                     x_test=x_test,
                     y_test=y_test,
+                    train_dates=train["date"].nunique(),
                 )
             )
     return rows
@@ -291,6 +285,7 @@ def _evaluate_classification_split(
     y_train: NDArray[np.str_],
     x_test: NDArray[np.float64],
     y_test: NDArray[np.str_],
+    train_dates: int,
 ) -> list[dict[str, object]]:
     common = {
         "target": spec.target,
@@ -301,7 +296,7 @@ def _evaluate_classification_split(
         "horizon_days": horizon_days,
         "train_rows": len(y_train),
         "test_rows": len(y_test),
-        "train_dates": split.train["date"].nunique(),
+        "train_dates": train_dates,
         "test_dates": split.test["date"].nunique(),
     }
 
@@ -337,22 +332,17 @@ def _evaluate_classification_split(
         )
     )
 
-    boosted = HistGradientBoostingClassifier(
-        max_iter=config.evaluation.gradient_boosting_max_iter,
-        learning_rate=0.05,
-        l2_regularization=1.0,
-        random_state=0,
-    )
-    boosted.fit(x_train, y_train)
-    rows.append(
-        _classification_metric_row(
-            **common,
-            model="hist_gradient_boosting",
-            y_true=y_test,
-            y_pred=boosted.predict(x_test),
-        )
-    )
     return rows
+
+
+def _limit_classification_training_rows(
+    train: pd.DataFrame,
+    config: ProjectConfig,
+) -> pd.DataFrame:
+    max_rows = config.evaluation.classification_max_train_rows
+    if max_rows <= 0 or len(train) <= max_rows:
+        return train
+    return train.tail(max_rows)
 
 
 def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
@@ -607,7 +597,57 @@ def _classification_metric_row(
     }
 
 
+def _sliced_regression_metrics(
+    spec: EvaluationSpec,
+    split: SplitWindow,
+    country: str,
+    horizon_days: int,
+    model_name: str,
+    y_true: NDArray[np.float64],
+    y_pred: NDArray[np.float64],
+    train_rows: int,
+    slice_column: str,
+    slice_values: pd.Series,
+) -> list[dict[str, object]]:
+    eval_frame = pd.DataFrame(
+        {
+            "date": split.test["date"].to_numpy(),
+            slice_column: slice_values.to_numpy(),
+            "y_true": y_true,
+            "y_pred": y_pred,
+        }
+    ).dropna(subset=[slice_column])
+
+    rows: list[dict[str, object]] = []
+    for slice_value, group in eval_frame.groupby(slice_column, sort=True):
+        kwargs = {"maturity_bucket": None, "maturity_years": None}
+        kwargs[slice_column] = slice_value
+        rows.append(
+            _metric_row(
+                target=spec.target,
+                representation=spec.representation,
+                model=model_name,
+                split_method=split.method,
+                window_id=split.window_id,
+                country=country,
+                horizon_days=horizon_days,
+                y_true=group["y_true"].to_numpy(dtype=float),
+                y_pred=group["y_pred"].to_numpy(dtype=float),
+                train_rows=train_rows,
+                test_rows=len(group),
+                train_dates=split.train["date"].nunique(),
+                test_dates=group["date"].nunique(),
+                **kwargs,
+            )
+        )
+    return rows
+
+
 def _as_tuple(value: object) -> tuple[object, ...]:
     if isinstance(value, tuple):
         return value
     return (value,)
+
+
+def _ordered_unique(values: list[str]) -> list[str]:
+    return list(dict.fromkeys(values))

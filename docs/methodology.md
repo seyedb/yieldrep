@@ -192,11 +192,10 @@ For volatility-regime classification, the baseline comparison is:
 P(g_{t,h}=k \mid \mathbf{x}_t)
 ```
 
-The current classical classifiers are a training-set mode baseline,
-L2-regularized multinomial logistic regression, and histogram gradient boosting.
-Logistic regression is a useful transparent hurdle; gradient boosting is the
-stronger classical ML benchmark because it can model nonlinear interactions
-between curve features without assuming a neural representation.
+The current classical classifiers are a training-set mode baseline and
+L2-regularized multinomial logistic regression. Logistic regression is a useful
+transparent hurdle because it is regularized, interpretable, and can combine
+multiple curve features without assuming a neural representation.
 
 Current feature sets:
 

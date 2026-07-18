@@ -37,7 +37,7 @@ class EvaluationConfig(BaseModel):
     step_dates: int = 63
     ridge_alpha: float = 1.0
     logistic_c: float = 1.0
-    gradient_boosting_max_iter: int = 100
+    classification_max_train_rows: int = 2_000
     lag_days: list[int] = Field(default_factory=lambda: [1, 5, 20])
 
 
