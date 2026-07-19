@@ -17,7 +17,6 @@ from yieldrep.evaluation.metrics import directional_accuracy, mae, rmse
 GROUP_COLUMNS = ["country", "horizon_days"]
 MATURITY_GROUP_COLUMNS = ["country", "horizon_days", "maturity_bucket"]
 MATURITY_POINT_GROUP_COLUMNS = ["country", "horizon_days", "maturity_years"]
-PCA_FEATURES = ["PC1", "PC2", "PC3", "PC4", "PC5"]
 NELSON_SIEGEL_FEATURES = ["beta_level", "beta_slope", "beta_curvature", "rmse"]
 CURVE_FEATURES = [
     "level",
@@ -336,7 +335,7 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                     target_column=target_column,
                     representation="pca",
                     path=config.modeling_dir / f"pca{suffix}_targets.parquet",
-                    features=PCA_FEATURES,
+                    features=_pca_features(config),
                 ),
                 EvaluationSpec(
                     target=target,
@@ -378,7 +377,7 @@ def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
             target_column="future_vol_regime",
             representation="pca",
             path=config.modeling_dir / "pca_vol_targets.parquet",
-            features=PCA_FEATURES,
+            features=_pca_features(config),
         ),
         EvaluationSpec(
             target="future_vol_regime",
@@ -732,3 +731,7 @@ def _as_tuple(value: object) -> tuple[object, ...]:
 
 def _ordered_unique(values: list[str]) -> list[str]:
     return list(dict.fromkeys(values))
+
+
+def _pca_features(config: ProjectConfig) -> list[str]:
+    return [f"PC{i}" for i in range(1, config.pca.n_components + 1)]

@@ -201,7 +201,7 @@ Current feature sets:
 
 ```text
 PCA:
-    PC1, PC2, PC3, PC4, PC5
+    PC1, ..., PCK where K is configured by pca.n_components
 
 Nelson-Siegel:
     beta_level, beta_slope, beta_curvature, rmse

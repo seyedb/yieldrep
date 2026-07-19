@@ -3,11 +3,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from yieldrep.config import EvaluationConfig, ProjectConfig, SourceConfig
+from yieldrep.config import EvaluationConfig, PCAConfig, ProjectConfig, SourceConfig
 from yieldrep.models.baselines import (
     date_ordered_split,
     evaluate_baselines,
     maturity_bucket,
+    _pca_features,
     walk_forward_splits,
 )
 
@@ -247,6 +248,17 @@ def test_maturity_bucket_maps_curve_segments() -> None:
     buckets = maturity_bucket(pd.Series([0.25, 2.0, 5.0, 10.0, 30.0]))
 
     assert buckets.tolist() == ["front_end", "front_end", "belly", "belly", "long_end"]
+
+
+def test_pca_features_follow_configured_component_count(tmp_path: Path) -> None:
+    config = ProjectConfig(
+        data_dir=tmp_path / "data",
+        reports_dir=tmp_path / "reports",
+        sources={"test": SourceConfig(country="US", source="test", raw_file=tmp_path / "raw.csv")},
+        pca=PCAConfig(n_components=7),
+    )
+
+    assert _pca_features(config) == ["PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7"]
 
 
 def _sample_modeling_data(
