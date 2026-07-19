@@ -41,6 +41,9 @@ def build_modeling_datasets(config: ProjectConfig) -> list[Path]:
 
     if config.vol_targets_path.exists():
         vol_targets = pd.read_parquet(config.vol_targets_path)
+        supervised_vol = make_supervised_vol_change_dataset(config, vol_targets, curves)
+        supervised_vol.to_parquet(config.supervised_vol_change_path, index=False)
+        output_paths.append(config.supervised_vol_change_path)
         output_paths.extend(_build_target_family(config, vol_targets, curves, suffix="_vol"))
 
     return output_paths
@@ -61,6 +64,15 @@ def make_supervised_residual_change_dataset(
     curves: pd.DataFrame,
 ) -> pd.DataFrame:
     """Build the canonical supervised panel for residual-change forecasting."""
+    return _make_supervised_dataset(config, targets, curves)
+
+
+def make_supervised_vol_change_dataset(
+    config: ProjectConfig,
+    targets: pd.DataFrame,
+    curves: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build the canonical supervised panel for volatility-change forecasting."""
     return _make_supervised_dataset(config, targets, curves)
 
 

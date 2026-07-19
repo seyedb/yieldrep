@@ -130,6 +130,7 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         {
             processed_dir / "modeling" / "supervised_yield_change.parquet",
             processed_dir / "modeling" / "supervised_residual_change.parquet",
+            processed_dir / "modeling" / "supervised_vol_change.parquet",
             processed_dir / "modeling" / "pca_targets.parquet",
             processed_dir / "modeling" / "nelson_siegel_targets.parquet",
             processed_dir / "modeling" / "lagged_targets.parquet",
@@ -148,6 +149,7 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     supervised_residual = pd.read_parquet(
         processed_dir / "modeling" / "supervised_residual_change.parquet"
     )
+    supervised_vol = pd.read_parquet(processed_dir / "modeling" / "supervised_vol_change.parquet")
     ns_targets = pd.read_parquet(processed_dir / "modeling" / "nelson_siegel_targets.parquet")
     lagged_targets = pd.read_parquet(processed_dir / "modeling" / "lagged_targets.parquet")
     curve_targets = pd.read_parquet(processed_dir / "modeling" / "curve_targets.parquet")
@@ -181,6 +183,10 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         supervised_residual.columns
     )
     assert set(supervised_residual["split"]) == {"train", "test"}
+    assert {"target_vol_change", "future_vol_regime", "PC1", "residual_z_60"}.issubset(
+        supervised_vol.columns
+    )
+    assert set(supervised_vol["split"]) == {"train", "test"}
     assert {"beta_level", "beta_slope", "beta_curvature", "target_yield_change"}.issubset(
         ns_targets.columns
     )

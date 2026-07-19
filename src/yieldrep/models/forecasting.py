@@ -306,6 +306,14 @@ def _target_specs(config: ProjectConfig) -> list[TargetSpec]:
                 target_column="target_residual_change",
             )
         )
+    if config.supervised_vol_change_path.exists():
+        specs.append(
+            TargetSpec(
+                target="vol_change",
+                path=config.supervised_vol_change_path,
+                target_column="target_vol_change",
+            )
+        )
     return specs
 
 

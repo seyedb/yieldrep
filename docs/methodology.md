@@ -379,9 +379,10 @@ where \(\mathbf{x}_t^{(c)}\) is a baseline representation available at date
 The canonical supervised tables store one row per country, date, maturity, and
 horizon, with all currently available classical features joined to a specific
 forecast target. The current canonical supervised targets are outright
-yield-change and Nelson-Siegel residual-change. Each table also stores the
-chronological train/test split labels used by the evaluation pipeline, so
-downstream models can reuse the same experimental design.
+yield-change, Nelson-Siegel residual-change, and realized-volatility change.
+Each table also stores the chronological train/test split labels used by the
+evaluation pipeline, so downstream models can reuse the same experimental
+design.
 
 ### Models
 
@@ -561,8 +562,7 @@ The current evaluation is a first sanity check, not a final forecasting protocol
 Important next improvements:
 
 - Report finer metrics by individual maturity and market regime.
-- Extend the canonical supervised benchmark to volatility and curve-state
-  transition targets.
+- Extend the canonical supervised benchmark to curve-state transition targets.
 - Add richer fixed-income return proxies when public bond-level cash-flow data is
   introduced; current carry/roll-down features are zero-curve approximations.
 - Run and summarize walk-forward robustness as a first-class report.

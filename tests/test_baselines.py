@@ -180,6 +180,10 @@ def test_evaluate_supervised_forecasts_writes_metrics_and_tables(tmp_path: Path)
         columns={"target_yield_change": "target_residual_change"}
     ).assign(residual=0.01)
     residual_data.to_parquet(modeling_dir / "supervised_residual_change.parquet", index=False)
+    vol_data = data.rename(columns={"target_yield_change": "target_vol_change"}).assign(
+        future_vol_regime="medium"
+    )
+    vol_data.to_parquet(modeling_dir / "supervised_vol_change.parquet", index=False)
     config = ProjectConfig(
         data_dir=tmp_path / "data",
         reports_dir=tmp_path / "reports",
@@ -203,7 +207,7 @@ def test_evaluate_supervised_forecasts_writes_metrics_and_tables(tmp_path: Path)
         config.supervised_forecast_coefficients_table_path,
     ]
     assert set(metrics["representation"]) == {"pca", "residual_feature"}
-    assert set(metrics["target"]) == {"yield_change", "residual_change"}
+    assert set(metrics["target"]) == {"yield_change", "residual_change", "vol_change"}
     assert set(metrics["model"]) == {"train_mean", "ridge", "elastic_net"}
     assert {
         "rmse",
@@ -214,7 +218,7 @@ def test_evaluate_supervised_forecasts_writes_metrics_and_tables(tmp_path: Path)
     }.issubset(metrics.columns)
     assert set(bucket_metrics["maturity_bucket"]) == {"front_end", "belly", "long_end"}
     assert set(coefficients["model"]) == {"ridge", "elastic_net"}
-    assert set(coefficients["target"]) == {"yield_change", "residual_change"}
+    assert set(coefficients["target"]) == {"yield_change", "residual_change", "vol_change"}
     assert {"feature", "coefficient", "abs_coefficient"}.issubset(coefficients.columns)
     assert set(summary["representation"]) == {"pca", "residual_feature"}
 
