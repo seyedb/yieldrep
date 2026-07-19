@@ -26,6 +26,15 @@ def test_load_config_reads_project_paths() -> None:
     assert config.baseline_classification_metrics_path == Path(
         "data/processed/evaluation/baseline_classification_metrics.parquet"
     )
+    assert config.supervised_forecast_metrics_path == Path(
+        "data/processed/evaluation/supervised_forecast_metrics.parquet"
+    )
+    assert config.supervised_forecast_summary_table_path == Path(
+        "reports/tables/supervised_forecast_summary.csv"
+    )
+    assert config.supervised_forecast_rank_table_path == Path(
+        "reports/tables/supervised_forecast_rank.csv"
+    )
     assert config.lagged_diagnostics_path == Path(
         "data/processed/evaluation/lagged_diagnostics.parquet"
     )

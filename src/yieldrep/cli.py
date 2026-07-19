@@ -20,6 +20,7 @@ from yieldrep.factors.nelson_siegel import build_nelson_siegel
 from yieldrep.factors.pca import build_pca
 from yieldrep.factors.residual import build_residual_features
 from yieldrep.models.baselines import evaluate_baselines
+from yieldrep.models.forecasting import evaluate_supervised_forecasts
 from yieldrep.visualization.plotly_baselines import plot_baseline_metrics
 from yieldrep.visualization.plotly_curves import plot_curves
 from yieldrep.visualization.plotly_nelson_siegel import plot_nelson_siegel
@@ -129,6 +130,8 @@ def evaluate_baselines_command(config: Path = Path("configs/default.yaml")) -> N
     """Evaluate simple forecasting baselines."""
     project_config = load_config(config)
     typer.echo(evaluate_baselines(project_config))
+    for output_path in evaluate_supervised_forecasts(project_config):
+        typer.echo(output_path)
 
 
 @app.command("summarize-baselines")
@@ -203,6 +206,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_vol_targets(project_config))
     output_paths.extend(build_modeling_datasets(project_config))
     output_paths.append(evaluate_baselines(project_config))
+    output_paths.extend(evaluate_supervised_forecasts(project_config))
     output_paths.extend(summarize_baselines(project_config))
     output_paths.extend(plot_baseline_metrics(project_config))
     return output_paths

@@ -143,6 +143,18 @@ class ProjectConfig(BaseModel):
         return self.evaluation_dir / "baseline_classification_metrics.parquet"
 
     @property
+    def supervised_forecast_metrics_path(self) -> Path:
+        return self.evaluation_dir / "supervised_forecast_metrics.parquet"
+
+    @property
+    def supervised_forecast_summary_table_path(self) -> Path:
+        return self.tables_dir / "supervised_forecast_summary.csv"
+
+    @property
+    def supervised_forecast_rank_table_path(self) -> Path:
+        return self.tables_dir / "supervised_forecast_rank.csv"
+
+    @property
     def lagged_diagnostics_path(self) -> Path:
         return self.evaluation_dir / "lagged_diagnostics.parquet"
 

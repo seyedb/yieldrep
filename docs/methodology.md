@@ -228,6 +228,12 @@ the same forward yield-change target. It also stores the chronological
 train/test split labels used by the evaluation pipeline, so downstream models
 can reuse the same experimental design.
 
+The first supervised benchmark compares a training-set mean forecast with
+L2-regularized Ridge regressions for each classical feature family. This is a
+standard linear hurdle: learned representations should eventually be evaluated
+against this same supervised table and split design, not against a different
+target construction.
+
 Metrics include a target label so outright yield-change, residual-change, and
 volatility-change tasks can be compared separately.
 

@@ -11,6 +11,7 @@ from yieldrep.models.baselines import (
     maturity_bucket,
     walk_forward_splits,
 )
+from yieldrep.models.forecasting import evaluate_supervised_forecasts
 
 
 def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
@@ -157,6 +158,37 @@ def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
     assert set(classification_metrics["target"]) == {"future_vol_regime"}
     assert set(classification_metrics["model"]) == {"train_mode", "logistic_l2"}
     assert {"accuracy", "balanced_accuracy", "macro_f1"}.issubset(classification_metrics.columns)
+
+
+def test_evaluate_supervised_forecasts_writes_metrics_and_tables(tmp_path: Path) -> None:
+    modeling_dir = tmp_path / "data" / "processed" / "modeling"
+    modeling_dir.mkdir(parents=True)
+    data = _sample_modeling_data(feature_prefix="pca").assign(
+        split=lambda frame: ["train" if date < frame["date"].iloc[-3] else "test" for date in frame["date"]],
+        split_method="date_ordered",
+        window_id=0,
+    )
+    data.to_parquet(modeling_dir / "supervised_yield_change.parquet", index=False)
+    config = ProjectConfig(
+        data_dir=tmp_path / "data",
+        reports_dir=tmp_path / "reports",
+        sources={"test": SourceConfig(country="US", source="test", raw_file=tmp_path / "raw.csv")},
+        evaluation=EvaluationConfig(test_fraction=0.25, ridge_alpha=1.0),
+    )
+
+    output_paths = evaluate_supervised_forecasts(config)
+    metrics = pd.read_parquet(config.supervised_forecast_metrics_path)
+    summary = pd.read_csv(config.supervised_forecast_summary_table_path)
+
+    assert output_paths == [
+        config.supervised_forecast_metrics_path,
+        config.supervised_forecast_summary_table_path,
+        config.supervised_forecast_rank_table_path,
+    ]
+    assert set(metrics["representation"]) == {"pca"}
+    assert set(metrics["model"]) == {"train_mean", "ridge"}
+    assert {"rmse", "mae", "directional_accuracy"}.issubset(metrics.columns)
+    assert set(summary["representation"]) == {"pca"}
 
 
 def test_date_ordered_split_keeps_dates_disjoint() -> None:
