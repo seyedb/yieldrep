@@ -40,7 +40,9 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     bucket_summary = pd.read_csv(output_paths[3])
     point_top = pd.read_csv(output_paths[4])
     assert {"target", "representation", "model", "mean_rmse"}.issubset(summary.columns)
-    assert {"rank", "rmse_gap_to_best", "pct_gap_to_best"}.issubset(rank_table.columns)
+    assert {"rank", "rmse_gap_to_best", "pct_gap_to_best", "mean_rank_ic"}.issubset(
+        rank_table.columns
+    )
     assert winners.loc[0, "best_representation"] == "pca"
     assert winners.loc[0, "lagged_rmse_gap_to_best"] == pytest.approx(0.02)
     assert "maturity_bucket" in bucket_summary.columns
@@ -123,6 +125,8 @@ def _metric_row(
         "rmse": rmse,
         "mae": rmse / 2.0,
         "directional_accuracy": 0.5,
+        "mean_rank_ic": 0.1,
+        "rank_ic_dates": 3,
         "train_rows": 10,
         "test_rows": 3,
         "train_dates": 10,

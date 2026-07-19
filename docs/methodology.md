@@ -422,6 +422,24 @@ Directional accuracy:
 \right]
 ```
 
+Cross-sectional rank IC is computed by date, country, and horizon. For each
+date, predicted and realized target values are ranked across maturities, then a
+Spearman correlation is computed:
+
+```math
+IC_t
+=
+\mathrm{corr}
+\left(
+\mathrm{rank}(\hat{y}_{t}^{(m)}),
+\mathrm{rank}(y_{t}^{(m)})
+\right)
+```
+
+The reported value is the mean of valid date-level rank correlations. This
+metric asks whether a model orders curve points correctly, even when RMSE is not
+the right objective.
+
 ## Current Limitations
 
 The current evaluation is a first sanity check, not a final forecasting protocol.

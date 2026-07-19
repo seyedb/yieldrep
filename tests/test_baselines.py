@@ -72,6 +72,8 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
         "rmse",
         "mae",
         "directional_accuracy",
+        "mean_rank_ic",
+        "rank_ic_dates",
         "train_rows",
         "test_rows",
         "train_dates",

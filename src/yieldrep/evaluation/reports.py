@@ -9,7 +9,7 @@ from yieldrep.config import ProjectConfig
 SUMMARY_GROUP_COLUMNS = ["target", "representation", "model"]
 BUCKET_GROUP_COLUMNS = ["target", "representation", "model", "maturity_bucket"]
 RANK_GROUP_COLUMNS = ["target", "country", "horizon_days"]
-METRIC_COLUMNS = ["rmse", "mae", "directional_accuracy"]
+METRIC_COLUMNS = ["rmse", "mae", "directional_accuracy", "mean_rank_ic", "rank_ic_dates"]
 
 
 def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
@@ -54,16 +54,22 @@ def summarize_metrics(
 ) -> pd.DataFrame:
     """Aggregate metric rows into compact mean-performance tables."""
     groups = group_columns or SUMMARY_GROUP_COLUMNS
+    aggregations = {
+        "rows": ("rmse", "size"),
+        "countries": ("country", "nunique"),
+        "horizons": ("horizon_days", "nunique"),
+        "mean_rmse": ("rmse", "mean"),
+        "mean_mae": ("mae", "mean"),
+        "mean_directional_accuracy": ("directional_accuracy", "mean"),
+    }
+    if "mean_rank_ic" in metrics.columns:
+        aggregations["mean_rank_ic"] = ("mean_rank_ic", "mean")
+    if "rank_ic_dates" in metrics.columns:
+        aggregations["rank_ic_dates"] = ("rank_ic_dates", "sum")
+
     summary = (
         metrics.groupby(groups, sort=True)
-        .agg(
-            rows=("rmse", "size"),
-            countries=("country", "nunique"),
-            horizons=("horizon_days", "nunique"),
-            mean_rmse=("rmse", "mean"),
-            mean_mae=("mae", "mean"),
-            mean_directional_accuracy=("directional_accuracy", "mean"),
-        )
+        .agg(**aggregations)
         .reset_index()
     )
     return summary.sort_values([*groups, "mean_rmse"]).reset_index(drop=True)
@@ -102,13 +108,7 @@ def rank_baselines(metrics: pd.DataFrame) -> pd.DataFrame:
     """Rank baseline representations within each target/country/horizon task."""
     summary = (
         metrics.groupby([*RANK_GROUP_COLUMNS, "representation", "model"], sort=True)
-        .agg(
-            rows=("rmse", "size"),
-            mean_rmse=("rmse", "mean"),
-            mean_mae=("mae", "mean"),
-            mean_directional_accuracy=("directional_accuracy", "mean"),
-            mean_test_dates=("test_dates", "mean"),
-        )
+        .agg(**_rank_aggregations(metrics))
         .reset_index()
     )
     summary["rank"] = summary.groupby(RANK_GROUP_COLUMNS)["mean_rmse"].rank(
@@ -145,6 +145,21 @@ def baseline_winners(rank_table: pd.DataFrame) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def _rank_aggregations(metrics: pd.DataFrame) -> dict[str, tuple[str, str]]:
+    aggregations = {
+        "rows": ("rmse", "size"),
+        "mean_rmse": ("rmse", "mean"),
+        "mean_mae": ("mae", "mean"),
+        "mean_directional_accuracy": ("directional_accuracy", "mean"),
+        "mean_test_dates": ("test_dates", "mean"),
+    }
+    if "mean_rank_ic" in metrics.columns:
+        aggregations["mean_rank_ic"] = ("mean_rank_ic", "mean")
+    if "rank_ic_dates" in metrics.columns:
+        aggregations["rank_ic_dates"] = ("rank_ic_dates", "sum")
+    return aggregations
 
 
 def _best_representation_row(group: pd.DataFrame, representation: str) -> pd.Series | None:

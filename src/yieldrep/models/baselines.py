@@ -586,6 +586,8 @@ def _regression_metric_rows(
         {
             "date": split.test["date"].to_numpy(),
             "maturity_years": split.test["maturity_years"].to_numpy(dtype=float),
+            "y_true": y_true,
+            "y_pred": y_pred,
             "squared_error": np.square(y_true - y_pred),
             "absolute_error": np.abs(y_true - y_pred),
             "direction_match": np.sign(y_true) == np.sign(y_pred),
@@ -629,7 +631,10 @@ def _aggregate_regression_metrics(
             .reset_index()
             .assign(rmse=lambda data: np.sqrt(data["mse"]))
         )
+        summary["mean_rank_ic"] = float("nan")
+        summary["rank_ic_dates"] = 0
     else:
+        rank_ic_summary = _rank_ic_summary(eval_frame)
         summary = pd.DataFrame(
             [
                 {
@@ -638,12 +643,56 @@ def _aggregate_regression_metrics(
                     "directional_accuracy": eval_frame["direction_match"].mean(),
                     "test_rows": len(eval_frame),
                     "test_dates": eval_frame["date"].nunique(),
+                    "mean_rank_ic": rank_ic_summary["mean_rank_ic"],
+                    "rank_ic_dates": rank_ic_summary["rank_ic_dates"],
                 }
             ]
         ).assign(rmse=lambda data: np.sqrt(data["mse"]))
 
     rows = summary.drop(columns=["mse"]).to_dict("records")
     return [{**common, **row} for row in rows]
+
+
+def _rank_ic_summary(eval_frame: pd.DataFrame) -> pd.Series:
+    if eval_frame.empty:
+        return pd.Series({"mean_rank_ic": float("nan"), "rank_ic_dates": 0})
+
+    ranks = pd.DataFrame(
+        {
+            "date": eval_frame["date"].to_numpy(),
+            "true_rank": eval_frame.groupby("date", sort=False)["y_true"].rank(method="average"),
+            "pred_rank": eval_frame.groupby("date", sort=False)["y_pred"].rank(method="average"),
+        }
+    )
+    ranks["true_rank_squared"] = np.square(ranks["true_rank"])
+    ranks["pred_rank_squared"] = np.square(ranks["pred_rank"])
+    ranks["rank_product"] = ranks["true_rank"] * ranks["pred_rank"]
+    summary = ranks.groupby("date", sort=False).agg(
+        observations=("true_rank", "size"),
+        true_sum=("true_rank", "sum"),
+        pred_sum=("pred_rank", "sum"),
+        true_squared_sum=("true_rank_squared", "sum"),
+        pred_squared_sum=("pred_rank_squared", "sum"),
+        product_sum=("rank_product", "sum"),
+    )
+    numerator = summary["observations"] * summary["product_sum"] - (
+        summary["true_sum"] * summary["pred_sum"]
+    )
+    true_denominator = summary["observations"] * summary["true_squared_sum"] - np.square(
+        summary["true_sum"]
+    )
+    pred_denominator = summary["observations"] * summary["pred_squared_sum"] - np.square(
+        summary["pred_sum"]
+    )
+    denominator = np.sqrt(true_denominator * pred_denominator)
+    rank_ics = numerator.loc[denominator > 0] / denominator.loc[denominator > 0]
+
+    return pd.Series(
+        {
+            "mean_rank_ic": float(rank_ics.mean()) if not rank_ics.empty else float("nan"),
+            "rank_ic_dates": len(rank_ics),
+        }
+    )
 
 
 def _classification_metric_row(
