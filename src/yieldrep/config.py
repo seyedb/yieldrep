@@ -150,6 +150,14 @@ class ProjectConfig(BaseModel):
     def baseline_by_maturity_point_top_table_path(self) -> Path:
         return self.tables_dir / "baseline_by_maturity_point_top.csv"
 
+    @property
+    def baseline_rank_table_path(self) -> Path:
+        return self.tables_dir / "baseline_rank.csv"
+
+    @property
+    def baseline_winners_table_path(self) -> Path:
+        return self.tables_dir / "baseline_winners.csv"
+
 
 def load_config(path: Path) -> ProjectConfig:
     with path.open("r", encoding="utf-8") as handle:

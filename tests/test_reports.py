@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from yieldrep.config import ProjectConfig, SourceConfig
-from yieldrep.evaluation.reports import summarize_baselines, top_maturity_point_metrics
+from yieldrep.evaluation.reports import baseline_winners, summarize_baselines, top_maturity_point_metrics
 
 
 def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
@@ -29,13 +29,20 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
 
     assert output_paths == [
         tmp_path / "reports" / "tables" / "baseline_summary.csv",
+        tmp_path / "reports" / "tables" / "baseline_rank.csv",
+        tmp_path / "reports" / "tables" / "baseline_winners.csv",
         tmp_path / "reports" / "tables" / "baseline_by_maturity_bucket.csv",
         tmp_path / "reports" / "tables" / "baseline_by_maturity_point_top.csv",
     ]
     summary = pd.read_csv(output_paths[0])
-    bucket_summary = pd.read_csv(output_paths[1])
-    point_top = pd.read_csv(output_paths[2])
+    rank_table = pd.read_csv(output_paths[1])
+    winners = pd.read_csv(output_paths[2])
+    bucket_summary = pd.read_csv(output_paths[3])
+    point_top = pd.read_csv(output_paths[4])
     assert {"target", "representation", "model", "mean_rmse"}.issubset(summary.columns)
+    assert {"rank", "rmse_gap_to_best", "pct_gap_to_best"}.issubset(rank_table.columns)
+    assert winners.loc[0, "best_representation"] == "pca"
+    assert winners.loc[0, "lagged_rmse_gap_to_best"] == pytest.approx(0.02)
     assert "maturity_bucket" in bucket_summary.columns
     assert len(point_top) == 2
     assert point_top["rmse"].tolist() == sorted(point_top["rmse"].tolist())
@@ -46,11 +53,34 @@ def test_top_maturity_point_metrics_rejects_invalid_top_n() -> None:
         top_maturity_point_metrics(_sample_point_metrics(), top_n=0)
 
 
+def test_baseline_winners_handles_missing_reference_representations() -> None:
+    rank_table = pd.DataFrame(
+        {
+            "target": ["yield_change"],
+            "country": ["US"],
+            "horizon_days": [1],
+            "representation": ["curve"],
+            "model": ["ridge"],
+            "mean_rmse": [0.1],
+            "mean_mae": [0.05],
+            "rank": [1.0],
+            "rmse_gap_to_best": [0.0],
+            "pct_gap_to_best": [0.0],
+        }
+    )
+
+    winners = baseline_winners(rank_table)
+
+    assert winners.loc[0, "best_representation"] == "curve"
+    assert pd.isna(winners.loc[0, "pca_rank"])
+
+
 def _sample_metrics() -> pd.DataFrame:
     return pd.DataFrame(
         [
             _metric_row(representation="pca", rmse=0.10, maturity_years=None),
-            _metric_row(representation="pca", rmse=0.20, maturity_years=None),
+            _metric_row(representation="pca", rmse=0.10, maturity_years=None),
+            _metric_row(representation="lagged", rmse=0.12, maturity_years=None),
             _metric_row(representation="curve", rmse=0.15, maturity_years=None),
         ]
     ).drop(columns=["maturity_years"])

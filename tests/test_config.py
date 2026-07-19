@@ -28,6 +28,8 @@ def test_load_config_reads_project_paths() -> None:
     assert config.figures_dir == Path("reports/figures")
     assert config.tables_dir == Path("reports/tables")
     assert config.baseline_summary_table_path == Path("reports/tables/baseline_summary.csv")
+    assert config.baseline_rank_table_path == Path("reports/tables/baseline_rank.csv")
+    assert config.baseline_winners_table_path == Path("reports/tables/baseline_winners.csv")
 
 
 def test_load_config_reads_source_metadata() -> None:
