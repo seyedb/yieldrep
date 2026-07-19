@@ -56,6 +56,7 @@ def make_supervised_yield_change_dataset(
             make_lagged_yield_change_features(curves, config.evaluation.lag_days),
             ["date", "country", "maturity_years"],
         ),
+        (_read_carry_roll_features(config), ["date", "country", "maturity_years"]),
         (_read_residual_features(config), ["date", "country", "maturity_years"]),
     ]:
         if not features.empty:
@@ -99,6 +100,12 @@ def _read_residual_features(config: ProjectConfig) -> pd.DataFrame:
     if not config.residual_features_path.exists():
         return pd.DataFrame()
     return pd.read_parquet(config.residual_features_path)
+
+
+def _read_carry_roll_features(config: ProjectConfig) -> pd.DataFrame:
+    if not config.carry_roll_features_path.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(config.carry_roll_features_path)
 
 
 def _attach_evaluation_splits(data: pd.DataFrame, config: ProjectConfig) -> pd.DataFrame:
@@ -191,6 +198,12 @@ def _build_target_family(
         curve_feature_targets.to_parquet(curve_path, index=False)
         output_paths.append(curve_path)
 
+    carry_roll_targets = _join_carry_roll_targets(config, targets)
+    if not carry_roll_targets.empty:
+        carry_roll_path = config.modeling_dir / f"carry_roll{suffix}_targets.parquet"
+        carry_roll_targets.to_parquet(carry_roll_path, index=False)
+        output_paths.append(carry_roll_path)
+
     residual_feature_targets = _join_residual_feature_targets(config, targets)
     if not residual_feature_targets.empty:
         residual_feature_path = config.modeling_dir / f"residual_feature{suffix}_targets.parquet"
@@ -240,6 +253,14 @@ def _join_curve_feature_targets(config: ProjectConfig, targets: pd.DataFrame) ->
 
     features = pd.read_parquet(config.curve_features_path)
     return targets.merge(features, on=["date", "country"], how="inner")
+
+
+def _join_carry_roll_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFrame:
+    if not config.carry_roll_features_path.exists():
+        return pd.DataFrame()
+
+    features = pd.read_parquet(config.carry_roll_features_path)
+    return targets.merge(features, on=["date", "country", "maturity_years"], how="inner")
 
 
 def _join_residual_feature_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFrame:

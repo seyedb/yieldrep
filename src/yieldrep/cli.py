@@ -15,6 +15,7 @@ from yieldrep.evaluation.targets import (
     build_targets,
     build_vol_targets,
 )
+from yieldrep.factors.carry import build_carry_roll_features
 from yieldrep.factors.curve import build_curve_features
 from yieldrep.factors.nelson_siegel import build_nelson_siegel
 from yieldrep.factors.pca import build_pca
@@ -100,6 +101,13 @@ def build_curve_features_command(config: Path = Path("configs/default.yaml")) ->
     """Build engineered curve-shape baseline features."""
     project_config = load_config(config)
     typer.echo(build_curve_features(project_config))
+
+
+@app.command("build-carry-roll-features")
+def build_carry_roll_features_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Build carry and roll-down proxy features."""
+    project_config = load_config(config)
+    typer.echo(build_carry_roll_features(project_config))
 
 
 @app.command("build-residual-features")
@@ -199,6 +207,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.extend(build_pca(project_config))
     output_paths.extend(build_nelson_siegel(project_config))
     output_paths.append(build_curve_features(project_config))
+    output_paths.append(build_carry_roll_features(project_config))
     output_paths.append(build_residual_features(project_config))
     output_paths.append(build_targets(project_config))
     output_paths.append(build_standardized_targets(project_config))

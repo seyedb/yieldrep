@@ -117,6 +117,10 @@ class ProjectConfig(BaseModel):
         return self.processed_dir / "curve_features.parquet"
 
     @property
+    def carry_roll_features_path(self) -> Path:
+        return self.processed_dir / "carry_roll_features.parquet"
+
+    @property
     def modeling_dir(self) -> Path:
         return self.processed_dir / "modeling"
 

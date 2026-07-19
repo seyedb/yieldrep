@@ -31,6 +31,14 @@ CURVE_FEATURES = [
     "front_slope_2y_1y",
     "long_slope_30y_10y",
 ]
+CARRY_ROLL_FEATURES = [
+    "carry_1m",
+    "roll_down_1m",
+    "carry_3m",
+    "roll_down_3m",
+    "carry_12m",
+    "roll_down_12m",
+]
 RESIDUAL_DYNAMIC_FEATURES = [
     "residual",
     "residual_z_60",
@@ -391,6 +399,13 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                 EvaluationSpec(
                     target=target,
                     target_column=target_column,
+                    representation="carry_roll",
+                    path=config.modeling_dir / f"carry_roll{suffix}_targets.parquet",
+                    features=CARRY_ROLL_FEATURES,
+                ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
                     representation="residual_feature",
                     path=config.modeling_dir / f"residual_feature{suffix}_targets.parquet",
                     features=RESIDUAL_DYNAMIC_FEATURES,
@@ -429,6 +444,13 @@ def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
             representation="curve",
             path=config.modeling_dir / "curve_vol_targets.parquet",
             features=CURVE_FEATURES,
+        ),
+        EvaluationSpec(
+            target="future_vol_regime",
+            target_column="future_vol_regime",
+            representation="carry_roll",
+            path=config.modeling_dir / "carry_roll_vol_targets.parquet",
+            features=CARRY_ROLL_FEATURES,
         ),
         EvaluationSpec(
             target="future_vol_regime",

@@ -96,6 +96,19 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
             "date": dates,
             "country": ["US", "US"],
             "maturity_years": [2.0, 2.0],
+            "carry_1m": [0.33, 0.34],
+            "roll_down_1m": [-0.01, -0.02],
+            "carry_3m": [1.0, 1.025],
+            "roll_down_3m": [-0.03, -0.04],
+            "carry_12m": [4.0, 4.1],
+            "roll_down_12m": [-0.2, -0.3],
+        }
+    ).to_parquet(processed_dir / "carry_roll_features.parquet", index=False)
+    pd.DataFrame(
+        {
+            "date": dates,
+            "country": ["US", "US"],
+            "maturity_years": [2.0, 2.0],
             "residual": [0.01, 0.03],
             "residual_z_60": [0.5, 1.0],
             "residual_z_252": [0.2, 0.4],
@@ -120,6 +133,7 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
             processed_dir / "modeling" / "nelson_siegel_targets.parquet",
             processed_dir / "modeling" / "lagged_targets.parquet",
             processed_dir / "modeling" / "curve_targets.parquet",
+            processed_dir / "modeling" / "carry_roll_targets.parquet",
             processed_dir / "modeling" / "residual_feature_targets.parquet",
             processed_dir / "modeling" / "pca_standardized_targets.parquet",
             processed_dir / "modeling" / "pca_residual_targets.parquet",
@@ -133,6 +147,7 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     ns_targets = pd.read_parquet(processed_dir / "modeling" / "nelson_siegel_targets.parquet")
     lagged_targets = pd.read_parquet(processed_dir / "modeling" / "lagged_targets.parquet")
     curve_targets = pd.read_parquet(processed_dir / "modeling" / "curve_targets.parquet")
+    carry_roll_targets = pd.read_parquet(processed_dir / "modeling" / "carry_roll_targets.parquet")
     pca_residual_targets = pd.read_parquet(
         processed_dir / "modeling" / "pca_residual_targets.parquet"
     )
@@ -151,6 +166,8 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         "PC1",
         "beta_level",
         "level",
+        "carry_3m",
+        "roll_down_3m",
         "lag_1_change",
         "residual_z_60",
         "target_yield_change",
@@ -165,6 +182,10 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     assert len(lagged_targets) == 1
     assert {"level", "slope_10y_2y", "target_yield_change"}.issubset(curve_targets.columns)
     assert len(curve_targets) == 2
+    assert {"carry_3m", "roll_down_3m", "target_yield_change"}.issubset(
+        carry_roll_targets.columns
+    )
+    assert len(carry_roll_targets) == 2
     assert {"PC1", "target_residual_change"}.issubset(pca_residual_targets.columns)
     assert len(pca_residual_targets) == 2
     assert {"PC1", "target_standardized_yield_change"}.issubset(

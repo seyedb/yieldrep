@@ -33,6 +33,10 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
         modeling_dir / "curve_targets.parquet",
         index=False,
     )
+    _sample_modeling_data(feature_prefix="carry_roll").to_parquet(
+        modeling_dir / "carry_roll_targets.parquet",
+        index=False,
+    )
     _sample_modeling_data(feature_prefix="residual_feature").to_parquet(
         modeling_dir / "residual_feature_targets.parquet",
         index=False,
@@ -64,6 +68,7 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
         "nelson_siegel",
         "lagged",
         "curve",
+        "carry_roll",
         "residual_feature",
     }
     assert set(metrics["representation"]) == expected_representations
@@ -372,6 +377,17 @@ def _sample_modeling_data(
                             "curvature_2s5s10s": horizon * 0.001,
                             "front_slope_2y_1y": 0.1,
                             "long_slope_30y_10y": 0.5,
+                        }
+                    )
+                elif feature_prefix == "carry_roll":
+                    row.update(
+                        {
+                            "carry_1m": maturity * 0.01,
+                            "roll_down_1m": -maturity * 0.001,
+                            "carry_3m": maturity * 0.03,
+                            "roll_down_3m": -maturity * 0.003,
+                            "carry_12m": maturity * 0.12,
+                            "roll_down_12m": -maturity * 0.012,
                         }
                     )
                 else:

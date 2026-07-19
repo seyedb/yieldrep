@@ -90,6 +90,34 @@ With \(\tau\) fixed, the betas are estimated by ordinary least squares for each
 country and date. The fitted residuals and RMSE measure how well the parametric
 curve matches the observed curve.
 
+## Carry And Roll-Down Proxies
+
+The project includes simple carry and roll-down proxy features built only from
+the public zero-coupon curve. For maturity \(m\) and roll horizon \(u\), carry is
+approximated by scaling the current zero yield:
+
+```math
+\mathrm{carry}_{t,u}^{(m)}
+=
+u r_t^{(m)}
+```
+
+Roll-down is the same-day yield difference between the rolled maturity and the
+current maturity:
+
+```math
+\mathrm{rolldown}_{t,u}^{(m)}
+=
+r_t^{(m-u)}
+-
+r_t^{(m)}
+```
+
+The rolled yield is linearly interpolated on the available maturity grid. These
+features are not full coupon-bond return estimates; they are transparent
+term-structure proxies that help benchmark learned representations against
+fixed-income-native classical inputs.
+
 ## Reconstruction Evaluation
 
 Reconstruction metrics evaluate representation quality before any forecasting

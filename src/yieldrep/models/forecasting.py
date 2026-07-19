@@ -249,6 +249,17 @@ def _feature_sets(config: ProjectConfig) -> list[FeatureSet]:
         ),
         FeatureSet("lagged", [f"lag_{lag}_change" for lag in config.evaluation.lag_days]),
         FeatureSet(
+            "carry_roll",
+            [
+                "carry_1m",
+                "roll_down_1m",
+                "carry_3m",
+                "roll_down_3m",
+                "carry_12m",
+                "roll_down_12m",
+            ],
+        ),
+        FeatureSet(
             "residual_feature",
             [
                 "residual",
