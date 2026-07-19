@@ -143,6 +143,10 @@ class ProjectConfig(BaseModel):
         return self.evaluation_dir / "lagged_diagnostics.parquet"
 
     @property
+    def lagged_diagnostics_table_path(self) -> Path:
+        return self.tables_dir / "lagged_diagnostics.csv"
+
+    @property
     def baseline_summary_table_path(self) -> Path:
         return self.tables_dir / "baseline_summary.csv"
 

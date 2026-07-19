@@ -23,35 +23,53 @@ def test_diagnose_lagged_baseline_writes_autocorrelation_metrics(tmp_path: Path)
     )
 
     output_path = diagnose_lagged_baseline(config)
-    diagnostics = pd.read_parquet(output_path)
+    diagnostics = pd.read_csv(output_path)
 
-    assert output_path == tmp_path / "data" / "processed" / "evaluation" / "lagged_diagnostics.parquet"
+    assert output_path == tmp_path / "reports" / "tables" / "lagged_diagnostics.csv"
+    assert (tmp_path / "data" / "processed" / "evaluation" / "lagged_diagnostics.parquet").exists()
     assert set(diagnostics["target"]) == {"yield_change"}
     assert set(diagnostics["diagnostic"]) == {
         "target_autocorrelation",
         "lag_feature_correlation",
     }
+    assert set(diagnostics["sample"]) == {"full", "non_overlapping"}
+    assert set(diagnostics["maturity_bucket"]) == {"front_end", "belly"}
     assert set(diagnostics["lag_days"]) == {1, 2}
-    assert {"correlation", "sign_agreement", "observations"}.issubset(diagnostics.columns)
+    assert {
+        "country",
+        "horizon_days",
+        "correlation",
+        "sign_agreement",
+        "observations",
+    }.issubset(diagnostics.columns)
 
 
 def _sample_targets() -> pd.DataFrame:
     dates = pd.date_range("2024-01-01", periods=8)
-    return pd.DataFrame(
-        {
-            "date": dates,
-            "country": "US",
-            "maturity_years": 2.0,
-            "horizon_days": 1,
-            "yield": 4.0,
-            "future_yield": 4.1,
-            "target_yield_change": [0.01, 0.02, 0.01, -0.01, -0.02, -0.01, 0.01, 0.02],
-        }
-    )
+    target_values = [0.01, 0.02, 0.01, -0.01, -0.02, -0.01, 0.01, 0.02]
+    rows = []
+    for horizon_days in [1, 2]:
+        for maturity_years in [2.0, 5.0]:
+            for date, target_value in zip(dates, target_values, strict=True):
+                rows.append(
+                    {
+                        "date": date,
+                        "country": "US",
+                        "maturity_years": maturity_years,
+                        "horizon_days": horizon_days,
+                        "yield": 4.0,
+                        "future_yield": 4.1,
+                        "target_yield_change": target_value + maturity_years * 0.001,
+                    }
+                )
+    return pd.DataFrame(rows)
 
 
 def _sample_lagged_targets(targets: pd.DataFrame) -> pd.DataFrame:
-    lagged = targets.copy()
-    lagged["lag_1_change"] = lagged["target_yield_change"].shift(1)
-    lagged["lag_2_change"] = lagged["target_yield_change"].shift(2)
+    lagged = targets.sort_values(["country", "maturity_years", "horizon_days", "date"]).copy()
+    grouped = lagged.groupby(["country", "maturity_years", "horizon_days"], sort=False)[
+        "target_yield_change"
+    ]
+    lagged["lag_1_change"] = grouped.shift(1)
+    lagged["lag_2_change"] = grouped.shift(2)
     return lagged.dropna(subset=["lag_1_change", "lag_2_change"])

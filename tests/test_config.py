@@ -26,6 +26,7 @@ def test_load_config_reads_project_paths() -> None:
     assert config.lagged_diagnostics_path == Path(
         "data/processed/evaluation/lagged_diagnostics.parquet"
     )
+    assert config.lagged_diagnostics_table_path == Path("reports/tables/lagged_diagnostics.csv")
     assert config.figures_dir == Path("reports/figures")
     assert config.tables_dir == Path("reports/tables")
     assert config.baseline_summary_table_path == Path("reports/tables/baseline_summary.csv")

@@ -129,7 +129,7 @@ def evaluate_baselines_command(config: Path = Path("configs/default.yaml")) -> N
     typer.echo(evaluate_baselines(project_config))
 
 
-@app.command("diagnose-lagged-baseline")
+@app.command("diagnose-lagged")
 def diagnose_lagged_baseline_command(config: Path = Path("configs/default.yaml")) -> None:
     """Measure autocorrelation behind lagged baseline performance."""
     project_config = load_config(config)
