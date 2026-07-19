@@ -64,6 +64,15 @@ def test_load_config_reads_project_paths() -> None:
     assert config.baseline_rank_table_path == Path("reports/tables/baseline_rank.csv")
     assert config.baseline_winners_table_path == Path("reports/tables/baseline_winners.csv")
     assert config.overlap_sensitivity_table_path == Path("reports/tables/overlap_sensitivity.csv")
+    assert config.supervised_walk_forward_summary_table_path == Path(
+        "reports/tables/supervised_walk_forward_summary.csv"
+    )
+    assert config.supervised_walk_forward_rank_table_path == Path(
+        "reports/tables/supervised_walk_forward_rank.csv"
+    )
+    assert config.supervised_walk_forward_comparison_table_path == Path(
+        "reports/tables/supervised_walk_forward_comparison.csv"
+    )
     assert config.reconstruction_summary_table_path == Path(
         "reports/tables/reconstruction_summary.csv"
     )
@@ -98,6 +107,7 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.evaluation.method == "date_ordered"
     assert config.evaluation.test_fraction == 0.2
     assert config.evaluation.ridge_alpha == 1.0
+    assert config.evaluation.walk_forward_max_windows == 4
     assert config.evaluation.elastic_net_alpha == 0.01
     assert config.evaluation.elastic_net_l1_ratio == 0.5
     assert config.evaluation.logistic_c == 1.0

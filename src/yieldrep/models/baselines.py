@@ -155,6 +155,7 @@ def _evaluate_regression_representation(
             min_train_dates=config.evaluation.min_train_dates,
             test_window_dates=config.evaluation.test_window_dates,
             step_dates=config.evaluation.step_dates,
+            max_windows=config.evaluation.walk_forward_max_windows,
             horizon_days=horizon_days,
             non_overlapping_targets=config.evaluation.non_overlapping_targets,
         ):
@@ -251,6 +252,7 @@ def _evaluate_classification_representation(
             min_train_dates=config.evaluation.min_train_dates,
             test_window_dates=config.evaluation.test_window_dates,
             step_dates=config.evaluation.step_dates,
+            max_windows=config.evaluation.walk_forward_max_windows,
             horizon_days=horizon_days,
             non_overlapping_targets=config.evaluation.non_overlapping_targets,
         ):

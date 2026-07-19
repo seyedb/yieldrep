@@ -7,6 +7,7 @@ from yieldrep.config import ProjectConfig, SourceConfig
 from yieldrep.evaluation.reports import (
     baseline_winners,
     overlap_sensitivity_table,
+    supervised_walk_forward_comparison,
     summarize_baselines,
     top_maturity_point_metrics,
 )
@@ -105,6 +106,29 @@ def test_overlap_sensitivity_table_compares_target_windows() -> None:
     assert lagged["rank_change_non_overlapping_minus_overlapping"] == pytest.approx(1.0)
 
 
+def test_supervised_walk_forward_comparison_compares_split_methods() -> None:
+    date_ordered = pd.DataFrame(
+        [
+            _supervised_metric_row(representation="pca", rmse=0.10),
+            _supervised_metric_row(representation="curve", rmse=0.12),
+        ]
+    )
+    walk_forward = pd.DataFrame(
+        [
+            _supervised_metric_row(representation="pca", rmse=0.14, window_id=1),
+            _supervised_metric_row(representation="curve", rmse=0.11, window_id=1),
+        ]
+    )
+
+    comparison = supervised_walk_forward_comparison(date_ordered, walk_forward)
+
+    pca = comparison.loc[comparison["representation"] == "pca"].iloc[0]
+    assert pca["date_ordered_rank"] == 1.0
+    assert pca["walk_forward_rank"] == 2.0
+    assert pca["rmse_change_walk_forward_minus_date_ordered"] == pytest.approx(0.04)
+    assert pca["rank_change_walk_forward_minus_date_ordered"] == pytest.approx(1.0)
+
+
 def _sample_metrics() -> pd.DataFrame:
     return pd.DataFrame(
         [
@@ -159,4 +183,31 @@ def _metric_row(
         "test_rows": 3,
         "train_dates": 10,
         "test_dates": 3,
+    }
+
+
+def _supervised_metric_row(
+    representation: str,
+    rmse: float,
+    window_id: int = 0,
+) -> dict[str, object]:
+    return {
+        "target": "yield_change",
+        "representation": representation,
+        "model": "ridge",
+        "country": "US",
+        "horizon_days": 1,
+        "split_method": "date_ordered" if window_id == 0 else "walk_forward",
+        "window_id": window_id,
+        "feature_count": 2,
+        "rmse": rmse,
+        "mae": rmse / 2.0,
+        "directional_accuracy": 0.5,
+        "train_rows": 10,
+        "test_rows": 3,
+        "train_dates": 10,
+        "test_dates": 3,
+        "train_mean_rmse": 0.15,
+        "rmse_improvement_vs_train_mean": 0.15 - rmse,
+        "pct_improvement_vs_train_mean": (0.15 - rmse) / 0.15,
     }

@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 
 from yieldrep.config import ProjectConfig
 from yieldrep.evaluation.metrics import directional_accuracy, mae, rmse
+from yieldrep.evaluation.splits import evaluation_splits
 
 GROUP_COLUMNS = ["country", "horizon_days", "split_method", "window_id"]
 METRIC_GROUP_COLUMNS = ["target", "representation", "model"]
@@ -28,6 +29,13 @@ class FeatureSet:
 class TargetSpec:
     target: str
     path: Path
+    target_column: str
+
+
+@dataclass(frozen=True)
+class TargetFrameSpec:
+    target: str
+    data: pd.DataFrame
     target_column: str
 
 
@@ -92,13 +100,30 @@ def supervised_forecast_frames(
     feature_sets: list[FeatureSet],
     config: ProjectConfig,
 ) -> SupervisedForecastFrames:
-    """Compute forecast metrics, maturity-bucket metrics, and coefficients."""
+    """Compute forecast metrics, maturity-bucket metrics, and coefficients from paths."""
+    target_frames = [
+        TargetFrameSpec(
+            target=target_spec.target,
+            data=pd.read_parquet(target_spec.path),
+            target_column=target_spec.target_column,
+        )
+        for target_spec in target_specs
+    ]
+    return supervised_forecast_frames_from_data(target_frames, feature_sets, config)
+
+
+def supervised_forecast_frames_from_data(
+    target_specs: list[TargetFrameSpec],
+    feature_sets: list[FeatureSet],
+    config: ProjectConfig,
+) -> SupervisedForecastFrames:
+    """Compute forecast metrics, maturity-bucket metrics, and coefficients from frames."""
     metric_rows: list[dict[str, object]] = []
     bucket_rows: list[dict[str, object]] = []
     coefficient_rows: list[dict[str, object]] = []
 
     for target_spec in target_specs:
-        data = pd.read_parquet(target_spec.path)
+        data = target_spec.data
         for feature_set in feature_sets:
             columns = [column for column in feature_set.columns if column in data.columns]
             if not columns:
@@ -159,6 +184,104 @@ def supervised_forecast_frames(
                         predictions=predictions,
                     )
                 )
+
+    metrics = _add_improvement_vs_train_mean(pd.DataFrame(metric_rows), ["target", *GROUP_COLUMNS])
+    by_maturity_bucket = _add_improvement_vs_train_mean(
+        pd.DataFrame(bucket_rows),
+        ["target", *GROUP_COLUMNS, "maturity_bucket"],
+    )
+    coefficients = pd.DataFrame(coefficient_rows)
+    return SupervisedForecastFrames(
+        metrics=metrics,
+        by_maturity_bucket=by_maturity_bucket,
+        coefficients=coefficients,
+    )
+
+
+def supervised_forecast_frames_from_unsplit_data(
+    target_specs: list[TargetFrameSpec],
+    feature_sets: list[FeatureSet],
+    config: ProjectConfig,
+) -> SupervisedForecastFrames:
+    """Compute supervised forecast frames while assigning splits lazily by target group."""
+    metric_rows: list[dict[str, object]] = []
+    bucket_rows: list[dict[str, object]] = []
+    coefficient_rows: list[dict[str, object]] = []
+
+    for target_spec in target_specs:
+        data = target_spec.data
+        for feature_set in feature_sets:
+            columns = [column for column in feature_set.columns if column in data.columns]
+            if not columns:
+                continue
+
+            required = [
+                "date",
+                "country",
+                "horizon_days",
+                "maturity_years",
+                target_spec.target_column,
+                *columns,
+            ]
+            sample = data.dropna(subset=required).loc[:, required]
+            for group_values, group in sample.groupby(["country", "horizon_days"], sort=True):
+                country, horizon_days = group_values
+                for split in evaluation_splits(
+                    group,
+                    method=config.evaluation.method,
+                    test_fraction=config.evaluation.test_fraction,
+                    min_train_dates=config.evaluation.min_train_dates,
+                    test_window_dates=config.evaluation.test_window_dates,
+                    step_dates=config.evaluation.step_dates,
+                    max_windows=config.evaluation.walk_forward_max_windows,
+                    horizon_days=int(horizon_days),
+                    non_overlapping_targets=config.evaluation.non_overlapping_targets,
+                ):
+                    train = split.train
+                    test = split.test
+                    if train.empty or test.empty:
+                        continue
+
+                    x_train = train[columns].to_numpy(dtype=float)
+                    y_train = train[target_spec.target_column].to_numpy(dtype=float)
+                    x_test = test[columns].to_numpy(dtype=float)
+                    y_test = test[target_spec.target_column].to_numpy(dtype=float)
+                    split_group_values = (country, horizon_days, split.method, split.window_id)
+                    predictions = _predictions(config, columns, x_train, y_train, x_test)
+                    metric_rows.extend(
+                        _metric_rows(
+                            target=target_spec.target,
+                            group_values=split_group_values,
+                            feature_set=feature_set,
+                            feature_count=len(columns),
+                            y_true=y_test,
+                            predictions=predictions,
+                            train_rows=len(train),
+                            test_rows=len(test),
+                            train_dates=train["date"].nunique(),
+                            test_dates=test["date"].nunique(),
+                        )
+                    )
+                    bucket_rows.extend(
+                        _bucket_metric_rows(
+                            target=target_spec.target,
+                            group_values=split_group_values,
+                            feature_set=feature_set,
+                            feature_count=len(columns),
+                            test=test,
+                            y_true=y_test,
+                            predictions=predictions,
+                            train_rows=len(train),
+                        )
+                    )
+                    coefficient_rows.extend(
+                        _coefficient_rows(
+                            target=target_spec.target,
+                            group_values=split_group_values,
+                            feature_set=feature_set,
+                            predictions=predictions,
+                        )
+                    )
 
     metrics = _add_improvement_vs_train_mean(pd.DataFrame(metric_rows), ["target", *GROUP_COLUMNS])
     by_maturity_bucket = _add_improvement_vs_train_mean(
@@ -286,6 +409,11 @@ def _feature_sets(config: ProjectConfig) -> list[FeatureSet]:
             ],
         ),
     ]
+
+
+def feature_sets(config: ProjectConfig) -> list[FeatureSet]:
+    """Return configured supervised forecast feature sets."""
+    return _feature_sets(config)
 
 
 def _target_specs(config: ProjectConfig) -> list[TargetSpec]:

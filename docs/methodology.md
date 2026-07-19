@@ -464,6 +464,10 @@ where \(T\) is the minimum number of training dates, \(H\) is the test-window
 length, and \(S\) is the step size. This better matches how forecasting models
 would be evaluated through time.
 
+The supervised walk-forward robustness report evaluates the canonical
+supervised targets under this expanding-window protocol and compares ranks
+against the default date-ordered benchmark.
+
 ### Reporting
 
 Metrics are reported overall, by maturity bucket, and by exact maturity point:
@@ -565,7 +569,6 @@ Important next improvements:
 - Extend the canonical supervised benchmark to curve-state transition targets.
 - Add richer fixed-income return proxies when public bond-level cash-flow data is
   introduced; current carry/roll-down features are zero-curve approximations.
-- Run and summarize walk-forward robustness as a first-class report.
 - Only after the classical pipeline is stable, compare against learned
   representations such as autoencoders, masked reconstruction models,
   Transformers, and graph models.

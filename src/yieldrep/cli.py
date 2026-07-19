@@ -7,7 +7,11 @@ from yieldrep.data.ingest import ingest_sources
 from yieldrep.data.normalize import build_curves_parquet
 from yieldrep.evaluation.datasets import build_modeling_datasets
 from yieldrep.evaluation.diagnostics import diagnose_lagged_baseline
-from yieldrep.evaluation.reports import build_overlap_sensitivity_report, summarize_baselines
+from yieldrep.evaluation.reports import (
+    build_overlap_sensitivity_report,
+    build_supervised_walk_forward_report,
+    summarize_baselines,
+)
 from yieldrep.evaluation.reconstruction import evaluate_reconstruction
 from yieldrep.evaluation.targets import (
     build_residual_targets,
@@ -156,6 +160,8 @@ def diagnostics_command(config: Path = Path("configs/default.yaml")) -> None:
     project_config = load_config(config)
     typer.echo(diagnose_lagged_baseline(project_config))
     typer.echo(build_overlap_sensitivity_report(project_config))
+    for output_path in build_supervised_walk_forward_report(project_config):
+        typer.echo(output_path)
 
 
 @app.command("reconstruction")

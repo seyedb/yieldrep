@@ -55,7 +55,9 @@ def make_supervised_yield_change_dataset(
     curves: pd.DataFrame,
 ) -> pd.DataFrame:
     """Build the canonical supervised panel for future yield-change forecasting."""
-    return _make_supervised_dataset(config, targets, curves)
+    dataset = make_supervised_feature_dataset(config, targets, curves)
+    dataset = _attach_evaluation_splits(dataset, config)
+    return _sort_supervised_dataset(dataset)
 
 
 def make_supervised_residual_change_dataset(
@@ -64,7 +66,9 @@ def make_supervised_residual_change_dataset(
     curves: pd.DataFrame,
 ) -> pd.DataFrame:
     """Build the canonical supervised panel for residual-change forecasting."""
-    return _make_supervised_dataset(config, targets, curves)
+    dataset = make_supervised_feature_dataset(config, targets, curves)
+    dataset = _attach_evaluation_splits(dataset, config)
+    return _sort_supervised_dataset(dataset)
 
 
 def make_supervised_vol_change_dataset(
@@ -73,14 +77,17 @@ def make_supervised_vol_change_dataset(
     curves: pd.DataFrame,
 ) -> pd.DataFrame:
     """Build the canonical supervised panel for volatility-change forecasting."""
-    return _make_supervised_dataset(config, targets, curves)
+    dataset = make_supervised_feature_dataset(config, targets, curves)
+    dataset = _attach_evaluation_splits(dataset, config)
+    return _sort_supervised_dataset(dataset)
 
 
-def _make_supervised_dataset(
+def make_supervised_feature_dataset(
     config: ProjectConfig,
     targets: pd.DataFrame,
     curves: pd.DataFrame,
 ) -> pd.DataFrame:
+    """Join all current supervised feature families without assigning split labels."""
     dataset = targets.copy()
     dataset["date"] = pd.to_datetime(dataset["date"])
 
@@ -98,7 +105,10 @@ def _make_supervised_dataset(
         if not features.empty:
             dataset = _merge_features(dataset, features, keys)
 
-    dataset = _attach_evaluation_splits(dataset, config)
+    return dataset
+
+
+def _sort_supervised_dataset(dataset: pd.DataFrame) -> pd.DataFrame:
     return dataset.sort_values(
         ["country", "horizon_days", "window_id", "split", "date", "maturity_years"]
     ).reset_index(drop=True)
@@ -166,6 +176,7 @@ def _attach_evaluation_splits(data: pd.DataFrame, config: ProjectConfig) -> pd.D
             min_train_dates=config.evaluation.min_train_dates,
             test_window_dates=config.evaluation.test_window_dates,
             step_dates=config.evaluation.step_dates,
+            max_windows=config.evaluation.walk_forward_max_windows,
             horizon_days=int(horizon_days),
             non_overlapping_targets=config.evaluation.non_overlapping_targets,
         ):

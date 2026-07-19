@@ -20,6 +20,7 @@ def evaluation_splits(
     min_train_dates: int,
     test_window_dates: int,
     step_dates: int,
+    max_windows: int | None = None,
     horizon_days: int | None = None,
     non_overlapping_targets: bool = False,
 ) -> list[SplitWindow]:
@@ -33,6 +34,7 @@ def evaluation_splits(
             min_train_dates=min_train_dates,
             test_window_dates=test_window_dates,
             step_dates=step_dates,
+            max_windows=max_windows,
         )
         return [
             _apply_non_overlapping_test_filter(split, horizon_days, non_overlapping_targets)
@@ -67,6 +69,7 @@ def walk_forward_splits(
     min_train_dates: int,
     test_window_dates: int,
     step_dates: int,
+    max_windows: int | None = None,
 ) -> list[SplitWindow]:
     """Create expanding-window chronological train/test splits."""
     if min_train_dates <= 0:
@@ -75,13 +78,16 @@ def walk_forward_splits(
         raise ValueError("test_window_dates must be positive")
     if step_dates <= 0:
         raise ValueError("step_dates must be positive")
+    if max_windows is not None and max_windows <= 0:
+        raise ValueError("max_windows must be positive")
 
     dates = pd.Index(sorted(pd.to_datetime(data["date"]).unique()))
     normalized_dates = pd.to_datetime(data["date"])
     splits: list[SplitWindow] = []
-    test_start = min_train_dates
-    window_id = 0
-    while test_start < len(dates):
+    test_starts = list(range(min_train_dates, len(dates), step_dates))
+    if max_windows is not None:
+        test_starts = test_starts[-max_windows:]
+    for window_id, test_start in enumerate(test_starts):
         test_end = min(test_start + test_window_dates, len(dates))
         train_dates = set(dates[:test_start])
         test_dates = set(dates[test_start:test_end])
@@ -95,8 +101,6 @@ def walk_forward_splits(
                 test=test,
             )
         )
-        window_id += 1
-        test_start += step_dates
     return splits
 
 

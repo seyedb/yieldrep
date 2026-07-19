@@ -5,7 +5,17 @@ from pathlib import Path
 import pandas as pd
 
 from yieldrep.config import ProjectConfig
+from yieldrep.evaluation.datasets import (
+    make_supervised_feature_dataset,
+)
 from yieldrep.models.baselines import evaluate_baseline_frames
+from yieldrep.models.forecasting import (
+    TargetFrameSpec,
+    feature_sets,
+    rank_supervised_forecasts,
+    summarize_supervised_forecasts,
+    supervised_forecast_frames_from_unsplit_data,
+)
 
 SUMMARY_GROUP_COLUMNS = ["target", "representation", "model"]
 BUCKET_GROUP_COLUMNS = ["target", "representation", "model", "maturity_bucket"]
@@ -60,6 +70,63 @@ def build_overlap_sensitivity_report(config: ProjectConfig) -> Path:
     return config.overlap_sensitivity_table_path
 
 
+def build_supervised_walk_forward_report(config: ProjectConfig) -> list[Path]:
+    """Evaluate canonical supervised benchmarks with expanding walk-forward splits."""
+    config.tables_dir.mkdir(parents=True, exist_ok=True)
+
+    walk_config = config.model_copy(
+        update={"evaluation": config.evaluation.model_copy(update={"method": "walk_forward"})}
+    )
+    target_specs = _walk_forward_target_specs(walk_config)
+    if not target_specs:
+        return []
+
+    frames = supervised_forecast_frames_from_unsplit_data(
+        target_specs=target_specs,
+        feature_sets=feature_sets(walk_config),
+        config=walk_config,
+    )
+    summary = summarize_supervised_forecasts(frames.metrics)
+    summary.to_csv(config.supervised_walk_forward_summary_table_path, index=False)
+    rank = rank_supervised_forecasts(frames.metrics)
+    rank.to_csv(config.supervised_walk_forward_rank_table_path, index=False)
+
+    output_paths = [
+        config.supervised_walk_forward_summary_table_path,
+        config.supervised_walk_forward_rank_table_path,
+    ]
+    if config.supervised_forecast_metrics_path.exists():
+        comparison = supervised_walk_forward_comparison(
+            date_ordered_metrics=pd.read_parquet(config.supervised_forecast_metrics_path),
+            walk_forward_metrics=frames.metrics,
+        )
+        comparison.to_csv(config.supervised_walk_forward_comparison_table_path, index=False)
+        output_paths.append(config.supervised_walk_forward_comparison_table_path)
+
+    return output_paths
+
+
+def supervised_walk_forward_comparison(
+    date_ordered_metrics: pd.DataFrame,
+    walk_forward_metrics: pd.DataFrame,
+) -> pd.DataFrame:
+    """Compare date-ordered and walk-forward supervised benchmark ranks."""
+    date_ordered = _rank_for_supervised_method(date_ordered_metrics, "date_ordered")
+    walk_forward = _rank_for_supervised_method(walk_forward_metrics, "walk_forward")
+    join_columns = [*RANK_GROUP_COLUMNS, "representation", "model"]
+    report = date_ordered.merge(walk_forward, on=join_columns, how="outer")
+    report["rmse_change_walk_forward_minus_date_ordered"] = (
+        report["walk_forward_mean_rmse"] - report["date_ordered_mean_rmse"]
+    )
+    report["rank_change_walk_forward_minus_date_ordered"] = (
+        report["walk_forward_rank"] - report["date_ordered_rank"]
+    )
+    return report.sort_values(
+        [*RANK_GROUP_COLUMNS, "walk_forward_rank", "date_ordered_rank", "representation", "model"],
+        na_position="last",
+    ).reset_index(drop=True)
+
+
 def overlap_sensitivity_table(
     overlapping_metrics: pd.DataFrame,
     non_overlapping_metrics: pd.DataFrame,
@@ -82,6 +149,63 @@ def overlap_sensitivity_table(
         [*RANK_GROUP_COLUMNS, "non_overlapping_rank", "overlapping_rank", "representation", "model"],
         na_position="last",
     ).reset_index(drop=True)
+
+
+def _walk_forward_target_specs(config: ProjectConfig) -> list[TargetFrameSpec]:
+    curves = pd.read_parquet(config.curves_path)
+    specs: list[TargetFrameSpec] = []
+    if config.targets_path.exists():
+        targets = pd.read_parquet(config.targets_path)
+        specs.append(
+            TargetFrameSpec(
+                target="yield_change",
+                data=make_supervised_feature_dataset(config, targets, curves),
+                target_column="target_yield_change",
+            )
+        )
+    if config.residual_targets_path.exists():
+        residual_targets = pd.read_parquet(config.residual_targets_path)
+        specs.append(
+            TargetFrameSpec(
+                target="residual_change",
+                data=make_supervised_feature_dataset(config, residual_targets, curves),
+                target_column="target_residual_change",
+            )
+        )
+    if config.vol_targets_path.exists():
+        vol_targets = pd.read_parquet(config.vol_targets_path)
+        specs.append(
+            TargetFrameSpec(
+                target="vol_change",
+                data=make_supervised_feature_dataset(config, vol_targets, curves),
+                target_column="target_vol_change",
+            )
+        )
+    return specs
+
+
+def _rank_for_supervised_method(metrics: pd.DataFrame, method: str) -> pd.DataFrame:
+    rank = rank_supervised_forecasts(metrics)
+    columns = [
+        *RANK_GROUP_COLUMNS,
+        "representation",
+        "model",
+        "mean_rmse",
+        "mean_mae",
+        "mean_directional_accuracy",
+        "mean_pct_improvement_vs_train_mean",
+        "rank",
+        "rmse_gap_to_best",
+        "pct_gap_to_best",
+    ]
+    if "mean_test_dates" in rank.columns:
+        columns.append("mean_test_dates")
+    renamed = {
+        column: f"{method}_{column}"
+        for column in columns
+        if column not in [*RANK_GROUP_COLUMNS, "representation", "model"]
+    }
+    return rank.loc[:, columns].rename(columns=renamed)
 
 
 def summarize_metrics(

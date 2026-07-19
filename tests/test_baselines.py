@@ -311,6 +311,21 @@ def test_walk_forward_splits_use_expanding_training_window() -> None:
     assert set(splits[0].train["date"]).isdisjoint(set(splits[0].test["date"]))
 
 
+def test_walk_forward_splits_can_keep_latest_windows() -> None:
+    data = _sample_modeling_data(feature_prefix="pca")
+
+    splits = walk_forward_splits(
+        data,
+        min_train_dates=3,
+        test_window_dates=2,
+        step_dates=2,
+        max_windows=2,
+    )
+
+    assert [split.window_id for split in splits] == [0, 1]
+    assert [split.train["date"].nunique() for split in splits] == [9, 11]
+
+
 def test_walk_forward_splits_reject_invalid_windows() -> None:
     data = _sample_modeling_data(feature_prefix="pca")
 

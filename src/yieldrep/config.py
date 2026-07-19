@@ -35,6 +35,7 @@ class EvaluationConfig(BaseModel):
     min_train_dates: int = 252
     test_window_dates: int = 63
     step_dates: int = 63
+    walk_forward_max_windows: int = 4
     ridge_alpha: float = 1.0
     elastic_net_alpha: float = 0.01
     elastic_net_l1_ratio: float = 0.5
@@ -215,6 +216,18 @@ class ProjectConfig(BaseModel):
     @property
     def overlap_sensitivity_table_path(self) -> Path:
         return self.tables_dir / "overlap_sensitivity.csv"
+
+    @property
+    def supervised_walk_forward_summary_table_path(self) -> Path:
+        return self.tables_dir / "supervised_walk_forward_summary.csv"
+
+    @property
+    def supervised_walk_forward_rank_table_path(self) -> Path:
+        return self.tables_dir / "supervised_walk_forward_rank.csv"
+
+    @property
+    def supervised_walk_forward_comparison_table_path(self) -> Path:
+        return self.tables_dir / "supervised_walk_forward_comparison.csv"
 
     @property
     def reconstruction_summary_table_path(self) -> Path:
