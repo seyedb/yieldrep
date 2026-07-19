@@ -14,15 +14,21 @@ from yieldrep.config import ProjectConfig
 from yieldrep.evaluation.metrics import directional_accuracy, mae, rmse
 
 GROUP_COLUMNS = ["country", "horizon_days", "split_method", "window_id"]
-TARGET_COLUMN = "target_yield_change"
-METRIC_GROUP_COLUMNS = ["representation", "model"]
-RANK_GROUP_COLUMNS = ["country", "horizon_days"]
+METRIC_GROUP_COLUMNS = ["target", "representation", "model"]
+RANK_GROUP_COLUMNS = ["target", "country", "horizon_days"]
 
 
 @dataclass(frozen=True)
 class FeatureSet:
     representation: str
     columns: list[str]
+
+
+@dataclass(frozen=True)
+class TargetSpec:
+    target: str
+    path: Path
+    target_column: str
 
 
 @dataclass(frozen=True)
@@ -41,11 +47,15 @@ class SupervisedForecastFrames:
 
 def evaluate_supervised_forecasts(config: ProjectConfig) -> list[Path]:
     """Evaluate classical forecasting benchmarks from the canonical supervised table."""
-    if not config.supervised_yield_change_path.exists():
+    target_specs = _target_specs(config)
+    if not target_specs:
         return []
 
-    data = pd.read_parquet(config.supervised_yield_change_path)
-    frames = supervised_forecast_frames(data, feature_sets=_feature_sets(config), config=config)
+    frames = supervised_forecast_frames(
+        target_specs=target_specs,
+        feature_sets=_feature_sets(config),
+        config=config,
+    )
 
     config.evaluation_dir.mkdir(parents=True, exist_ok=True)
     config.tables_dir.mkdir(parents=True, exist_ok=True)
@@ -78,7 +88,7 @@ def evaluate_supervised_forecasts(config: ProjectConfig) -> list[Path]:
 
 
 def supervised_forecast_frames(
-    data: pd.DataFrame,
+    target_specs: list[TargetSpec],
     feature_sets: list[FeatureSet],
     config: ProjectConfig,
 ) -> SupervisedForecastFrames:
@@ -87,68 +97,73 @@ def supervised_forecast_frames(
     bucket_rows: list[dict[str, object]] = []
     coefficient_rows: list[dict[str, object]] = []
 
-    for feature_set in feature_sets:
-        columns = [column for column in feature_set.columns if column in data.columns]
-        if not columns:
-            continue
-
-        required = [
-            "date",
-            "maturity_years",
-            *GROUP_COLUMNS,
-            "split",
-            TARGET_COLUMN,
-            *columns,
-        ]
-        sample = data.dropna(subset=required).loc[:, required]
-        for group_values, group in sample.groupby(GROUP_COLUMNS, sort=True):
-            train = group.loc[group["split"] == "train"]
-            test = group.loc[group["split"] == "test"]
-            if train.empty or test.empty:
+    for target_spec in target_specs:
+        data = pd.read_parquet(target_spec.path)
+        for feature_set in feature_sets:
+            columns = [column for column in feature_set.columns if column in data.columns]
+            if not columns:
                 continue
 
-            x_train = train[columns].to_numpy(dtype=float)
-            y_train = train[TARGET_COLUMN].to_numpy(dtype=float)
-            x_test = test[columns].to_numpy(dtype=float)
-            y_test = test[TARGET_COLUMN].to_numpy(dtype=float)
+            required = [
+                "date",
+                "maturity_years",
+                *GROUP_COLUMNS,
+                "split",
+                target_spec.target_column,
+                *columns,
+            ]
+            sample = data.dropna(subset=required).loc[:, required]
+            for group_values, group in sample.groupby(GROUP_COLUMNS, sort=True):
+                train = group.loc[group["split"] == "train"]
+                test = group.loc[group["split"] == "test"]
+                if train.empty or test.empty:
+                    continue
 
-            predictions = _predictions(config, columns, x_train, y_train, x_test)
-            metric_rows.extend(
-                _metric_rows(
-                    group_values=group_values,
-                    feature_set=feature_set,
-                    feature_count=len(columns),
-                    y_true=y_test,
-                    predictions=predictions,
-                    train_rows=len(train),
-                    test_rows=len(test),
-                    train_dates=train["date"].nunique(),
-                    test_dates=test["date"].nunique(),
-                )
-            )
-            bucket_rows.extend(
-                _bucket_metric_rows(
-                    group_values=group_values,
-                    feature_set=feature_set,
-                    feature_count=len(columns),
-                    test=test,
-                    y_true=y_test,
-                    predictions=predictions,
-                    train_rows=len(train),
-                )
-            )
-            coefficient_rows.extend(
-                _coefficient_rows(
-                    group_values=group_values,
-                    feature_set=feature_set,
-                    predictions=predictions,
-                )
-            )
+                x_train = train[columns].to_numpy(dtype=float)
+                y_train = train[target_spec.target_column].to_numpy(dtype=float)
+                x_test = test[columns].to_numpy(dtype=float)
+                y_test = test[target_spec.target_column].to_numpy(dtype=float)
 
-    metrics = _add_improvement_vs_train_mean(pd.DataFrame(metric_rows), GROUP_COLUMNS)
+                predictions = _predictions(config, columns, x_train, y_train, x_test)
+                metric_rows.extend(
+                    _metric_rows(
+                        target=target_spec.target,
+                        group_values=group_values,
+                        feature_set=feature_set,
+                        feature_count=len(columns),
+                        y_true=y_test,
+                        predictions=predictions,
+                        train_rows=len(train),
+                        test_rows=len(test),
+                        train_dates=train["date"].nunique(),
+                        test_dates=test["date"].nunique(),
+                    )
+                )
+                bucket_rows.extend(
+                    _bucket_metric_rows(
+                        target=target_spec.target,
+                        group_values=group_values,
+                        feature_set=feature_set,
+                        feature_count=len(columns),
+                        test=test,
+                        y_true=y_test,
+                        predictions=predictions,
+                        train_rows=len(train),
+                    )
+                )
+                coefficient_rows.extend(
+                    _coefficient_rows(
+                        target=target_spec.target,
+                        group_values=group_values,
+                        feature_set=feature_set,
+                        predictions=predictions,
+                    )
+                )
+
+    metrics = _add_improvement_vs_train_mean(pd.DataFrame(metric_rows), ["target", *GROUP_COLUMNS])
     by_maturity_bucket = _add_improvement_vs_train_mean(
         pd.DataFrame(bucket_rows),
-        [*GROUP_COLUMNS, "maturity_bucket"],
+        ["target", *GROUP_COLUMNS, "maturity_bucket"],
     )
     coefficients = pd.DataFrame(coefficient_rows)
     return SupervisedForecastFrames(
@@ -193,7 +208,7 @@ def summarize_coefficients(coefficients: pd.DataFrame) -> pd.DataFrame:
         return coefficients
 
     summary = (
-        coefficients.groupby(["representation", "model", "feature"], sort=True)
+        coefficients.groupby(["target", "representation", "model", "feature"], sort=True)
         .agg(
             rows=("coefficient", "size"),
             mean_coefficient=("coefficient", "mean"),
@@ -202,8 +217,8 @@ def summarize_coefficients(coefficients: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
     )
     return summary.sort_values(
-        ["representation", "model", "mean_abs_coefficient", "feature"],
-        ascending=[True, True, False, True],
+        ["target", "representation", "model", "mean_abs_coefficient", "feature"],
+        ascending=[True, True, True, False, True],
     ).reset_index(drop=True)
 
 
@@ -273,6 +288,27 @@ def _feature_sets(config: ProjectConfig) -> list[FeatureSet]:
     ]
 
 
+def _target_specs(config: ProjectConfig) -> list[TargetSpec]:
+    specs: list[TargetSpec] = []
+    if config.supervised_yield_change_path.exists():
+        specs.append(
+            TargetSpec(
+                target="yield_change",
+                path=config.supervised_yield_change_path,
+                target_column="target_yield_change",
+            )
+        )
+    if config.supervised_residual_change_path.exists():
+        specs.append(
+            TargetSpec(
+                target="residual_change",
+                path=config.supervised_residual_change_path,
+                target_column="target_residual_change",
+            )
+        )
+    return specs
+
+
 def _predictions(
     config: ProjectConfig,
     columns: list[str],
@@ -319,6 +355,7 @@ def _standardized_coefficients(pipeline: Pipeline, columns: list[str]) -> dict[s
 
 
 def _metric_rows(
+    target: str,
     group_values: tuple[object, ...],
     feature_set: FeatureSet,
     feature_count: int,
@@ -330,6 +367,7 @@ def _metric_rows(
     test_dates: int,
 ) -> list[dict[str, object]]:
     common = _common_metric_values(
+        target=target,
         group_values=group_values,
         feature_set=feature_set,
         feature_count=feature_count,
@@ -342,6 +380,7 @@ def _metric_rows(
 
 
 def _bucket_metric_rows(
+    target: str,
     group_values: tuple[object, ...],
     feature_set: FeatureSet,
     feature_count: int,
@@ -364,6 +403,7 @@ def _bucket_metric_rows(
         eval_frame["y_pred"] = result.y_pred
         for bucket, bucket_frame in eval_frame.groupby("maturity_bucket", sort=True, observed=True):
             common = _common_metric_values(
+                target=target,
                 group_values=group_values,
                 feature_set=feature_set,
                 feature_count=feature_count,
@@ -387,6 +427,7 @@ def _bucket_metric_rows(
 
 
 def _coefficient_rows(
+    target: str,
     group_values: tuple[object, ...],
     feature_set: FeatureSet,
     predictions: list[PredictionResult],
@@ -397,6 +438,7 @@ def _coefficient_rows(
         for feature, coefficient in result.coefficients.items():
             rows.append(
                 {
+                    "target": target,
                     "representation": feature_set.representation,
                     "model": result.model,
                     "country": country,
@@ -412,6 +454,7 @@ def _coefficient_rows(
 
 
 def _common_metric_values(
+    target: str,
     group_values: tuple[object, ...],
     feature_set: FeatureSet,
     feature_count: int,
@@ -422,6 +465,7 @@ def _common_metric_values(
 ) -> dict[str, object]:
     country, horizon_days, split_method, window_id = group_values
     return {
+        "target": target,
         "representation": feature_set.representation,
         "country": country,
         "horizon_days": int(str(horizon_days)),

@@ -129,6 +129,10 @@ class ProjectConfig(BaseModel):
         return self.modeling_dir / "supervised_yield_change.parquet"
 
     @property
+    def supervised_residual_change_path(self) -> Path:
+        return self.modeling_dir / "supervised_residual_change.parquet"
+
+    @property
     def evaluation_dir(self) -> Path:
         return self.processed_dir / "evaluation"
 

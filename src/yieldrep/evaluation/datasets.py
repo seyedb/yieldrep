@@ -28,6 +28,13 @@ def build_modeling_datasets(config: ProjectConfig) -> list[Path]:
 
     if config.residual_targets_path.exists():
         residual_targets = pd.read_parquet(config.residual_targets_path)
+        supervised_residual = make_supervised_residual_change_dataset(
+            config,
+            residual_targets,
+            curves,
+        )
+        supervised_residual.to_parquet(config.supervised_residual_change_path, index=False)
+        output_paths.append(config.supervised_residual_change_path)
         output_paths.extend(
             _build_target_family(config, residual_targets, curves, suffix="_residual")
         )
@@ -45,6 +52,23 @@ def make_supervised_yield_change_dataset(
     curves: pd.DataFrame,
 ) -> pd.DataFrame:
     """Build the canonical supervised panel for future yield-change forecasting."""
+    return _make_supervised_dataset(config, targets, curves)
+
+
+def make_supervised_residual_change_dataset(
+    config: ProjectConfig,
+    targets: pd.DataFrame,
+    curves: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build the canonical supervised panel for residual-change forecasting."""
+    return _make_supervised_dataset(config, targets, curves)
+
+
+def _make_supervised_dataset(
+    config: ProjectConfig,
+    targets: pd.DataFrame,
+    curves: pd.DataFrame,
+) -> pd.DataFrame:
     dataset = targets.copy()
     dataset["date"] = pd.to_datetime(dataset["date"])
 
@@ -60,12 +84,23 @@ def make_supervised_yield_change_dataset(
         (_read_residual_features(config), ["date", "country", "maturity_years"]),
     ]:
         if not features.empty:
-            dataset = dataset.merge(features, on=keys, how="left")
+            dataset = _merge_features(dataset, features, keys)
 
     dataset = _attach_evaluation_splits(dataset, config)
     return dataset.sort_values(
         ["country", "horizon_days", "window_id", "split", "date", "maturity_years"]
     ).reset_index(drop=True)
+
+
+def _merge_features(
+    dataset: pd.DataFrame,
+    features: pd.DataFrame,
+    keys: list[str],
+) -> pd.DataFrame:
+    feature_columns = [
+        column for column in features.columns if column in keys or column not in dataset.columns
+    ]
+    return dataset.merge(features.loc[:, feature_columns], on=keys, how="left")
 
 
 def _read_pca_features(config: ProjectConfig) -> pd.DataFrame:

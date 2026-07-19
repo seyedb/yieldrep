@@ -22,6 +22,9 @@ def test_load_config_reads_project_paths() -> None:
     assert config.supervised_yield_change_path == Path(
         "data/processed/modeling/supervised_yield_change.parquet"
     )
+    assert config.supervised_residual_change_path == Path(
+        "data/processed/modeling/supervised_residual_change.parquet"
+    )
     assert config.evaluation_dir == Path("data/processed/evaluation")
     assert config.baseline_metrics_path == Path("data/processed/evaluation/baseline_metrics.parquet")
     assert config.baseline_classification_metrics_path == Path(
