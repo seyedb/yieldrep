@@ -8,6 +8,7 @@ from yieldrep.data.normalize import build_curves_parquet
 from yieldrep.evaluation.datasets import build_modeling_datasets
 from yieldrep.evaluation.diagnostics import diagnose_lagged_baseline
 from yieldrep.evaluation.reports import build_overlap_sensitivity_report, summarize_baselines
+from yieldrep.evaluation.reconstruction import evaluate_reconstruction
 from yieldrep.evaluation.targets import (
     build_residual_targets,
     build_standardized_targets,
@@ -149,6 +150,14 @@ def overlap_sensitivity_command(config: Path = Path("configs/default.yaml")) -> 
     """Compare baseline performance with overlapping and non-overlapping targets."""
     project_config = load_config(config)
     typer.echo(build_overlap_sensitivity_report(project_config))
+
+
+@app.command("evaluate-reconstruction")
+def evaluate_reconstruction_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Evaluate curve reconstruction quality for classical representations."""
+    project_config = load_config(config)
+    for output_path in evaluate_reconstruction(project_config):
+        typer.echo(output_path)
 
 
 @app.command("plot-pca")

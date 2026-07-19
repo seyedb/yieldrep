@@ -170,6 +170,14 @@ class ProjectConfig(BaseModel):
     def overlap_sensitivity_table_path(self) -> Path:
         return self.tables_dir / "overlap_sensitivity.csv"
 
+    @property
+    def reconstruction_summary_table_path(self) -> Path:
+        return self.tables_dir / "reconstruction_summary.csv"
+
+    @property
+    def reconstruction_by_maturity_table_path(self) -> Path:
+        return self.tables_dir / "reconstruction_by_maturity.csv"
+
 
 def load_config(path: Path) -> ProjectConfig:
     with path.open("r", encoding="utf-8") as handle:

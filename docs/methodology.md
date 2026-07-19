@@ -90,6 +90,25 @@ With \(\tau\) fixed, the betas are estimated by ordinary least squares for each
 country and date. The fitted residuals and RMSE measure how well the parametric
 curve matches the observed curve.
 
+## Reconstruction Evaluation
+
+Reconstruction metrics evaluate representation quality before any forecasting
+task. For PCA, the observed curve is reconstructed from the first \(K\)
+components. For Nelson-Siegel, the reconstructed curve is the fitted parametric
+curve.
+
+```math
+e_t^{(m)}
+=
+r_t^{(m)}
+-
+\hat{r}_t^{(m)}
+```
+
+The project reports reconstruction RMSE and MAE overall and by maturity. This is
+a standard compression/fit benchmark: it asks whether the representation encodes
+the observed curve well, not whether it predicts future returns.
+
 ## Prediction Target
 
 For horizon \(h\), the current target is the forward yield change:
