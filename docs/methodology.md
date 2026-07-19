@@ -222,6 +222,12 @@ f\left(\mathbf{x}_t^{(c)}\right)
 where \(\mathbf{x}_t^{(c)}\) is a baseline representation available at date
 \(t\).
 
+The canonical supervised yield-change table stores one row per country, date,
+maturity, and horizon, with all currently available classical features joined to
+the same forward yield-change target. It also stores the chronological
+train/test split labels used by the evaluation pipeline, so downstream models
+can reuse the same experimental design.
+
 Metrics include a target label so outright yield-change, residual-change, and
 volatility-change tasks can be compared separately.
 

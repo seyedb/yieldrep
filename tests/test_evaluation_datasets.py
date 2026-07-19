@@ -115,6 +115,7 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
 
     assert set(output_paths).issuperset(
         {
+            processed_dir / "modeling" / "supervised_yield_change.parquet",
             processed_dir / "modeling" / "pca_targets.parquet",
             processed_dir / "modeling" / "nelson_siegel_targets.parquet",
             processed_dir / "modeling" / "lagged_targets.parquet",
@@ -128,6 +129,7 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         }
     )
     pca_targets = pd.read_parquet(processed_dir / "modeling" / "pca_targets.parquet")
+    supervised = pd.read_parquet(processed_dir / "modeling" / "supervised_yield_change.parquet")
     ns_targets = pd.read_parquet(processed_dir / "modeling" / "nelson_siegel_targets.parquet")
     lagged_targets = pd.read_parquet(processed_dir / "modeling" / "lagged_targets.parquet")
     curve_targets = pd.read_parquet(processed_dir / "modeling" / "curve_targets.parquet")
@@ -142,6 +144,18 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         processed_dir / "modeling" / "residual_feature_targets.parquet"
     )
     assert {"PC1", "PC2", "target_yield_change"}.issubset(pca_targets.columns)
+    assert {
+        "split",
+        "split_method",
+        "window_id",
+        "PC1",
+        "beta_level",
+        "level",
+        "lag_1_change",
+        "residual_z_60",
+        "target_yield_change",
+    }.issubset(supervised.columns)
+    assert set(supervised["split"]) == {"train", "test"}
     assert {"beta_level", "beta_slope", "beta_curvature", "target_yield_change"}.issubset(
         ns_targets.columns
     )

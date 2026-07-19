@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from yieldrep.config import ProjectConfig
+from yieldrep.evaluation.splits import evaluation_splits
 
 
 def build_modeling_datasets(config: ProjectConfig) -> list[Path]:
@@ -14,6 +15,9 @@ def build_modeling_datasets(config: ProjectConfig) -> list[Path]:
     config.modeling_dir.mkdir(parents=True, exist_ok=True)
 
     output_paths: list[Path] = []
+    supervised = make_supervised_yield_change_dataset(config, targets, curves)
+    supervised.to_parquet(config.supervised_yield_change_path, index=False)
+    output_paths.append(config.supervised_yield_change_path)
     output_paths.extend(_build_target_family(config, targets, curves, suffix=""))
 
     if config.standardized_targets_path.exists():
@@ -33,6 +37,126 @@ def build_modeling_datasets(config: ProjectConfig) -> list[Path]:
         output_paths.extend(_build_target_family(config, vol_targets, curves, suffix="_vol"))
 
     return output_paths
+
+
+def make_supervised_yield_change_dataset(
+    config: ProjectConfig,
+    targets: pd.DataFrame,
+    curves: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build the canonical supervised panel for future yield-change forecasting."""
+    dataset = targets.copy()
+    dataset["date"] = pd.to_datetime(dataset["date"])
+
+    for features, keys in [
+        (_read_pca_features(config), ["date", "country"]),
+        (_read_nelson_siegel_features(config), ["date", "country"]),
+        (_read_curve_features(config), ["date", "country"]),
+        (
+            make_lagged_yield_change_features(curves, config.evaluation.lag_days),
+            ["date", "country", "maturity_years"],
+        ),
+        (_read_residual_features(config), ["date", "country", "maturity_years"]),
+    ]:
+        if not features.empty:
+            dataset = dataset.merge(features, on=keys, how="left")
+
+    dataset = _attach_evaluation_splits(dataset, config)
+    return dataset.sort_values(
+        ["country", "horizon_days", "window_id", "split", "date", "maturity_years"]
+    ).reset_index(drop=True)
+
+
+def _read_pca_features(config: ProjectConfig) -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
+    for scores_path in sorted(config.pca_dir.glob("*_scores.parquet")):
+        country = scores_path.name.removesuffix("_scores.parquet").upper()
+        scores = pd.read_parquet(scores_path)
+        scores["country"] = country
+        frames.append(scores)
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
+
+
+def _read_nelson_siegel_features(config: ProjectConfig) -> pd.DataFrame:
+    frames = [
+        pd.read_parquet(factors_path)
+        for factors_path in sorted(config.nelson_siegel_dir.glob("*_factors.parquet"))
+    ]
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
+
+
+def _read_curve_features(config: ProjectConfig) -> pd.DataFrame:
+    if not config.curve_features_path.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(config.curve_features_path)
+
+
+def _read_residual_features(config: ProjectConfig) -> pd.DataFrame:
+    if not config.residual_features_path.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(config.residual_features_path)
+
+
+def _attach_evaluation_splits(data: pd.DataFrame, config: ProjectConfig) -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
+    for group_values, group in data.groupby(["country", "horizon_days"], sort=True):
+        country, horizon_days = group_values
+        for split in evaluation_splits(
+            group,
+            method=config.evaluation.method,
+            test_fraction=config.evaluation.test_fraction,
+            min_train_dates=config.evaluation.min_train_dates,
+            test_window_dates=config.evaluation.test_window_dates,
+            step_dates=config.evaluation.step_dates,
+            horizon_days=int(horizon_days),
+            non_overlapping_targets=config.evaluation.non_overlapping_targets,
+        ):
+            frames.extend(
+                [
+                    _labeled_split_frame(
+                        split.train,
+                        country,
+                        horizon_days,
+                        split.method,
+                        split.window_id,
+                        "train",
+                    ),
+                    _labeled_split_frame(
+                        split.test,
+                        country,
+                        horizon_days,
+                        split.method,
+                        split.window_id,
+                        "test",
+                    ),
+                ]
+            )
+
+    if not frames:
+        return data.iloc[0:0].copy()
+
+    return pd.concat(frames, ignore_index=True)
+
+
+def _labeled_split_frame(
+    data: pd.DataFrame,
+    country: object,
+    horizon_days: object,
+    split_method: str,
+    window_id: int,
+    split: str,
+) -> pd.DataFrame:
+    labeled = data.copy()
+    labeled["split_method"] = split_method
+    labeled["window_id"] = window_id
+    labeled["split"] = split
+    labeled["country"] = country
+    labeled["horizon_days"] = horizon_days
+    return labeled
 
 
 def _build_target_family(
