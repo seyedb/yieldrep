@@ -4,7 +4,12 @@ import pandas as pd
 import pytest
 
 from yieldrep.config import ProjectConfig, SourceConfig
-from yieldrep.evaluation.reports import baseline_winners, summarize_baselines, top_maturity_point_metrics
+from yieldrep.evaluation.reports import (
+    baseline_winners,
+    overlap_sensitivity_table,
+    summarize_baselines,
+    top_maturity_point_metrics,
+)
 
 
 def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
@@ -75,6 +80,29 @@ def test_baseline_winners_handles_missing_reference_representations() -> None:
 
     assert winners.loc[0, "best_representation"] == "curve"
     assert pd.isna(winners.loc[0, "pca_rank"])
+
+
+def test_overlap_sensitivity_table_compares_target_windows() -> None:
+    overlapping = pd.DataFrame(
+        [
+            _metric_row(representation="lagged", rmse=0.10, maturity_years=None),
+            _metric_row(representation="pca", rmse=0.12, maturity_years=None),
+        ]
+    ).drop(columns=["maturity_years"])
+    non_overlapping = pd.DataFrame(
+        [
+            _metric_row(representation="lagged", rmse=0.16, maturity_years=None),
+            _metric_row(representation="pca", rmse=0.14, maturity_years=None),
+        ]
+    ).drop(columns=["maturity_years"])
+
+    sensitivity = overlap_sensitivity_table(overlapping, non_overlapping)
+
+    lagged = sensitivity.loc[sensitivity["representation"] == "lagged"].iloc[0]
+    assert lagged["overlapping_rank"] == 1.0
+    assert lagged["non_overlapping_rank"] == 2.0
+    assert lagged["rmse_change_non_overlapping_minus_overlapping"] == pytest.approx(0.06)
+    assert lagged["rank_change_non_overlapping_minus_overlapping"] == pytest.approx(1.0)
 
 
 def _sample_metrics() -> pd.DataFrame:

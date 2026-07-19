@@ -60,8 +60,34 @@ class PreparedEvaluationData:
     feature_columns: list[str]
 
 
+@dataclass(frozen=True)
+class BaselineEvaluationFrames:
+    metrics: pd.DataFrame
+    metrics_by_maturity: pd.DataFrame
+    metrics_by_maturity_point: pd.DataFrame
+    classification_metrics: pd.DataFrame
+
+
 def evaluate_baselines(config: ProjectConfig) -> Path:
     """Evaluate simple forecasting baselines on prepared modeling datasets."""
+    frames = evaluate_baseline_frames(config)
+
+    config.evaluation_dir.mkdir(parents=True, exist_ok=True)
+    frames.metrics.to_parquet(config.baseline_metrics_path, index=False)
+    frames.metrics_by_maturity.to_parquet(config.baseline_metrics_by_maturity_path, index=False)
+    frames.metrics_by_maturity_point.to_parquet(
+        config.baseline_metrics_by_maturity_point_path,
+        index=False,
+    )
+    frames.classification_metrics.to_parquet(
+        config.baseline_classification_metrics_path,
+        index=False,
+    )
+    return config.baseline_metrics_path
+
+
+def evaluate_baseline_frames(config: ProjectConfig) -> BaselineEvaluationFrames:
+    """Evaluate baselines and return metric frames without writing outputs."""
     specs = _evaluation_specs(config)
 
     rows: list[dict[str, object]] = []
@@ -79,25 +105,18 @@ def evaluate_baselines(config: ProjectConfig) -> Path:
         maturity_rows.extend(spec_maturity_rows)
         maturity_point_rows.extend(spec_maturity_point_rows)
 
-    config.evaluation_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows).to_parquet(config.baseline_metrics_path, index=False)
-    pd.DataFrame(maturity_rows).to_parquet(config.baseline_metrics_by_maturity_path, index=False)
-    pd.DataFrame(maturity_point_rows).to_parquet(
-        config.baseline_metrics_by_maturity_point_path,
-        index=False,
-    )
-
     classification_rows: list[dict[str, object]] = []
     for spec in _classification_specs(config):
         prepared = _prepare_evaluation_data(spec)
         if prepared is None:
             continue
         classification_rows.extend(_evaluate_classification_representation(config, spec, prepared))
-    pd.DataFrame(classification_rows).to_parquet(
-        config.baseline_classification_metrics_path,
-        index=False,
+    return BaselineEvaluationFrames(
+        metrics=pd.DataFrame(rows),
+        metrics_by_maturity=pd.DataFrame(maturity_rows),
+        metrics_by_maturity_point=pd.DataFrame(maturity_point_rows),
+        classification_metrics=pd.DataFrame(classification_rows),
     )
-    return config.baseline_metrics_path
 
 
 def _evaluate_regression_representation(

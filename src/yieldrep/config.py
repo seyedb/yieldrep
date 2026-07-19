@@ -166,6 +166,10 @@ class ProjectConfig(BaseModel):
     def baseline_winners_table_path(self) -> Path:
         return self.tables_dir / "baseline_winners.csv"
 
+    @property
+    def overlap_sensitivity_table_path(self) -> Path:
+        return self.tables_dir / "overlap_sensitivity.csv"
+
 
 def load_config(path: Path) -> ProjectConfig:
     with path.open("r", encoding="utf-8") as handle:

@@ -383,6 +383,10 @@ This is useful for checking whether apparent predictability comes from
 overlapping forward-change labels rather than from genuinely forecastable curve
 information.
 
+The overlap-sensitivity report runs both protocols and compares ranks and RMSE
+side by side. This is used as a robustness check before interpreting any
+short-horizon forecasting result as evidence of predictive signal.
+
 Walk-forward evaluation is also supported. Each split trains on an expanding
 history and tests on the next chronological block:
 

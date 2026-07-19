@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from yieldrep.config import ProjectConfig
+from yieldrep.models.baselines import evaluate_baseline_frames
 
 SUMMARY_GROUP_COLUMNS = ["target", "representation", "model"]
 BUCKET_GROUP_COLUMNS = ["target", "representation", "model", "maturity_bucket"]
@@ -46,6 +47,41 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.baseline_by_maturity_bucket_table_path,
         config.baseline_by_maturity_point_top_table_path,
     ]
+
+
+def build_overlap_sensitivity_report(config: ProjectConfig) -> Path:
+    """Compare baseline ranks with overlapping and non-overlapping target windows."""
+    config.tables_dir.mkdir(parents=True, exist_ok=True)
+
+    overlapping = _evaluate_with_target_window(config, non_overlapping_targets=False)
+    non_overlapping = _evaluate_with_target_window(config, non_overlapping_targets=True)
+    report = overlap_sensitivity_table(overlapping, non_overlapping)
+    report.to_csv(config.overlap_sensitivity_table_path, index=False)
+    return config.overlap_sensitivity_table_path
+
+
+def overlap_sensitivity_table(
+    overlapping_metrics: pd.DataFrame,
+    non_overlapping_metrics: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build a compact side-by-side comparison of two evaluation protocols."""
+    overlapping = _rank_for_target_window(overlapping_metrics, target_window="overlapping")
+    non_overlapping = _rank_for_target_window(
+        non_overlapping_metrics,
+        target_window="non_overlapping",
+    )
+    join_columns = [*RANK_GROUP_COLUMNS, "representation", "model"]
+    report = overlapping.merge(non_overlapping, on=join_columns, how="outer")
+    report["rmse_change_non_overlapping_minus_overlapping"] = (
+        report["non_overlapping_mean_rmse"] - report["overlapping_mean_rmse"]
+    )
+    report["rank_change_non_overlapping_minus_overlapping"] = (
+        report["non_overlapping_rank"] - report["overlapping_rank"]
+    )
+    return report.sort_values(
+        [*RANK_GROUP_COLUMNS, "non_overlapping_rank", "overlapping_rank", "representation", "model"],
+        na_position="last",
+    ).reset_index(drop=True)
 
 
 def summarize_metrics(
@@ -179,3 +215,40 @@ def _gap_value(row: pd.Series | None) -> float | None:
 
 def _pct_gap_value(row: pd.Series | None) -> float | None:
     return None if row is None else float(row["pct_gap_to_best"])
+
+
+def _evaluate_with_target_window(
+    config: ProjectConfig,
+    non_overlapping_targets: bool,
+) -> pd.DataFrame:
+    evaluation = config.evaluation.model_copy(
+        update={"non_overlapping_targets": non_overlapping_targets}
+    )
+    evaluation_config = config.model_copy(update={"evaluation": evaluation})
+    return evaluate_baseline_frames(evaluation_config).metrics
+
+
+def _rank_for_target_window(metrics: pd.DataFrame, target_window: str) -> pd.DataFrame:
+    rank_table = rank_baselines(metrics)
+    columns = [
+        *RANK_GROUP_COLUMNS,
+        "representation",
+        "model",
+        "mean_rmse",
+        "mean_mae",
+        "mean_directional_accuracy",
+        "rank",
+        "rmse_gap_to_best",
+        "pct_gap_to_best",
+    ]
+    if "mean_rank_ic" in rank_table.columns:
+        columns.append("mean_rank_ic")
+    if "rank_ic_dates" in rank_table.columns:
+        columns.append("rank_ic_dates")
+
+    renamed = {
+        column: f"{target_window}_{column}"
+        for column in columns
+        if column not in [*RANK_GROUP_COLUMNS, "representation", "model"]
+    }
+    return rank_table.loc[:, columns].rename(columns=renamed)
