@@ -8,6 +8,11 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from yieldrep.config import ProjectConfig
+from yieldrep.evaluation.metrics import directional_accuracy, mae, rmse
+from yieldrep.models.forecasting import FeatureSet, TargetSpec, feature_sets
+from yieldrep.models.forecasting import _predictions as forecast_predictions
+
+GROUP_COLUMNS = ["country", "horizon_days", "split_method", "window_id"]
 
 
 @dataclass(frozen=True)
@@ -37,6 +42,140 @@ def diagnose_lagged_baseline(config: ProjectConfig) -> Path:
     diagnostics.to_parquet(config.lagged_diagnostics_path, index=False)
     diagnostics.to_csv(config.lagged_diagnostics_table_path, index=False)
     return config.lagged_diagnostics_table_path
+
+
+def build_forecast_error_diagnostics(config: ProjectConfig) -> Path:
+    """Summarize supervised forecast errors by curve segment and realized move regime."""
+    rows: list[dict[str, object]] = []
+    for target in _supervised_targets(config):
+        data = pd.read_parquet(target.path)
+        for feature_set in feature_sets(config):
+            rows.extend(_forecast_error_rows(config, data, target, feature_set))
+
+    diagnostics = pd.DataFrame(rows)
+    config.tables_dir.mkdir(parents=True, exist_ok=True)
+    diagnostics.to_csv(config.forecast_error_diagnostics_table_path, index=False)
+    return config.forecast_error_diagnostics_table_path
+
+
+def _forecast_error_rows(
+    config: ProjectConfig,
+    data: pd.DataFrame,
+    target: TargetSpec,
+    feature_set: FeatureSet,
+) -> list[dict[str, object]]:
+    columns = [column for column in feature_set.columns if column in data.columns]
+    if not columns:
+        return []
+
+    required = [
+        "date",
+        "maturity_years",
+        *GROUP_COLUMNS,
+        "split",
+        target.target_column,
+        *columns,
+    ]
+    sample = data.dropna(subset=required).loc[:, required]
+
+    rows: list[dict[str, object]] = []
+    for group_values, group in sample.groupby(GROUP_COLUMNS, sort=True):
+        train = group.loc[group["split"] == "train"]
+        test = group.loc[group["split"] == "test"]
+        if train.empty or test.empty:
+            continue
+
+        x_train = train[columns].to_numpy(dtype=float)
+        y_train = train[target.target_column].to_numpy(dtype=float)
+        x_test = test[columns].to_numpy(dtype=float)
+        y_test = test[target.target_column].to_numpy(dtype=float)
+        predictions = forecast_predictions(config, columns, x_train, y_train, x_test)
+
+        for prediction in predictions:
+            errors = _prediction_error_frame(test, y_test, prediction.y_pred)
+            rows.extend(
+                _summarize_forecast_errors(
+                    target=target.target,
+                    group_values=group_values,
+                    representation=feature_set.representation,
+                    model=prediction.model,
+                    errors=errors,
+                )
+            )
+
+    return rows
+
+
+def _prediction_error_frame(
+    test: pd.DataFrame,
+    y_true: NDArray[np.float64],
+    y_pred: NDArray[np.float64],
+) -> pd.DataFrame:
+    errors = pd.DataFrame(
+        {
+            "date": test["date"].to_numpy(),
+            "maturity_years": test["maturity_years"].to_numpy(dtype=float),
+            "y_true": y_true,
+            "y_pred": y_pred,
+        }
+    )
+    errors["maturity_bucket"] = _maturity_bucket(errors["maturity_years"])
+    errors["realized_move_regime"] = _realized_move_regime(errors["y_true"])
+    return errors
+
+
+def _summarize_forecast_errors(
+    target: str,
+    group_values: tuple[object, ...],
+    representation: str,
+    model: str,
+    errors: pd.DataFrame,
+) -> list[dict[str, object]]:
+    country, horizon_days, split_method, window_id = group_values
+    rows: list[dict[str, object]] = []
+    for (bucket, regime), group in errors.groupby(
+        ["maturity_bucket", "realized_move_regime"],
+        sort=True,
+        observed=True,
+    ):
+        y_true = group["y_true"].to_numpy(dtype=float)
+        y_pred = group["y_pred"].to_numpy(dtype=float)
+        forecast_error = y_pred - y_true
+        rows.append(
+            {
+                "target": target,
+                "country": country,
+                "horizon_days": int(str(horizon_days)),
+                "split_method": split_method,
+                "window_id": int(str(window_id)),
+                "representation": representation,
+                "model": model,
+                "maturity_bucket": str(bucket),
+                "realized_move_regime": str(regime),
+                "observations": len(group),
+                "rmse": rmse(y_true, y_pred),
+                "mae": mae(y_true, y_pred),
+                "directional_accuracy": directional_accuracy(y_true, y_pred),
+                "bias": float(np.mean(forecast_error)),
+                "mean_abs_target": float(np.mean(np.abs(y_true))),
+                "mean_abs_error": float(np.mean(np.abs(forecast_error))),
+            }
+        )
+    return rows
+
+
+def _realized_move_regime(target_values: pd.Series) -> pd.Series:
+    abs_move = target_values.abs()
+    if abs_move.nunique(dropna=True) < 3:
+        return pd.Series("all", index=target_values.index, dtype="string")
+    ranked = abs_move.rank(method="first")
+    regimes = pd.qcut(
+        ranked,
+        q=3,
+        labels=["small", "medium", "large"],
+        duplicates="drop",
+    )
+    return regimes.astype("string")
 
 
 def _diagnose_target_autocorrelation(
@@ -254,6 +393,35 @@ def _diagnostic_targets(config: ProjectConfig) -> list[DiagnosticTarget]:
             target_column="target_vol_change",
         ),
     ]
+
+
+def _supervised_targets(config: ProjectConfig) -> list[TargetSpec]:
+    specs: list[TargetSpec] = []
+    if config.supervised_yield_change_path.exists():
+        specs.append(
+            TargetSpec(
+                target="yield_change",
+                path=config.supervised_yield_change_path,
+                target_column="target_yield_change",
+            )
+        )
+    if config.supervised_residual_change_path.exists():
+        specs.append(
+            TargetSpec(
+                target="residual_change",
+                path=config.supervised_residual_change_path,
+                target_column="target_residual_change",
+            )
+        )
+    if config.supervised_vol_change_path.exists():
+        specs.append(
+            TargetSpec(
+                target="vol_change",
+                path=config.supervised_vol_change_path,
+                target_column="target_vol_change",
+            )
+        )
+    return specs
 
 
 def _lagged_dataset_name(target_name: str) -> str:
