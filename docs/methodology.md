@@ -220,8 +220,14 @@ Current feature sets:
 PCA:
     PC1, ..., PCK where K is configured by pca.n_components
 
+Maturity-aware PCA:
+    maturity_years, PC1, ..., PCK, and PC-by-maturity interactions
+
 Nelson-Siegel:
     beta_level, beta_slope, beta_curvature, rmse
+
+Maturity-aware Nelson-Siegel:
+    maturity_years, Nelson-Siegel factors, and factor-by-maturity interactions
 
 Lagged yield changes:
     lag_1_change, lag_5_change, lag_20_change
@@ -230,10 +236,31 @@ Engineered curve features:
     level, slope_10y_2y, curvature_2s5s10s,
     front_slope_2y_1y, long_slope_30y_10y
 
+Maturity-aware curve features:
+    maturity_years, engineered curve features, and feature-by-maturity interactions
+
 Residual dynamic features:
     residual, residual_z_60, residual_z_252,
     residual_change_1, residual_change_5, residual_vol_20
 ```
+
+The maturity-aware variants keep the original date-level representations but
+allow the linear model to assign different forecast exposure by maturity:
+
+```math
+\hat{y}_{t,h}^{(m)}
+=
+\alpha
++ \gamma m
++ \mathbf{x}_t^\top \beta
++ \left(m \mathbf{x}_t\right)^\top \delta
+```
+
+This matters for cross-sectional rank IC. Plain PCA, Nelson-Siegel, and curve
+features are identical for all maturities on a given date, so their predictions
+can be identical across maturities and rank IC may be undefined. The
+maturity-aware version is still classical and linear, but it can produce
+maturity-specific predictions.
 
 The residual dynamic baseline adds local relative-value state. Residual
 z-scores standardize the Nelson-Siegel residual within a rolling window:
