@@ -36,6 +36,8 @@ class EvaluationConfig(BaseModel):
     test_window_dates: int = 63
     step_dates: int = 63
     ridge_alpha: float = 1.0
+    elastic_net_alpha: float = 0.01
+    elastic_net_l1_ratio: float = 0.5
     logistic_c: float = 1.0
     classification_max_train_rows: int = 2_000
     non_overlapping_targets: bool = True
@@ -147,12 +149,28 @@ class ProjectConfig(BaseModel):
         return self.evaluation_dir / "supervised_forecast_metrics.parquet"
 
     @property
+    def supervised_forecast_by_maturity_bucket_path(self) -> Path:
+        return self.evaluation_dir / "supervised_forecast_by_maturity_bucket.parquet"
+
+    @property
+    def supervised_forecast_coefficients_path(self) -> Path:
+        return self.evaluation_dir / "supervised_forecast_coefficients.parquet"
+
+    @property
     def supervised_forecast_summary_table_path(self) -> Path:
         return self.tables_dir / "supervised_forecast_summary.csv"
 
     @property
     def supervised_forecast_rank_table_path(self) -> Path:
         return self.tables_dir / "supervised_forecast_rank.csv"
+
+    @property
+    def supervised_forecast_by_maturity_bucket_table_path(self) -> Path:
+        return self.tables_dir / "supervised_forecast_by_maturity_bucket.csv"
+
+    @property
+    def supervised_forecast_coefficients_table_path(self) -> Path:
+        return self.tables_dir / "supervised_forecast_coefficients.csv"
 
     @property
     def lagged_diagnostics_path(self) -> Path:

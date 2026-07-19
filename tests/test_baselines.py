@@ -164,7 +164,9 @@ def test_evaluate_supervised_forecasts_writes_metrics_and_tables(tmp_path: Path)
     modeling_dir = tmp_path / "data" / "processed" / "modeling"
     modeling_dir.mkdir(parents=True)
     data = _sample_modeling_data(feature_prefix="pca").assign(
-        split=lambda frame: ["train" if date < frame["date"].iloc[-3] else "test" for date in frame["date"]],
+        split=lambda frame: [
+            "train" if date < frame["date"].iloc[-3] else "test" for date in frame["date"]
+        ],
         split_method="date_ordered",
         window_id=0,
     )
@@ -178,16 +180,31 @@ def test_evaluate_supervised_forecasts_writes_metrics_and_tables(tmp_path: Path)
 
     output_paths = evaluate_supervised_forecasts(config)
     metrics = pd.read_parquet(config.supervised_forecast_metrics_path)
+    bucket_metrics = pd.read_parquet(config.supervised_forecast_by_maturity_bucket_path)
+    coefficients = pd.read_parquet(config.supervised_forecast_coefficients_path)
     summary = pd.read_csv(config.supervised_forecast_summary_table_path)
 
     assert output_paths == [
         config.supervised_forecast_metrics_path,
+        config.supervised_forecast_by_maturity_bucket_path,
+        config.supervised_forecast_coefficients_path,
         config.supervised_forecast_summary_table_path,
         config.supervised_forecast_rank_table_path,
+        config.supervised_forecast_by_maturity_bucket_table_path,
+        config.supervised_forecast_coefficients_table_path,
     ]
     assert set(metrics["representation"]) == {"pca"}
-    assert set(metrics["model"]) == {"train_mean", "ridge"}
-    assert {"rmse", "mae", "directional_accuracy"}.issubset(metrics.columns)
+    assert set(metrics["model"]) == {"train_mean", "ridge", "elastic_net"}
+    assert {
+        "rmse",
+        "mae",
+        "directional_accuracy",
+        "rmse_improvement_vs_train_mean",
+        "pct_improvement_vs_train_mean",
+    }.issubset(metrics.columns)
+    assert set(bucket_metrics["maturity_bucket"]) == {"front_end", "belly", "long_end"}
+    assert set(coefficients["model"]) == {"ridge", "elastic_net"}
+    assert {"feature", "coefficient", "abs_coefficient"}.issubset(coefficients.columns)
     assert set(summary["representation"]) == {"pca"}
 
 

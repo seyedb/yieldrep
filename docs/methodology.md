@@ -229,10 +229,19 @@ train/test split labels used by the evaluation pipeline, so downstream models
 can reuse the same experimental design.
 
 The first supervised benchmark compares a training-set mean forecast with
-L2-regularized Ridge regressions for each classical feature family. This is a
-standard linear hurdle: learned representations should eventually be evaluated
-against this same supervised table and split design, not against a different
-target construction.
+L2-regularized Ridge regressions and Elastic Net regressions for each classical
+feature family. Ridge tests whether dense linear combinations of a feature set
+are useful; Elastic Net adds sparsity pressure, so it can reveal whether only a
+small subset of features carries most of the signal.
+
+The benchmark reports improvement versus the training-set mean forecast, both
+overall and by maturity bucket. Coefficient tables are based on standardized
+features, so coefficient magnitudes are useful for inspecting which inputs the
+linear models rely on within each country and horizon.
+
+This is a standard linear hurdle: learned representations should eventually be
+evaluated against this same supervised table and split design, not against a
+different target construction.
 
 Metrics include a target label so outright yield-change, residual-change, and
 volatility-change tasks can be compared separately.

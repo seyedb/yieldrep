@@ -29,11 +29,23 @@ def test_load_config_reads_project_paths() -> None:
     assert config.supervised_forecast_metrics_path == Path(
         "data/processed/evaluation/supervised_forecast_metrics.parquet"
     )
+    assert config.supervised_forecast_by_maturity_bucket_path == Path(
+        "data/processed/evaluation/supervised_forecast_by_maturity_bucket.parquet"
+    )
+    assert config.supervised_forecast_coefficients_path == Path(
+        "data/processed/evaluation/supervised_forecast_coefficients.parquet"
+    )
     assert config.supervised_forecast_summary_table_path == Path(
         "reports/tables/supervised_forecast_summary.csv"
     )
     assert config.supervised_forecast_rank_table_path == Path(
         "reports/tables/supervised_forecast_rank.csv"
+    )
+    assert config.supervised_forecast_by_maturity_bucket_table_path == Path(
+        "reports/tables/supervised_forecast_by_maturity_bucket.csv"
+    )
+    assert config.supervised_forecast_coefficients_table_path == Path(
+        "reports/tables/supervised_forecast_coefficients.csv"
     )
     assert config.lagged_diagnostics_path == Path(
         "data/processed/evaluation/lagged_diagnostics.parquet"
@@ -79,6 +91,8 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.evaluation.method == "date_ordered"
     assert config.evaluation.test_fraction == 0.2
     assert config.evaluation.ridge_alpha == 1.0
+    assert config.evaluation.elastic_net_alpha == 0.01
+    assert config.evaluation.elastic_net_l1_ratio == 0.5
     assert config.evaluation.logistic_c == 1.0
     assert config.evaluation.classification_max_train_rows == 2_000
     assert config.evaluation.non_overlapping_targets is True

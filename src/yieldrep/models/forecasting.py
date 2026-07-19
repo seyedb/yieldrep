@@ -6,8 +6,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
-from sklearn.linear_model import Ridge
-from sklearn.pipeline import make_pipeline
+from sklearn.linear_model import ElasticNet, Ridge
+from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from yieldrep.config import ProjectConfig
@@ -15,6 +15,8 @@ from yieldrep.evaluation.metrics import directional_accuracy, mae, rmse
 
 GROUP_COLUMNS = ["country", "horizon_days", "split_method", "window_id"]
 TARGET_COLUMN = "target_yield_change"
+METRIC_GROUP_COLUMNS = ["representation", "model"]
+RANK_GROUP_COLUMNS = ["country", "horizon_days"]
 
 
 @dataclass(frozen=True)
@@ -23,42 +25,81 @@ class FeatureSet:
     columns: list[str]
 
 
+@dataclass(frozen=True)
+class PredictionResult:
+    model: str
+    y_pred: NDArray[np.float64]
+    coefficients: dict[str, float]
+
+
+@dataclass(frozen=True)
+class SupervisedForecastFrames:
+    metrics: pd.DataFrame
+    by_maturity_bucket: pd.DataFrame
+    coefficients: pd.DataFrame
+
+
 def evaluate_supervised_forecasts(config: ProjectConfig) -> list[Path]:
     """Evaluate classical forecasting benchmarks from the canonical supervised table."""
     if not config.supervised_yield_change_path.exists():
         return []
 
     data = pd.read_parquet(config.supervised_yield_change_path)
-    metrics = supervised_forecast_metrics(data, feature_sets=_feature_sets(config), config=config)
+    frames = supervised_forecast_frames(data, feature_sets=_feature_sets(config), config=config)
 
     config.evaluation_dir.mkdir(parents=True, exist_ok=True)
     config.tables_dir.mkdir(parents=True, exist_ok=True)
 
-    metrics.to_parquet(config.supervised_forecast_metrics_path, index=False)
-    summary = summarize_supervised_forecasts(metrics)
+    frames.metrics.to_parquet(config.supervised_forecast_metrics_path, index=False)
+    frames.by_maturity_bucket.to_parquet(
+        config.supervised_forecast_by_maturity_bucket_path,
+        index=False,
+    )
+    frames.coefficients.to_parquet(config.supervised_forecast_coefficients_path, index=False)
+
+    summary = summarize_supervised_forecasts(frames.metrics)
     summary.to_csv(config.supervised_forecast_summary_table_path, index=False)
-    rank = rank_supervised_forecasts(metrics)
+    rank = rank_supervised_forecasts(frames.metrics)
     rank.to_csv(config.supervised_forecast_rank_table_path, index=False)
+    bucket_summary = summarize_supervised_forecasts_by_bucket(frames.by_maturity_bucket)
+    bucket_summary.to_csv(config.supervised_forecast_by_maturity_bucket_table_path, index=False)
+    coefficient_summary = summarize_coefficients(frames.coefficients)
+    coefficient_summary.to_csv(config.supervised_forecast_coefficients_table_path, index=False)
+
     return [
         config.supervised_forecast_metrics_path,
+        config.supervised_forecast_by_maturity_bucket_path,
+        config.supervised_forecast_coefficients_path,
         config.supervised_forecast_summary_table_path,
         config.supervised_forecast_rank_table_path,
+        config.supervised_forecast_by_maturity_bucket_table_path,
+        config.supervised_forecast_coefficients_table_path,
     ]
 
 
-def supervised_forecast_metrics(
+def supervised_forecast_frames(
     data: pd.DataFrame,
     feature_sets: list[FeatureSet],
     config: ProjectConfig,
-) -> pd.DataFrame:
-    """Compute train-mean and Ridge forecast metrics for each feature set."""
-    rows: list[dict[str, object]] = []
+) -> SupervisedForecastFrames:
+    """Compute forecast metrics, maturity-bucket metrics, and coefficients."""
+    metric_rows: list[dict[str, object]] = []
+    bucket_rows: list[dict[str, object]] = []
+    coefficient_rows: list[dict[str, object]] = []
+
     for feature_set in feature_sets:
         columns = [column for column in feature_set.columns if column in data.columns]
         if not columns:
             continue
 
-        required = ["date", *GROUP_COLUMNS, "split", TARGET_COLUMN, *columns]
+        required = [
+            "date",
+            "maturity_years",
+            *GROUP_COLUMNS,
+            "split",
+            TARGET_COLUMN,
+            *columns,
+        ]
         sample = data.dropna(subset=required).loc[:, required]
         for group_values, group in sample.groupby(GROUP_COLUMNS, sort=True):
             train = group.loc[group["split"] == "train"]
@@ -71,64 +112,125 @@ def supervised_forecast_metrics(
             x_test = test[columns].to_numpy(dtype=float)
             y_test = test[TARGET_COLUMN].to_numpy(dtype=float)
 
-            rows.extend(
+            predictions = _predictions(config, columns, x_train, y_train, x_test)
+            metric_rows.extend(
                 _metric_rows(
                     group_values=group_values,
                     feature_set=feature_set,
                     feature_count=len(columns),
                     y_true=y_test,
-                    predictions=_predictions(config, x_train, y_train, x_test),
+                    predictions=predictions,
                     train_rows=len(train),
                     test_rows=len(test),
-                    train_dates=train["date"].nunique() if "date" in train else 0,
-                    test_dates=test["date"].nunique() if "date" in test else 0,
+                    train_dates=train["date"].nunique(),
+                    test_dates=test["date"].nunique(),
+                )
+            )
+            bucket_rows.extend(
+                _bucket_metric_rows(
+                    group_values=group_values,
+                    feature_set=feature_set,
+                    feature_count=len(columns),
+                    test=test,
+                    y_true=y_test,
+                    predictions=predictions,
+                    train_rows=len(train),
+                )
+            )
+            coefficient_rows.extend(
+                _coefficient_rows(
+                    group_values=group_values,
+                    feature_set=feature_set,
+                    predictions=predictions,
                 )
             )
 
-    return pd.DataFrame(rows)
+    metrics = _add_improvement_vs_train_mean(pd.DataFrame(metric_rows), GROUP_COLUMNS)
+    by_maturity_bucket = _add_improvement_vs_train_mean(
+        pd.DataFrame(bucket_rows),
+        [*GROUP_COLUMNS, "maturity_bucket"],
+    )
+    coefficients = pd.DataFrame(coefficient_rows)
+    return SupervisedForecastFrames(
+        metrics=metrics,
+        by_maturity_bucket=by_maturity_bucket,
+        coefficients=coefficients,
+    )
 
 
 def summarize_supervised_forecasts(metrics: pd.DataFrame) -> pd.DataFrame:
     """Aggregate supervised forecast metrics by representation and model."""
-    return (
-        metrics.groupby(["representation", "model"], sort=True)
-        .agg(
-            rows=("rmse", "size"),
-            countries=("country", "nunique"),
-            horizons=("horizon_days", "nunique"),
-            mean_rmse=("rmse", "mean"),
-            mean_mae=("mae", "mean"),
-            mean_directional_accuracy=("directional_accuracy", "mean"),
-        )
-        .reset_index()
-        .sort_values(["mean_rmse", "mean_mae", "representation", "model"])
-        .reset_index(drop=True)
-    )
+    return _summarize_metrics(metrics, METRIC_GROUP_COLUMNS)
+
+
+def summarize_supervised_forecasts_by_bucket(metrics: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate supervised forecast metrics by maturity bucket."""
+    return _summarize_metrics(metrics, [*METRIC_GROUP_COLUMNS, "maturity_bucket"])
 
 
 def rank_supervised_forecasts(metrics: pd.DataFrame) -> pd.DataFrame:
     """Rank supervised feature sets within each country and horizon."""
-    summary = (
-        metrics.groupby(["country", "horizon_days", "representation", "model"], sort=True)
-        .agg(
-            rows=("rmse", "size"),
-            mean_rmse=("rmse", "mean"),
-            mean_mae=("mae", "mean"),
-            mean_directional_accuracy=("directional_accuracy", "mean"),
-            mean_test_dates=("test_dates", "mean"),
-        )
-        .reset_index()
+    summary = _summarize_metrics(
+        metrics,
+        [*RANK_GROUP_COLUMNS, "representation", "model"],
+        include_mean_test_dates=True,
     )
-    summary["rank"] = summary.groupby(["country", "horizon_days"])["mean_rmse"].rank(
+    summary["rank"] = summary.groupby(RANK_GROUP_COLUMNS)["mean_rmse"].rank(
         method="min",
         ascending=True,
     )
-    best_rmse = summary.groupby(["country", "horizon_days"])["mean_rmse"].transform("min")
+    best_rmse = summary.groupby(RANK_GROUP_COLUMNS)["mean_rmse"].transform("min")
     summary["rmse_gap_to_best"] = summary["mean_rmse"] - best_rmse
     summary["pct_gap_to_best"] = summary["rmse_gap_to_best"] / best_rmse
     return summary.sort_values(
-        ["country", "horizon_days", "rank", "mean_mae", "representation", "model"]
+        [*RANK_GROUP_COLUMNS, "rank", "mean_mae", "representation", "model"]
     ).reset_index(drop=True)
+
+
+def summarize_coefficients(coefficients: pd.DataFrame) -> pd.DataFrame:
+    """Summarize standardized linear model coefficients across evaluation groups."""
+    if coefficients.empty:
+        return coefficients
+
+    summary = (
+        coefficients.groupby(["representation", "model", "feature"], sort=True)
+        .agg(
+            rows=("coefficient", "size"),
+            mean_coefficient=("coefficient", "mean"),
+            mean_abs_coefficient=("coefficient", lambda values: values.abs().mean()),
+        )
+        .reset_index()
+    )
+    return summary.sort_values(
+        ["representation", "model", "mean_abs_coefficient", "feature"],
+        ascending=[True, True, False, True],
+    ).reset_index(drop=True)
+
+
+def _summarize_metrics(
+    metrics: pd.DataFrame,
+    group_columns: list[str],
+    include_mean_test_dates: bool = False,
+) -> pd.DataFrame:
+    aggregations = {
+        "rows": ("rmse", "size"),
+        "countries": ("country", "nunique"),
+        "horizons": ("horizon_days", "nunique"),
+        "mean_rmse": ("rmse", "mean"),
+        "mean_mae": ("mae", "mean"),
+        "mean_directional_accuracy": ("directional_accuracy", "mean"),
+        "mean_pct_improvement_vs_train_mean": ("pct_improvement_vs_train_mean", "mean"),
+    }
+    if include_mean_test_dates:
+        aggregations["mean_test_dates"] = ("test_dates", "mean")
+
+    return (
+        metrics.groupby(group_columns, sort=True)
+        .agg(**aggregations)
+        .reset_index()
+        .sort_values(["mean_rmse", "mean_mae", *group_columns])
+        .reset_index(drop=True)
+    )
 
 
 def _feature_sets(config: ProjectConfig) -> list[FeatureSet]:
@@ -162,15 +264,47 @@ def _feature_sets(config: ProjectConfig) -> list[FeatureSet]:
 
 def _predictions(
     config: ProjectConfig,
+    columns: list[str],
     x_train: NDArray[np.float64],
     y_train: NDArray[np.float64],
     x_test: NDArray[np.float64],
-) -> list[tuple[str, NDArray[np.float64]]]:
-    predictions = [("train_mean", np.full(x_test.shape[0], float(np.mean(y_train))))]
-    model = make_pipeline(StandardScaler(), Ridge(alpha=config.evaluation.ridge_alpha))
-    model.fit(x_train, y_train)
-    predictions.append(("ridge", model.predict(x_test)))
+) -> list[PredictionResult]:
+    predictions = [
+        PredictionResult(
+            model="train_mean",
+            y_pred=np.full(x_test.shape[0], float(np.mean(y_train))),
+            coefficients={},
+        )
+    ]
+
+    for model_name, model in [
+        ("ridge", Ridge(alpha=config.evaluation.ridge_alpha)),
+        (
+            "elastic_net",
+            ElasticNet(
+                alpha=config.evaluation.elastic_net_alpha,
+                l1_ratio=config.evaluation.elastic_net_l1_ratio,
+                max_iter=10_000,
+            ),
+        ),
+    ]:
+        pipeline = make_pipeline(StandardScaler(), model)
+        pipeline.fit(x_train, y_train)
+        predictions.append(
+            PredictionResult(
+                model=model_name,
+                y_pred=pipeline.predict(x_test),
+                coefficients=_standardized_coefficients(pipeline, columns),
+            )
+        )
+
     return predictions
+
+
+def _standardized_coefficients(pipeline: Pipeline, columns: list[str]) -> dict[str, float]:
+    model = pipeline[-1]
+    coefficients = np.asarray(model.coef_, dtype=float)
+    return dict(zip(columns, coefficients, strict=True))
 
 
 def _metric_rows(
@@ -178,29 +312,152 @@ def _metric_rows(
     feature_set: FeatureSet,
     feature_count: int,
     y_true: NDArray[np.float64],
-    predictions: list[tuple[str, NDArray[np.float64]]],
+    predictions: list[PredictionResult],
     train_rows: int,
     test_rows: int,
     train_dates: int,
     test_dates: int,
 ) -> list[dict[str, object]]:
-    country, horizon_days, split_method, window_id = group_values
-    return [
+    common = _common_metric_values(
+        group_values=group_values,
+        feature_set=feature_set,
+        feature_count=feature_count,
+        train_rows=train_rows,
+        test_rows=test_rows,
+        train_dates=train_dates,
+        test_dates=test_dates,
+    )
+    return [{**common, **_error_metrics(result.model, y_true, result.y_pred)} for result in predictions]
+
+
+def _bucket_metric_rows(
+    group_values: tuple[object, ...],
+    feature_set: FeatureSet,
+    feature_count: int,
+    test: pd.DataFrame,
+    y_true: NDArray[np.float64],
+    predictions: list[PredictionResult],
+    train_rows: int,
+) -> list[dict[str, object]]:
+    eval_frame = pd.DataFrame(
         {
-            "representation": feature_set.representation,
-            "model": model,
-            "country": country,
-            "horizon_days": int(str(horizon_days)),
-            "split_method": split_method,
-            "window_id": int(str(window_id)),
-            "feature_count": feature_count,
-            "rmse": rmse(y_true, y_pred),
-            "mae": mae(y_true, y_pred),
-            "directional_accuracy": directional_accuracy(y_true, y_pred),
-            "train_rows": train_rows,
-            "test_rows": test_rows,
-            "train_dates": train_dates,
-            "test_dates": test_dates,
+            "date": test["date"].to_numpy(),
+            "maturity_years": test["maturity_years"].to_numpy(dtype=float),
+            "y_true": y_true,
         }
-        for model, y_pred in predictions
-    ]
+    )
+    eval_frame["maturity_bucket"] = maturity_bucket(eval_frame["maturity_years"])
+
+    rows: list[dict[str, object]] = []
+    for result in predictions:
+        eval_frame["y_pred"] = result.y_pred
+        for bucket, bucket_frame in eval_frame.groupby("maturity_bucket", sort=True, observed=True):
+            common = _common_metric_values(
+                group_values=group_values,
+                feature_set=feature_set,
+                feature_count=feature_count,
+                train_rows=train_rows,
+                test_rows=len(bucket_frame),
+                train_dates=0,
+                test_dates=bucket_frame["date"].nunique(),
+            )
+            rows.append(
+                {
+                    **common,
+                    "maturity_bucket": str(bucket),
+                    **_error_metrics(
+                        result.model,
+                        bucket_frame["y_true"].to_numpy(dtype=float),
+                        bucket_frame["y_pred"].to_numpy(dtype=float),
+                    ),
+                }
+            )
+    return rows
+
+
+def _coefficient_rows(
+    group_values: tuple[object, ...],
+    feature_set: FeatureSet,
+    predictions: list[PredictionResult],
+) -> list[dict[str, object]]:
+    country, horizon_days, split_method, window_id = group_values
+    rows: list[dict[str, object]] = []
+    for result in predictions:
+        for feature, coefficient in result.coefficients.items():
+            rows.append(
+                {
+                    "representation": feature_set.representation,
+                    "model": result.model,
+                    "country": country,
+                    "horizon_days": int(str(horizon_days)),
+                    "split_method": split_method,
+                    "window_id": int(str(window_id)),
+                    "feature": feature,
+                    "coefficient": coefficient,
+                    "abs_coefficient": abs(coefficient),
+                }
+            )
+    return rows
+
+
+def _common_metric_values(
+    group_values: tuple[object, ...],
+    feature_set: FeatureSet,
+    feature_count: int,
+    train_rows: int,
+    test_rows: int,
+    train_dates: int,
+    test_dates: int,
+) -> dict[str, object]:
+    country, horizon_days, split_method, window_id = group_values
+    return {
+        "representation": feature_set.representation,
+        "country": country,
+        "horizon_days": int(str(horizon_days)),
+        "split_method": split_method,
+        "window_id": int(str(window_id)),
+        "feature_count": feature_count,
+        "train_rows": train_rows,
+        "test_rows": test_rows,
+        "train_dates": train_dates,
+        "test_dates": test_dates,
+    }
+
+
+def _error_metrics(
+    model: str,
+    y_true: NDArray[np.float64],
+    y_pred: NDArray[np.float64],
+) -> dict[str, object]:
+    return {
+        "model": model,
+        "rmse": rmse(y_true, y_pred),
+        "mae": mae(y_true, y_pred),
+        "directional_accuracy": directional_accuracy(y_true, y_pred),
+    }
+
+
+def _add_improvement_vs_train_mean(metrics: pd.DataFrame, group_columns: list[str]) -> pd.DataFrame:
+    if metrics.empty:
+        return metrics
+
+    baseline_columns = [*group_columns, "representation"]
+    baseline = metrics.loc[metrics["model"] == "train_mean", [*baseline_columns, "rmse"]].rename(
+        columns={"rmse": "train_mean_rmse"}
+    )
+    output = metrics.merge(baseline, on=baseline_columns, how="left")
+    output["rmse_improvement_vs_train_mean"] = output["train_mean_rmse"] - output["rmse"]
+    output["pct_improvement_vs_train_mean"] = (
+        output["rmse_improvement_vs_train_mean"] / output["train_mean_rmse"]
+    )
+    return output
+
+
+def maturity_bucket(maturity_years: pd.Series) -> pd.Series:
+    """Map maturities into front-end, belly, and long-end buckets."""
+    return pd.cut(
+        maturity_years,
+        bins=[0.0, 2.0, 10.0, float("inf")],
+        labels=["front_end", "belly", "long_end"],
+        right=True,
+    ).astype("string")
