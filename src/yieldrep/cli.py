@@ -24,6 +24,7 @@ from yieldrep.visualization.plotly_baselines import plot_baseline_metrics
 from yieldrep.visualization.plotly_curves import plot_curves
 from yieldrep.visualization.plotly_nelson_siegel import plot_nelson_siegel
 from yieldrep.visualization.plotly_pca import plot_pca
+from yieldrep.visualization.plotly_reconstruction import plot_reconstruction
 
 app = typer.Typer(help="Yield curve research pipelines.")
 
@@ -173,6 +174,14 @@ def plot_baseline_metrics_command(config: Path = Path("configs/default.yaml")) -
     """Generate Plotly HTML figures from baseline evaluation metrics."""
     project_config = load_config(config)
     for output_path in plot_baseline_metrics(project_config):
+        typer.echo(output_path)
+
+
+@app.command("plot-reconstruction")
+def plot_reconstruction_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Generate Plotly HTML figures from reconstruction metrics."""
+    project_config = load_config(config)
+    for output_path in plot_reconstruction(project_config):
         typer.echo(output_path)
 
 
