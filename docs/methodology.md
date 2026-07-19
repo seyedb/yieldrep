@@ -372,20 +372,19 @@ test_dates  = last 20% of dates
 All maturities from the same date remain on the same side of the split. This
 avoids mixing observations from the same date across train and test samples.
 
-Evaluation can optionally use non-overlapping target windows. When enabled, the
-test set keeps every \(h\)-th date for an \(h\)-day forecast horizon:
+Main forecasting reports use non-overlapping target windows by default. The test
+set keeps every \(h\)-th date for an \(h\)-day forecast horizon:
 
 ```text
 test_dates_non_overlapping = test_dates[::h]
 ```
 
-This is useful for checking whether apparent predictability comes from
-overlapping forward-change labels rather than from genuinely forecastable curve
-information.
+This reduces the chance that apparent predictability comes from overlapping
+forward-change labels rather than from genuinely forecastable curve information.
 
 The overlap-sensitivity report runs both protocols and compares ranks and RMSE
-side by side. This is used as a robustness check before interpreting any
-short-horizon forecasting result as evidence of predictive signal.
+side by side. The overlapping version is treated as diagnostic context rather
+than the main benchmark.
 
 Walk-forward evaluation is also supported. Each split trains on an expanding
 history and tests on the next chronological block:

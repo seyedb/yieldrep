@@ -89,7 +89,7 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
         "rank_ic_dates",
     ].gt(0).any()
     assert set(metrics["train_dates"]) == {9}
-    assert set(metrics["test_dates"]) == {3}
+    assert set(metrics["test_dates"]) == {1, 3}
     assert set(maturity_metrics["maturity_bucket"]) == {"front_end", "belly", "long_end"}
     assert set(maturity_metrics["representation"]) == expected_representations
     assert set(maturity_point_metrics["maturity_years"]) == {1.0, 5.0, 30.0}
@@ -223,7 +223,7 @@ def test_evaluate_baselines_supports_walk_forward(tmp_path: Path) -> None:
     assert set(metrics["split_method"]) == {"walk_forward"}
     assert set(metrics["window_id"]) == {0, 1}
     assert set(metrics["train_dates"]) == {6, 9}
-    assert set(metrics["test_dates"]) == {3}
+    assert set(metrics["test_dates"]) == {1, 3}
 
 
 def test_evaluate_baselines_supports_non_overlapping_targets(tmp_path: Path) -> None:

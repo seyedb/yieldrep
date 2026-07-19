@@ -19,6 +19,7 @@ evaluation:
   test_window_dates: 63
   step_dates: 63
   ridge_alpha: 1.0
+  non_overlapping_targets: true
   lag_days: [1, 5, 20]
 
 plots:
