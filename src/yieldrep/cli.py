@@ -131,13 +131,6 @@ def evaluate_baselines_command(config: Path = Path("configs/default.yaml")) -> N
     typer.echo(evaluate_baselines(project_config))
 
 
-@app.command("diagnose-lagged")
-def diagnose_lagged_baseline_command(config: Path = Path("configs/default.yaml")) -> None:
-    """Measure autocorrelation behind lagged baseline performance."""
-    project_config = load_config(config)
-    typer.echo(diagnose_lagged_baseline(project_config))
-
-
 @app.command("summarize-baselines")
 def summarize_baselines_command(config: Path = Path("configs/default.yaml")) -> None:
     """Write CSV summary tables from baseline evaluation metrics."""
@@ -146,18 +139,21 @@ def summarize_baselines_command(config: Path = Path("configs/default.yaml")) -> 
         typer.echo(output_path)
 
 
-@app.command("overlap-sensitivity")
-def overlap_sensitivity_command(config: Path = Path("configs/default.yaml")) -> None:
-    """Compare baseline performance with overlapping and non-overlapping targets."""
+@app.command("diagnostics")
+def diagnostics_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Write diagnostic reports for baseline evaluation."""
     project_config = load_config(config)
+    typer.echo(diagnose_lagged_baseline(project_config))
     typer.echo(build_overlap_sensitivity_report(project_config))
 
 
-@app.command("evaluate-reconstruction")
-def evaluate_reconstruction_command(config: Path = Path("configs/default.yaml")) -> None:
-    """Evaluate curve reconstruction quality for classical representations."""
+@app.command("reconstruction")
+def reconstruction_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Evaluate and plot classical curve reconstruction quality."""
     project_config = load_config(config)
     for output_path in evaluate_reconstruction(project_config):
+        typer.echo(output_path)
+    for output_path in plot_reconstruction(project_config):
         typer.echo(output_path)
 
 
@@ -174,14 +170,6 @@ def plot_baseline_metrics_command(config: Path = Path("configs/default.yaml")) -
     """Generate Plotly HTML figures from baseline evaluation metrics."""
     project_config = load_config(config)
     for output_path in plot_baseline_metrics(project_config):
-        typer.echo(output_path)
-
-
-@app.command("plot-reconstruction")
-def plot_reconstruction_command(config: Path = Path("configs/default.yaml")) -> None:
-    """Generate Plotly HTML figures from reconstruction metrics."""
-    project_config = load_config(config)
-    for output_path in plot_reconstruction(project_config):
         typer.echo(output_path)
 
 
