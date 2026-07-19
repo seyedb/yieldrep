@@ -22,18 +22,25 @@ def evaluate_reconstruction(config: ProjectConfig) -> list[Path]:
 
     rows = [_pca_reconstruction_errors(curves, config), _nelson_siegel_reconstruction_errors(config)]
     errors = pd.concat([row for row in rows if not row.empty], ignore_index=True)
+    oos_errors = _out_of_sample_reconstruction_errors(curves, config)
 
     config.tables_dir.mkdir(parents=True, exist_ok=True)
     summary = _summarize_reconstruction(errors, GROUP_COLUMNS)
     by_maturity = _summarize_reconstruction(errors, MATURITY_GROUP_COLUMNS)
     worst_maturities = _worst_maturity_diagnostics(by_maturity)
+    oos_summary = _summarize_reconstruction(oos_errors, GROUP_COLUMNS)
+    oos_by_maturity = _summarize_reconstruction(oos_errors, MATURITY_GROUP_COLUMNS)
     summary.to_csv(config.reconstruction_summary_table_path, index=False)
     by_maturity.to_csv(config.reconstruction_by_maturity_table_path, index=False)
     worst_maturities.to_csv(config.reconstruction_worst_maturities_table_path, index=False)
+    oos_summary.to_csv(config.reconstruction_oos_summary_table_path, index=False)
+    oos_by_maturity.to_csv(config.reconstruction_oos_by_maturity_table_path, index=False)
     return [
         config.reconstruction_summary_table_path,
         config.reconstruction_by_maturity_table_path,
         config.reconstruction_worst_maturities_table_path,
+        config.reconstruction_oos_summary_table_path,
+        config.reconstruction_oos_by_maturity_table_path,
     ]
 
 
@@ -48,6 +55,59 @@ def _pca_reconstruction_errors(curves: pd.DataFrame, config: ProjectConfig) -> p
         rows.extend(_fit_pca_reconstructions(str(country), panel, max_components))
 
     return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+
+
+def _out_of_sample_reconstruction_errors(curves: pd.DataFrame, config: ProjectConfig) -> pd.DataFrame:
+    rows: list[pd.DataFrame] = []
+    test_dates_by_country: dict[str, set[pd.Timestamp]] = {}
+    for country in sorted(curves["country"].dropna().unique()):
+        panel = curve_panel(curves, str(country)).ffill().dropna()
+        if panel.shape[1] < config.pca.min_maturities:
+            continue
+
+        split = _date_ordered_panel_split(panel, config.evaluation.test_fraction)
+        if split is None:
+            continue
+
+        train_panel, test_panel = split
+        test_dates_by_country[str(country)] = set(pd.to_datetime(test_panel.index))
+        max_components = min(config.pca.n_components, train_panel.shape[0], train_panel.shape[1])
+        rows.extend(
+            _fit_pca_oos_reconstructions(
+                country=str(country),
+                train_panel=train_panel,
+                test_panel=test_panel,
+                max_components=max_components,
+            )
+        )
+
+    nelson_siegel = _nelson_siegel_reconstruction_errors(config)
+    if not nelson_siegel.empty and test_dates_by_country:
+        ns_rows = []
+        for country, test_dates in test_dates_by_country.items():
+            country_ns = nelson_siegel.loc[
+                (nelson_siegel["country"] == country)
+                & pd.to_datetime(nelson_siegel["date"]).isin(test_dates)
+            ]
+            if not country_ns.empty:
+                ns_rows.append(country_ns)
+        if ns_rows:
+            rows.append(pd.concat(ns_rows, ignore_index=True))
+
+    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+
+
+def _date_ordered_panel_split(
+    panel: pd.DataFrame,
+    test_fraction: float,
+) -> tuple[pd.DataFrame, pd.DataFrame] | None:
+    if not 0 < test_fraction < 1:
+        raise ValueError("test_fraction must be between 0 and 1")
+
+    split_index = int(len(panel.index) * (1.0 - test_fraction))
+    if split_index <= 0 or split_index >= len(panel.index):
+        return None
+    return panel.iloc[:split_index], panel.iloc[split_index:]
 
 
 def _fit_pca_reconstructions(
@@ -71,6 +131,35 @@ def _fit_pca_reconstructions(
                 n_components=n_components,
                 actual=panel,
                 fitted=pd.DataFrame(reconstructed, index=panel.index, columns=panel.columns),
+            )
+        )
+    return rows
+
+
+def _fit_pca_oos_reconstructions(
+    country: str,
+    train_panel: pd.DataFrame,
+    test_panel: pd.DataFrame,
+    max_components: int,
+) -> list[pd.DataFrame]:
+    scaler = StandardScaler()
+    x_train = scaler.fit_transform(train_panel)
+    x_test = scaler.transform(test_panel)
+    model = PCA(n_components=max_components)
+    model.fit(x_train)
+    test_scores = model.transform(x_test)
+
+    rows: list[pd.DataFrame] = []
+    for n_components in range(1, max_components + 1):
+        reconstructed_scaled = test_scores[:, :n_components] @ model.components_[:n_components]
+        reconstructed = scaler.inverse_transform(reconstructed_scaled)
+        rows.append(
+            _panel_errors(
+                country=country,
+                representation="pca",
+                n_components=n_components,
+                actual=test_panel,
+                fitted=pd.DataFrame(reconstructed, index=test_panel.index, columns=test_panel.columns),
             )
         )
     return rows

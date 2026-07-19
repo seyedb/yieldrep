@@ -42,6 +42,12 @@ def test_load_config_reads_project_paths() -> None:
     assert config.reconstruction_worst_maturities_table_path == Path(
         "reports/tables/reconstruction_worst_maturities.csv"
     )
+    assert config.reconstruction_oos_summary_table_path == Path(
+        "reports/tables/reconstruction_oos_summary.csv"
+    )
+    assert config.reconstruction_oos_by_maturity_table_path == Path(
+        "reports/tables/reconstruction_oos_by_maturity.csv"
+    )
 
 
 def test_load_config_reads_source_metadata() -> None:

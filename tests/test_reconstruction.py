@@ -24,11 +24,15 @@ def test_evaluate_reconstruction_writes_summary_tables(tmp_path: Path) -> None:
     summary = pd.read_csv(output_paths[0])
     by_maturity = pd.read_csv(output_paths[1])
     worst_maturities = pd.read_csv(output_paths[2])
+    oos_summary = pd.read_csv(output_paths[3])
+    oos_by_maturity = pd.read_csv(output_paths[4])
 
     assert output_paths == [
         tmp_path / "reports" / "tables" / "reconstruction_summary.csv",
         tmp_path / "reports" / "tables" / "reconstruction_by_maturity.csv",
         tmp_path / "reports" / "tables" / "reconstruction_worst_maturities.csv",
+        tmp_path / "reports" / "tables" / "reconstruction_oos_summary.csv",
+        tmp_path / "reports" / "tables" / "reconstruction_oos_by_maturity.csv",
     ]
     assert set(summary["representation"]) == {"pca", "nelson_siegel"}
     assert set(summary.loc[summary["representation"].eq("pca"), "n_components"]) == {1, 2}
@@ -36,6 +40,8 @@ def test_evaluate_reconstruction_writes_summary_tables(tmp_path: Path) -> None:
     assert {"maturity_years", "maturity_bucket"}.issubset(by_maturity.columns)
     assert {"abs_mean_error", "rmse_rank"}.issubset(worst_maturities.columns)
     assert worst_maturities["rmse_rank"].min() == 1
+    assert set(oos_summary["representation"]) == {"pca", "nelson_siegel"}
+    assert {"maturity_years", "maturity_bucket"}.issubset(oos_by_maturity.columns)
 
 
 def _sample_curves() -> pd.DataFrame:

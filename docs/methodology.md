@@ -111,6 +111,10 @@ the observed curve well, not whether it predicts future returns.
 The worst-maturity diagnostics rank maturity points by reconstruction RMSE and
 report signed bias to identify where each representation fits poorly.
 
+Out-of-sample reconstruction fits the PCA basis on train dates and reconstructs
+held-out test curves. This checks whether the linear representation generalizes
+through time, rather than only fitting the full sample in-sample.
+
 ## Prediction Target
 
 For horizon \(h\), the current target is the forward yield change:
