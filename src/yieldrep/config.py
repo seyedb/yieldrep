@@ -194,10 +194,6 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "lagged_diagnostics.csv"
 
     @property
-    def forecast_error_diagnostics_table_path(self) -> Path:
-        return self.tables_dir / "forecast_error_diagnostics.csv"
-
-    @property
     def baseline_summary_table_path(self) -> Path:
         return self.tables_dir / "baseline_summary.csv"
 

@@ -26,7 +26,6 @@ Run commands from the project root with `PYTHONPATH=src`:
 ```bash
 PYTHONPATH=src python -m yieldrep.cli ingest --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli run-baselines --config configs/default.yaml
-PYTHONPATH=src python -m yieldrep.cli diagnostics --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli plot-curves --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli plot-pca --config configs/default.yaml
 ```
