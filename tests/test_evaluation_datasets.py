@@ -34,6 +34,19 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
             "country": ["US", "US"],
             "maturity_years": [2.0, 2.0],
             "horizon_days": [1, 1],
+            "yield": [4.0, 4.1],
+            "future_yield": [4.1, 4.2],
+            "realized_vol": [0.05, 0.05],
+            "target_yield_change": [0.1, 0.1],
+            "target_standardized_yield_change": [2.0, 2.0],
+        }
+    ).to_parquet(processed_dir / "standardized_targets.parquet", index=False)
+    pd.DataFrame(
+        {
+            "date": dates,
+            "country": ["US", "US"],
+            "maturity_years": [2.0, 2.0],
+            "horizon_days": [1, 1],
             "residual": [0.01, 0.03],
             "future_residual": [0.03, 0.02],
             "target_residual_change": [0.02, -0.01],
@@ -107,6 +120,7 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
             processed_dir / "modeling" / "lagged_targets.parquet",
             processed_dir / "modeling" / "curve_targets.parquet",
             processed_dir / "modeling" / "residual_feature_targets.parquet",
+            processed_dir / "modeling" / "pca_standardized_targets.parquet",
             processed_dir / "modeling" / "pca_residual_targets.parquet",
             processed_dir / "modeling" / "residual_feature_residual_targets.parquet",
             processed_dir / "modeling" / "pca_vol_targets.parquet",
@@ -119,6 +133,9 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     curve_targets = pd.read_parquet(processed_dir / "modeling" / "curve_targets.parquet")
     pca_residual_targets = pd.read_parquet(
         processed_dir / "modeling" / "pca_residual_targets.parquet"
+    )
+    pca_standardized_targets = pd.read_parquet(
+        processed_dir / "modeling" / "pca_standardized_targets.parquet"
     )
     pca_vol_targets = pd.read_parquet(processed_dir / "modeling" / "pca_vol_targets.parquet")
     residual_feature_targets = pd.read_parquet(
@@ -136,6 +153,10 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     assert len(curve_targets) == 2
     assert {"PC1", "target_residual_change"}.issubset(pca_residual_targets.columns)
     assert len(pca_residual_targets) == 2
+    assert {"PC1", "target_standardized_yield_change"}.issubset(
+        pca_standardized_targets.columns
+    )
+    assert len(pca_standardized_targets) == 2
     assert {"PC1", "target_vol_change"}.issubset(pca_vol_targets.columns)
     assert len(pca_vol_targets) == 2
     assert {"residual_z_60", "residual_change_5", "target_yield_change"}.issubset(

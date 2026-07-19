@@ -16,6 +16,12 @@ def build_modeling_datasets(config: ProjectConfig) -> list[Path]:
     output_paths: list[Path] = []
     output_paths.extend(_build_target_family(config, targets, curves, suffix=""))
 
+    if config.standardized_targets_path.exists():
+        standardized_targets = pd.read_parquet(config.standardized_targets_path)
+        output_paths.extend(
+            _build_target_family(config, standardized_targets, curves, suffix="_standardized")
+        )
+
     if config.residual_targets_path.exists():
         residual_targets = pd.read_parquet(config.residual_targets_path)
         output_paths.extend(

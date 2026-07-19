@@ -325,6 +325,11 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
     specs: list[EvaluationSpec] = []
     for target, suffix, target_column in [
         ("yield_change", "", "target_yield_change"),
+        (
+            "standardized_yield_change",
+            "_standardized",
+            "target_standardized_yield_change",
+        ),
         ("residual_change", "_residual", "target_residual_change"),
         ("vol_change", "_vol", "target_vol_change"),
     ]:

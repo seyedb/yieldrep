@@ -15,6 +15,17 @@ TARGET_COLUMNS = (
     "future_yield",
     "target_yield_change",
 )
+STANDARDIZED_TARGET_COLUMNS = (
+    "date",
+    "country",
+    "maturity_years",
+    "horizon_days",
+    "yield",
+    "future_yield",
+    "realized_vol",
+    "target_yield_change",
+    "target_standardized_yield_change",
+)
 RESIDUAL_TARGET_COLUMNS = (
     "date",
     "country",
@@ -45,6 +56,20 @@ def build_targets(config: ProjectConfig) -> Path:
     config.processed_dir.mkdir(parents=True, exist_ok=True)
     targets.to_parquet(config.targets_path, index=False)
     return config.targets_path
+
+
+def build_standardized_targets(config: ProjectConfig) -> Path:
+    """Build volatility-scaled forward yield-change targets."""
+    curves = pd.read_parquet(config.curves_path)
+    targets = make_forward_standardized_yield_change_targets(
+        curves,
+        horizons_days=config.targets.horizons_days,
+        realized_vol_window=config.targets.realized_vol_window,
+    )
+
+    config.processed_dir.mkdir(parents=True, exist_ok=True)
+    targets.to_parquet(config.standardized_targets_path, index=False)
+    return config.standardized_targets_path
 
 
 def build_residual_targets(config: ProjectConfig) -> Path:
@@ -87,6 +112,31 @@ def make_forward_yield_change_targets(
 
     frames = [_make_horizon_targets(base, horizon) for horizon in horizons_days]
     return pd.concat(frames, ignore_index=True).loc[:, TARGET_COLUMNS]
+
+
+def make_forward_standardized_yield_change_targets(
+    curves: pd.DataFrame,
+    horizons_days: list[int],
+    realized_vol_window: int,
+) -> pd.DataFrame:
+    """Create forward yield changes scaled by trailing realized volatility."""
+    if not horizons_days:
+        raise ValueError("At least one target horizon is required")
+    if any(horizon <= 0 for horizon in horizons_days):
+        raise ValueError("Target horizons must be positive")
+    if realized_vol_window <= 1:
+        raise ValueError("realized_vol_window must be greater than 1")
+
+    base = curves.loc[:, ["date", "country", "maturity_years", "yield"]].copy()
+    base["date"] = pd.to_datetime(base["date"])
+    base = base.sort_values(["country", "maturity_years", "date"]).reset_index(drop=True)
+    grouped = base.groupby(["country", "maturity_years"], sort=False)["yield"]
+    base["realized_vol"] = grouped.transform(
+        lambda series: series.diff().rolling(realized_vol_window).std()
+    )
+
+    frames = [_make_horizon_standardized_targets(base, horizon) for horizon in horizons_days]
+    return pd.concat(frames, ignore_index=True).loc[:, STANDARDIZED_TARGET_COLUMNS]
 
 
 def make_forward_residual_change_targets(
@@ -144,6 +194,16 @@ def _make_horizon_targets(curves: pd.DataFrame, horizon_days: int) -> pd.DataFra
     target["target_yield_change"] = target["future_yield"] - target["yield"]
     target["horizon_days"] = horizon_days
     return target.dropna(subset=["future_yield", "target_yield_change"])
+
+
+def _make_horizon_standardized_targets(curves: pd.DataFrame, horizon_days: int) -> pd.DataFrame:
+    target = _make_horizon_targets(curves, horizon_days)
+    target["target_standardized_yield_change"] = (
+        target["target_yield_change"] / target["realized_vol"]
+    )
+    return target.dropna(subset=["realized_vol", "target_standardized_yield_change"]).loc[
+        target["realized_vol"] > 0
+    ]
 
 
 def _make_horizon_residual_targets(

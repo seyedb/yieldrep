@@ -119,6 +119,30 @@ def test_evaluate_baselines_supports_residual_targets(tmp_path: Path) -> None:
     assert set(metrics["horizon_days"]) == {1, 5}
 
 
+def test_evaluate_baselines_supports_standardized_targets(tmp_path: Path) -> None:
+    modeling_dir = tmp_path / "data" / "processed" / "modeling"
+    modeling_dir.mkdir(parents=True)
+    _sample_modeling_data(
+        feature_prefix="pca",
+        target_column="target_standardized_yield_change",
+    ).to_parquet(
+        modeling_dir / "pca_standardized_targets.parquet",
+        index=False,
+    )
+    config = ProjectConfig(
+        data_dir=tmp_path / "data",
+        reports_dir=tmp_path / "reports",
+        sources={"test": SourceConfig(country="US", source="test", raw_file=tmp_path / "raw.csv")},
+        evaluation=EvaluationConfig(test_fraction=0.25, ridge_alpha=1.0),
+    )
+
+    output_path = evaluate_baselines(config)
+    metrics = pd.read_parquet(output_path)
+
+    assert set(metrics["target"]) == {"standardized_yield_change"}
+    assert set(metrics["representation"]) == {"pca"}
+
+
 def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
     modeling_dir = tmp_path / "data" / "processed" / "modeling"
     modeling_dir.mkdir(parents=True)

@@ -8,7 +8,12 @@ from yieldrep.data.normalize import build_curves_parquet
 from yieldrep.evaluation.datasets import build_modeling_datasets
 from yieldrep.evaluation.diagnostics import diagnose_lagged_baseline
 from yieldrep.evaluation.reports import summarize_baselines
-from yieldrep.evaluation.targets import build_residual_targets, build_targets, build_vol_targets
+from yieldrep.evaluation.targets import (
+    build_residual_targets,
+    build_standardized_targets,
+    build_targets,
+    build_vol_targets,
+)
 from yieldrep.factors.curve import build_curve_features
 from yieldrep.factors.nelson_siegel import build_nelson_siegel
 from yieldrep.factors.pca import build_pca
@@ -64,6 +69,13 @@ def build_targets_command(config: Path = Path("configs/default.yaml")) -> None:
     """Build forward yield-change prediction targets."""
     project_config = load_config(config)
     typer.echo(build_targets(project_config))
+
+
+@app.command("build-standardized-targets")
+def build_standardized_targets_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Build volatility-scaled yield-change prediction targets."""
+    project_config = load_config(config)
+    typer.echo(build_standardized_targets(project_config))
 
 
 @app.command("build-residual-targets")
@@ -173,6 +185,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_curve_features(project_config))
     output_paths.append(build_residual_features(project_config))
     output_paths.append(build_targets(project_config))
+    output_paths.append(build_standardized_targets(project_config))
     output_paths.append(build_residual_targets(project_config))
     output_paths.append(build_vol_targets(project_config))
     output_paths.extend(build_modeling_datasets(project_config))

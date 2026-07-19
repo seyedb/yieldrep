@@ -104,6 +104,23 @@ r_{t+h}^{(c,m)}
 The default horizons are 1, 5, and 20 available observations. These are
 observation steps, not exact calendar days.
 
+The project also supports a volatility-scaled yield-change target:
+
+```math
+z_{t,h}^{(c,m)}
+=
+\frac{
+r_{t+h}^{(c,m)}
+- r_t^{(c,m)}
+}{
+\sigma_t^{(c,m)}
+}
+```
+
+where \(\sigma_t^{(c,m)}\) is trailing realized volatility of daily yield
+changes at the same country and maturity. This target asks whether features help
+predict risk-adjusted moves rather than raw basis-point moves.
+
 The project also supports a Nelson-Siegel residual-change target. For fitted
 yield \(\hat{r}_t^{(c,m)}\), define the relative-value residual:
 

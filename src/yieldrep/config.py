@@ -95,6 +95,10 @@ class ProjectConfig(BaseModel):
         return self.processed_dir / "targets.parquet"
 
     @property
+    def standardized_targets_path(self) -> Path:
+        return self.processed_dir / "standardized_targets.parquet"
+
+    @property
     def residual_targets_path(self) -> Path:
         return self.processed_dir / "residual_targets.parquet"
 
