@@ -23,15 +23,19 @@ def test_evaluate_reconstruction_writes_summary_tables(tmp_path: Path) -> None:
     output_paths = evaluate_reconstruction(config)
     summary = pd.read_csv(output_paths[0])
     by_maturity = pd.read_csv(output_paths[1])
+    worst_maturities = pd.read_csv(output_paths[2])
 
     assert output_paths == [
         tmp_path / "reports" / "tables" / "reconstruction_summary.csv",
         tmp_path / "reports" / "tables" / "reconstruction_by_maturity.csv",
+        tmp_path / "reports" / "tables" / "reconstruction_worst_maturities.csv",
     ]
     assert set(summary["representation"]) == {"pca", "nelson_siegel"}
     assert set(summary.loc[summary["representation"].eq("pca"), "n_components"]) == {1, 2}
     assert {"observations", "dates", "rmse", "mae", "mean_error"}.issubset(summary.columns)
     assert {"maturity_years", "maturity_bucket"}.issubset(by_maturity.columns)
+    assert {"abs_mean_error", "rmse_rank"}.issubset(worst_maturities.columns)
+    assert worst_maturities["rmse_rank"].min() == 1
 
 
 def _sample_curves() -> pd.DataFrame:

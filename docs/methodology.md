@@ -108,6 +108,8 @@ r_t^{(m)}
 The project reports reconstruction RMSE and MAE overall and by maturity. This is
 a standard compression/fit benchmark: it asks whether the representation encodes
 the observed curve well, not whether it predicts future returns.
+The worst-maturity diagnostics rank maturity points by reconstruction RMSE and
+report signed bias to identify where each representation fits poorly.
 
 ## Prediction Target
 

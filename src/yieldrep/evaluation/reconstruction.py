@@ -13,6 +13,7 @@ from yieldrep.factors.curve import curve_panel
 
 GROUP_COLUMNS = ["country", "representation", "n_components"]
 MATURITY_GROUP_COLUMNS = [*GROUP_COLUMNS, "maturity_years", "maturity_bucket"]
+WORST_MATURITIES_PER_GROUP = 10
 
 
 def evaluate_reconstruction(config: ProjectConfig) -> list[Path]:
@@ -25,11 +26,14 @@ def evaluate_reconstruction(config: ProjectConfig) -> list[Path]:
     config.tables_dir.mkdir(parents=True, exist_ok=True)
     summary = _summarize_reconstruction(errors, GROUP_COLUMNS)
     by_maturity = _summarize_reconstruction(errors, MATURITY_GROUP_COLUMNS)
+    worst_maturities = _worst_maturity_diagnostics(by_maturity)
     summary.to_csv(config.reconstruction_summary_table_path, index=False)
     by_maturity.to_csv(config.reconstruction_by_maturity_table_path, index=False)
+    worst_maturities.to_csv(config.reconstruction_worst_maturities_table_path, index=False)
     return [
         config.reconstruction_summary_table_path,
         config.reconstruction_by_maturity_table_path,
+        config.reconstruction_worst_maturities_table_path,
     ]
 
 
@@ -167,6 +171,35 @@ def _summarize_reconstruction(errors: pd.DataFrame, group_columns: list[str]) ->
     )
     summary["rmse"] = np.sqrt(summary["mse"])
     return summary.drop(columns=["mse"]).sort_values([*group_columns, "rmse"]).reset_index(drop=True)
+
+
+def _worst_maturity_diagnostics(by_maturity: pd.DataFrame) -> pd.DataFrame:
+    if by_maturity.empty:
+        return pd.DataFrame(
+            columns=[
+                *MATURITY_GROUP_COLUMNS,
+                "observations",
+                "dates",
+                "rmse",
+                "mae",
+                "mean_error",
+                "abs_mean_error",
+                "rmse_rank",
+            ]
+        )
+
+    ranked = by_maturity.copy()
+    ranked["abs_mean_error"] = ranked["mean_error"].abs()
+    ranked = ranked.sort_values(
+        [*GROUP_COLUMNS, "rmse", "abs_mean_error"],
+        ascending=[True, True, True, False, False],
+    )
+    ranked["rmse_rank"] = ranked.groupby(GROUP_COLUMNS, sort=False).cumcount() + 1
+    return (
+        ranked.loc[ranked["rmse_rank"] <= WORST_MATURITIES_PER_GROUP]
+        .sort_values([*GROUP_COLUMNS, "rmse_rank"])
+        .reset_index(drop=True)
+    )
 
 
 def _maturity_bucket(maturity_years: pd.Series) -> pd.Series:
