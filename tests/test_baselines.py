@@ -5,7 +5,6 @@ import pytest
 
 from yieldrep.config import EvaluationConfig, PCAConfig, ProjectConfig, SourceConfig
 from yieldrep.models.baselines import (
-    _maturity_aware_features,
     _pca_features,
     date_ordered_split,
     evaluate_baselines,
@@ -61,12 +60,9 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
     assert set(metrics["target"]) == {"yield_change"}
     expected_representations = {
         "pca",
-        "pca_maturity",
         "nelson_siegel",
-        "nelson_siegel_maturity",
         "lagged",
         "curve",
-        "curve_maturity",
         "residual_feature",
     }
     assert set(metrics["representation"]) == expected_representations
@@ -84,26 +80,12 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
         "train_dates",
         "test_dates",
     }.issubset(metrics.columns)
-    assert metrics.loc[
-        metrics["representation"].eq("pca_maturity"),
-        "rank_ic_dates",
-    ].gt(0).any()
     assert set(metrics["train_dates"]) == {9}
     assert set(metrics["test_dates"]) == {1, 3}
     assert set(maturity_metrics["maturity_bucket"]) == {"front_end", "belly", "long_end"}
     assert set(maturity_metrics["representation"]) == expected_representations
     assert set(maturity_point_metrics["maturity_years"]) == {1.0, 5.0, 30.0}
     assert set(maturity_point_metrics["representation"]) == expected_representations
-
-
-def test_maturity_aware_features_add_maturity_interactions() -> None:
-    assert _maturity_aware_features(["PC1", "PC2"]) == [
-        "maturity_years",
-        "PC1",
-        "PC2",
-        "PC1_x_maturity",
-        "PC2_x_maturity",
-    ]
 
 
 def test_evaluate_baselines_supports_residual_targets(tmp_path: Path) -> None:
@@ -124,7 +106,7 @@ def test_evaluate_baselines_supports_residual_targets(tmp_path: Path) -> None:
     metrics = pd.read_parquet(output_path)
 
     assert set(metrics["target"]) == {"residual_change"}
-    assert set(metrics["representation"]) == {"pca", "pca_maturity"}
+    assert set(metrics["representation"]) == {"pca"}
     assert set(metrics["horizon_days"]) == {1, 5}
 
 
@@ -149,7 +131,7 @@ def test_evaluate_baselines_supports_standardized_targets(tmp_path: Path) -> Non
     metrics = pd.read_parquet(output_path)
 
     assert set(metrics["target"]) == {"standardized_yield_change"}
-    assert set(metrics["representation"]) == {"pca", "pca_maturity"}
+    assert set(metrics["representation"]) == {"pca"}
 
 
 def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
@@ -171,7 +153,7 @@ def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
     classification_metrics = pd.read_parquet(config.baseline_classification_metrics_path)
 
     assert set(metrics["target"]) == {"vol_change"}
-    assert set(metrics["representation"]) == {"pca", "pca_maturity"}
+    assert set(metrics["representation"]) == {"pca"}
     assert set(classification_metrics["target"]) == {"future_vol_regime"}
     assert set(classification_metrics["model"]) == {"train_mode", "logistic_l2"}
     assert {"accuracy", "balanced_accuracy", "macro_f1"}.issubset(classification_metrics.columns)

@@ -186,19 +186,16 @@ def _prepare_evaluation_data(spec: EvaluationSpec) -> PreparedEvaluationData | N
     if spec.target_column not in available_columns:
         return None
 
+    feature_columns = [column for column in spec.features if column in available_columns]
+    if not feature_columns:
+        return None
+
     required_columns = [*BASE_EVALUATION_COLUMNS, spec.target_column]
-    source_feature_columns = [
-        column for column in _source_feature_columns(spec.features) if column in available_columns
-    ]
-    columns = _ordered_unique([*required_columns, *source_feature_columns])
+    columns = _ordered_unique([*required_columns, *feature_columns])
     if any(column not in available_columns for column in required_columns):
         return None
 
     data = pd.read_parquet(spec.path, columns=columns)
-    data = _add_maturity_aware_features(data, spec.features)
-    feature_columns = [column for column in spec.features if column in data.columns]
-    if not feature_columns:
-        return None
     return PreparedEvaluationData(data=data, feature_columns=feature_columns)
 
 
@@ -367,23 +364,9 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                 EvaluationSpec(
                     target=target,
                     target_column=target_column,
-                    representation="pca_maturity",
-                    path=config.modeling_dir / f"pca{suffix}_targets.parquet",
-                    features=_maturity_aware_features(_pca_features(config)),
-                ),
-                EvaluationSpec(
-                    target=target,
-                    target_column=target_column,
                     representation="nelson_siegel",
                     path=config.modeling_dir / f"nelson_siegel{suffix}_targets.parquet",
                     features=NELSON_SIEGEL_FEATURES,
-                ),
-                EvaluationSpec(
-                    target=target,
-                    target_column=target_column,
-                    representation="nelson_siegel_maturity",
-                    path=config.modeling_dir / f"nelson_siegel{suffix}_targets.parquet",
-                    features=_maturity_aware_features(NELSON_SIEGEL_FEATURES),
                 ),
                 EvaluationSpec(
                     target=target,
@@ -398,13 +381,6 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                     representation="curve",
                     path=config.modeling_dir / f"curve{suffix}_targets.parquet",
                     features=CURVE_FEATURES,
-                ),
-                EvaluationSpec(
-                    target=target,
-                    target_column=target_column,
-                    representation="curve_maturity",
-                    path=config.modeling_dir / f"curve{suffix}_targets.parquet",
-                    features=_maturity_aware_features(CURVE_FEATURES),
                 ),
                 EvaluationSpec(
                     target=target,
@@ -430,23 +406,9 @@ def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
         EvaluationSpec(
             target="future_vol_regime",
             target_column="future_vol_regime",
-            representation="pca_maturity",
-            path=config.modeling_dir / "pca_vol_targets.parquet",
-            features=_maturity_aware_features(_pca_features(config)),
-        ),
-        EvaluationSpec(
-            target="future_vol_regime",
-            target_column="future_vol_regime",
             representation="nelson_siegel",
             path=config.modeling_dir / "nelson_siegel_vol_targets.parquet",
             features=NELSON_SIEGEL_FEATURES,
-        ),
-        EvaluationSpec(
-            target="future_vol_regime",
-            target_column="future_vol_regime",
-            representation="nelson_siegel_maturity",
-            path=config.modeling_dir / "nelson_siegel_vol_targets.parquet",
-            features=_maturity_aware_features(NELSON_SIEGEL_FEATURES),
         ),
         EvaluationSpec(
             target="future_vol_regime",
@@ -461,13 +423,6 @@ def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
             representation="curve",
             path=config.modeling_dir / "curve_vol_targets.parquet",
             features=CURVE_FEATURES,
-        ),
-        EvaluationSpec(
-            target="future_vol_regime",
-            target_column="future_vol_regime",
-            representation="curve_maturity",
-            path=config.modeling_dir / "curve_vol_targets.parquet",
-            features=_maturity_aware_features(CURVE_FEATURES),
         ),
         EvaluationSpec(
             target="future_vol_regime",
@@ -853,40 +808,3 @@ def _ordered_unique(values: list[str]) -> list[str]:
 
 def _pca_features(config: ProjectConfig) -> list[str]:
     return [f"PC{i}" for i in range(1, config.pca.n_components + 1)]
-
-
-def _source_feature_columns(features: list[str]) -> list[str]:
-    source_columns: list[str] = []
-    for feature in features:
-        if feature == "maturity_years":
-            continue
-        source_columns.append(feature.removesuffix("_x_maturity"))
-    return _ordered_unique(source_columns)
-
-
-def _maturity_aware_features(base_features: list[str]) -> list[str]:
-    return [
-        "maturity_years",
-        *base_features,
-        *[f"{feature}_x_maturity" for feature in base_features],
-    ]
-
-
-def _add_maturity_aware_features(
-    data: pd.DataFrame,
-    base_feature_columns: list[str],
-) -> pd.DataFrame:
-    maturity_aware_columns = [
-        column
-        for column in base_feature_columns
-        if column.endswith("_x_maturity") or column == "maturity_years"
-    ]
-    if not maturity_aware_columns:
-        return data
-
-    data = data.copy()
-    for interaction in [column for column in base_feature_columns if column.endswith("_x_maturity")]:
-        feature = interaction.removesuffix("_x_maturity")
-        if feature in data.columns:
-            data[interaction] = data[feature] * data["maturity_years"]
-    return data
