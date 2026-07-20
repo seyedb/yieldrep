@@ -308,6 +308,27 @@ This reduces artificial predictability from overlapping forward-change labels.
 Walk-forward evaluation is available as a robustness check, not the main
 headline result.
 
+### Evaluation Level
+
+Not every representation is evaluated on every task in the same way. The project
+separates curve-level and maturity-level evaluation:
+
+| Level | Natural representations | Natural tasks |
+| --- | --- | --- |
+| Curve-level | PCA scores, Nelson-Siegel factors, curve-shape features | reconstruction, curve-state summaries, aggregate curve-move forecasting |
+| Maturity-level | residual features, lagged maturity moves, carry/roll-down proxies | residual relative value, cross-sectional maturity ranking |
+
+PCA and Nelson-Siegel are currently date/country-level curve representations.
+They describe the state of the whole curve at a point in time. In this
+implementation, they do not by themselves create maturity-varying predictions
+within the same date, so they are not expected to produce valid cross-sectional
+rank IC for maturity-level residual RV tasks.
+
+This is an evaluation-design distinction, not a claim that PCA or
+Nelson-Siegel are weak representations. A learned representation that is meant
+to compete on residual RV ranking should explicitly produce maturity-aware
+features or node-level embeddings.
+
 ### Metric Protocol
 
 Metrics are interpreted by task. A single pooled error number is not treated as
@@ -452,6 +473,7 @@ Included now:
 - engineered slope, curvature, carry, roll-down, lagged, and residual features
 - reconstruction evaluation
 - classical supervised forecasting baselines
+- residual RV ranking metrics for maturity-level feature sets
 - chronological, non-overlapping, and walk-forward evaluation checks
 - Plotly figures and CSV report tables
 
