@@ -39,6 +39,13 @@ CARRY_ROLL_FEATURES = [
     "carry_12m",
     "roll_down_12m",
 ]
+POLICY_FEATURES = [
+    "policy_rate",
+    "policy_change_21d",
+    "policy_change_63d",
+    "policy_change_252d",
+    "policy_2y_spread",
+]
 RESIDUAL_DYNAMIC_FEATURES = [
     "residual",
     "residual_z_60",
@@ -540,6 +547,14 @@ def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
             features=["realized_curve_vol"],
             base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
         ),
+        EvaluationSpec(
+            target="curve_vol_regime",
+            target_column="future_curve_move_rms",
+            representation="policy",
+            path=config.modeling_dir / "policy_curve_vol_regime_targets.parquet",
+            features=POLICY_FEATURES,
+            base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
+        ),
     ]
     for component in range(1, min(3, config.pca.n_components) + 1):
         target = f"curve_state_pc{component}"
@@ -569,6 +584,14 @@ def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                     representation="curve",
                     path=config.modeling_dir / f"curve{suffix}_targets.parquet",
                     features=CURVE_FEATURES,
+                    base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
+                ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
+                    representation="policy",
+                    path=config.modeling_dir / f"policy{suffix}_targets.parquet",
+                    features=POLICY_FEATURES,
                     base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
                 ),
             ]
@@ -855,6 +878,8 @@ def _classification_metric_row(
         "accuracy": accuracy,
         "balanced_accuracy": balanced_accuracy,
         "macro_f1": macro_f1,
+        "true_classes": int(len(np.unique(y_true))),
+        "predicted_classes": int(len(np.unique(y_pred))),
         "train_rows": train_rows,
         "test_rows": test_rows,
         "train_dates": train_dates,

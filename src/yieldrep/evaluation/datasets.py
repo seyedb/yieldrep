@@ -186,6 +186,12 @@ def _read_carry_roll_features(config: ProjectConfig) -> pd.DataFrame:
     return pd.read_parquet(config.carry_roll_features_path)
 
 
+def _read_policy_features(config: ProjectConfig) -> pd.DataFrame:
+    if not config.policy_features_path.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(config.policy_features_path)
+
+
 def _attach_evaluation_splits(data: pd.DataFrame, config: ProjectConfig) -> pd.DataFrame:
     frames: list[pd.DataFrame] = []
     for group_values, group in data.groupby(["country", "horizon_days"], sort=True):
@@ -303,6 +309,7 @@ def _build_curve_level_target_family(
         ("pca", _read_pca_features(config)),
         ("nelson_siegel", _read_nelson_siegel_features(config)),
         ("curve", _read_curve_features(config)),
+        ("policy", _read_policy_features(config)),
     ]:
         if features.empty:
             continue

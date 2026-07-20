@@ -3,8 +3,9 @@ from pathlib import Path
 import typer
 
 from yieldrep.config import ProjectConfig, load_config
-from yieldrep.data.ingest import ingest_sources
+from yieldrep.data.ingest import ingest_policy_rates, ingest_sources
 from yieldrep.data.normalize import build_curves_parquet
+from yieldrep.data.policy_rates import build_policy_rates
 from yieldrep.evaluation.datasets import build_modeling_datasets
 from yieldrep.evaluation.cross_market import build_cross_market_report
 from yieldrep.evaluation.diagnostics import diagnose_lagged_baseline
@@ -25,6 +26,7 @@ from yieldrep.factors.carry import build_carry_roll_features
 from yieldrep.factors.curve import build_curve_features
 from yieldrep.factors.nelson_siegel import build_nelson_siegel
 from yieldrep.factors.pca import build_pca
+from yieldrep.factors.policy import build_policy_features
 from yieldrep.factors.residual import build_residual_features
 from yieldrep.models.baselines import evaluate_baselines
 from yieldrep.models.forecasting import evaluate_supervised_forecasts
@@ -52,12 +54,30 @@ def ingest(config: Path = Path("configs/default.yaml"), overwrite: bool = False)
         typer.echo(raw_path)
 
 
+@app.command("ingest-policy-rates")
+def ingest_policy_rates_command(
+    config: Path = Path("configs/default.yaml"),
+    overwrite: bool = False,
+) -> None:
+    """Download configured policy-rate source files."""
+    project_config = load_config(config)
+    for raw_path in ingest_policy_rates(project_config, overwrite=overwrite):
+        typer.echo(raw_path)
+
+
 @app.command()
 def normalize(config: Path = Path("configs/default.yaml")) -> None:
     """Build normalized yield curve parquet from local raw files."""
     project_config = load_config(config)
     output_path = build_curves_parquet(project_config)
     typer.echo(output_path)
+
+
+@app.command("build-policy-rates")
+def build_policy_rates_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Build normalized policy-rate parquet from local raw files."""
+    project_config = load_config(config)
+    typer.echo(build_policy_rates(project_config))
 
 
 @app.command("build-pca")
@@ -131,6 +151,13 @@ def build_residual_features_command(config: Path = Path("configs/default.yaml"))
     """Build dynamic Nelson-Siegel residual baseline features."""
     project_config = load_config(config)
     typer.echo(build_residual_features(project_config))
+
+
+@app.command("build-policy-features")
+def build_policy_features_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Build policy-rate features aligned to curve dates."""
+    project_config = load_config(config)
+    typer.echo(build_policy_features(project_config))
 
 
 @app.command("run-baselines")
@@ -244,6 +271,9 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_curve_features(project_config))
     output_paths.append(build_carry_roll_features(project_config))
     output_paths.append(build_residual_features(project_config))
+    if project_config.policy_rates:
+        output_paths.append(build_policy_rates(project_config))
+        output_paths.append(build_policy_features(project_config))
     output_paths.append(build_targets(project_config))
     output_paths.append(build_standardized_targets(project_config))
     output_paths.append(build_residual_targets(project_config))

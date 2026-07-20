@@ -10,6 +10,8 @@ def test_load_config_reads_project_paths() -> None:
     assert config.raw_dir == Path("data/raw")
     assert config.processed_dir == Path("data/processed")
     assert config.curves_path == Path("data/processed/curves.parquet")
+    assert config.policy_rates_path == Path("data/processed/policy_rates.parquet")
+    assert config.policy_features_path == Path("data/processed/policy_features.parquet")
     assert config.pca_dir == Path("data/processed/pca")
     assert config.nelson_siegel_dir == Path("data/processed/nelson_siegel")
     assert config.targets_path == Path("data/processed/targets.parquet")
@@ -129,6 +131,14 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.sources["fed_gsw"].url is not None
     assert config.sources["bank_of_canada"].url is not None
     assert config.sources["ecb_yield_curve"].url is not None
+    assert set(config.policy_rates) == {
+        "fed_funds",
+        "boc_target_overnight",
+        "ecb_deposit_facility",
+    }
+    assert config.policy_rates["fed_funds"].country == "US"
+    assert config.policy_rates["boc_target_overnight"].country == "CA"
+    assert config.policy_rates["ecb_deposit_facility"].country == "EA"
     assert config.pca.n_components == 5
     assert config.pca.min_maturities == 3
     assert config.nelson_siegel.tau == 1.5

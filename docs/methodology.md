@@ -123,6 +123,41 @@ r_t^{(m)}
 These are not full bond return calculations. They are interpretable
 term-structure proxies built from public zero-coupon data.
 
+### Policy-Rate Features
+
+Policy-rate features add central-bank context to curve-level classification
+tasks. The current sources are the daily effective fed funds rate for the US,
+the Bank of Canada target overnight rate, and the ECB deposit facility rate for
+the euro area.
+
+For each country, policy observations are aligned to curve dates using the most
+recent available policy-rate observation:
+
+```math
+p_t^{(c)}
+```
+
+The feature set includes policy-rate level, recent changes, and a simple
+curve-policy spread:
+
+```math
+\Delta_\ell p_t^{(c)}
+=
+p_t^{(c)}
+-
+p_{t-\ell}^{(c)}
+```
+
+```math
+\mathrm{policy\ spread}_t^{(c)}
+=
+r_t^{(c,2Y)}
+-
+p_t^{(c)}
+```
+
+These are macro-policy context features, not learned representations.
+
 ### Lagged And Residual Features
 
 Lagged yield-change features are included as a simple autoregressive hurdle:
@@ -609,6 +644,7 @@ Included now:
 - normalized long-format curve schema
 - PCA and Nelson-Siegel curve representations
 - engineered slope, curvature, carry, roll-down, lagged, and residual features
+- policy-rate level, change, and curve-policy spread features
 - reconstruction evaluation
 - classical supervised forecasting baselines
 - residual RV ranking metrics for maturity-level feature sets
@@ -624,7 +660,7 @@ Not included yet:
 - claim of tradable alpha or state-of-the-art forecasting performance
 - bond-level total return targets
 - transaction costs, RFQ execution constraints, or backtesting
-- macro, policy-rate, inflation, unemployment, VIX, or MOVE features
+- inflation, unemployment, VIX, MOVE, or broader macro feature sets
 
 ## Current Limitations
 

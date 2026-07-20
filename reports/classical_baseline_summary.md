@@ -16,6 +16,7 @@ Current evaluation covers:
 - curve-level volatility-regime classification
 - PCA-defined curve-state classification
 - cross-market representation diagnostics
+- policy-rate features for curve-level classification tasks
 
 ## Metric Hierarchy
 
@@ -54,6 +55,10 @@ Cross-market diagnostics compare PCA variance, PCA score co-movement,
 Nelson-Siegel factor co-movement, and PCA state overlap across US, Canada, and
 the euro-area aggregate curve.
 
+Policy-rate features currently improve euro-area volatility-regime
+classification for the 1-day and 20-day horizons. For US and Canada, recent
+realized curve volatility remains the stronger hurdle.
+
 ## Interpretation
 
 PCA and Nelson-Siegel remain useful curve-level representations. They are most
@@ -71,8 +76,8 @@ not include duration-neutral construction, transaction costs, liquidity,
 financing, or execution constraints.
 
 The euro-area ECB source is an aggregate all-issuers curve, not a single
-sovereign issuer. Macro variables, policy-rate variables, inflation,
-labor-market data, and market volatility indices are not yet included.
+sovereign issuer. Inflation, labor-market data, and market volatility indices
+are not yet included.
 
 ## Next Step
 

@@ -10,8 +10,20 @@ _USER_AGENT = "yieldrep/0.1"
 
 def ingest_sources(config: ProjectConfig, overwrite: bool = False) -> list[Path]:
     """Download configured source files into local raw data paths."""
+    return _ingest_configured_sources(config.sources, overwrite=overwrite)
+
+
+def ingest_policy_rates(config: ProjectConfig, overwrite: bool = False) -> list[Path]:
+    """Download configured policy-rate source files into local raw data paths."""
+    return _ingest_configured_sources(config.policy_rates, overwrite=overwrite)
+
+
+def _ingest_configured_sources(
+    sources: dict[str, SourceConfig],
+    overwrite: bool,
+) -> list[Path]:
     raw_paths: list[Path] = []
-    for name, source_config in config.sources.items():
+    for name, source_config in sources.items():
         raw_paths.append(_ingest_source(name, source_config, overwrite=overwrite))
     return raw_paths
 

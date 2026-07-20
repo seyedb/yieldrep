@@ -46,3 +46,22 @@ sources:
     source: ecb_yield_curve
     raw_file: data/raw/ecb_yield_curve.csv
     url: https://data-api.ecb.europa.eu/service/data/YC/B.U2.EUR.4F.G_N_C.SV_C_YM.SR_3M+SR_6M+SR_1Y+SR_2Y+SR_5Y+SR_10Y+SR_30Y?format=csvdata
+
+policy_rates:
+  fed_funds:
+    country: US
+    source: fred_dff
+    raw_file: data/raw/policy_dff.csv
+    url: https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFF
+
+  boc_target_overnight:
+    country: CA
+    source: bank_of_canada_policy_rate
+    raw_file: data/raw/policy_boc_target_overnight.csv
+    url: https://www.bankofcanada.ca/valet/observations/V39079/csv
+
+  ecb_deposit_facility:
+    country: EA
+    source: ecb_deposit_facility
+    raw_file: data/raw/policy_ecb_deposit_facility.csv
+    url: https://data-api.ecb.europa.eu/service/data/FM/B.U2.EUR.4F.KR.DFR.LEV?format=csvdata

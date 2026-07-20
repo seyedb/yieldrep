@@ -55,6 +55,7 @@ class ProjectConfig(BaseModel):
     data_dir: Path
     reports_dir: Path
     sources: dict[str, SourceConfig]
+    policy_rates: dict[str, SourceConfig] = Field(default_factory=dict)
     pca: PCAConfig = Field(default_factory=PCAConfig)
     nelson_siegel: NelsonSiegelConfig = Field(default_factory=NelsonSiegelConfig)
     targets: TargetConfig = Field(default_factory=TargetConfig)
@@ -84,6 +85,14 @@ class ProjectConfig(BaseModel):
     @property
     def curves_path(self) -> Path:
         return self.processed_dir / "curves.parquet"
+
+    @property
+    def policy_rates_path(self) -> Path:
+        return self.processed_dir / "policy_rates.parquet"
+
+    @property
+    def policy_features_path(self) -> Path:
+        return self.processed_dir / "policy_features.parquet"
 
     @property
     def pca_dir(self) -> Path:

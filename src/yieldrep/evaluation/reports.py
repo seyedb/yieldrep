@@ -365,6 +365,7 @@ def volatility_regime_summary(config: ProjectConfig) -> pd.DataFrame:
         "mean_balanced_accuracy",
         "mean_macro_f1",
         "mean_accuracy",
+        "mean_true_classes",
         "mean_test_dates",
         "rank",
         "balanced_accuracy_gap_to_best",
@@ -384,6 +385,7 @@ def volatility_regime_summary(config: ProjectConfig) -> pd.DataFrame:
             mean_balanced_accuracy=("balanced_accuracy", "mean"),
             mean_macro_f1=("macro_f1", "mean"),
             mean_accuracy=("accuracy", "mean"),
+            mean_true_classes=("true_classes", "mean"),
             mean_test_dates=("test_dates", "mean"),
         )
         .reset_index()
@@ -413,9 +415,11 @@ def volatility_regime_benchmark_summary(summary: pd.DataFrame) -> pd.DataFrame:
         "best_model",
         "best_balanced_accuracy",
         "curve_vol_balanced_accuracy",
+        "policy_balanced_accuracy",
         "pca_balanced_accuracy",
         "nelson_siegel_balanced_accuracy",
         "curve_balanced_accuracy",
+        "policy_beats_curve_vol",
         "pca_beats_curve_vol",
         "nelson_siegel_beats_curve_vol",
         "curve_beats_curve_vol",
@@ -446,9 +450,11 @@ def volatility_regime_benchmark_summary(summary: pd.DataFrame) -> pd.DataFrame:
                 "best_model": f"{best['representation']}/{best['model']}",
                 "best_balanced_accuracy": float(best["mean_balanced_accuracy"]),
                 "curve_vol_balanced_accuracy": curve_vol_score,
+                "policy_balanced_accuracy": scores.get("policy"),
                 "pca_balanced_accuracy": scores.get("pca"),
                 "nelson_siegel_balanced_accuracy": scores.get("nelson_siegel"),
                 "curve_balanced_accuracy": scores.get("curve"),
+                "policy_beats_curve_vol": _beats_hurdle(scores.get("policy"), curve_vol_score),
                 "pca_beats_curve_vol": _beats_hurdle(scores.get("pca"), curve_vol_score),
                 "nelson_siegel_beats_curve_vol": _beats_hurdle(
                     scores.get("nelson_siegel"),
@@ -473,6 +479,7 @@ def curve_state_summary(config: ProjectConfig) -> pd.DataFrame:
         "mean_balanced_accuracy",
         "mean_macro_f1",
         "mean_accuracy",
+        "mean_true_classes",
         "mean_test_dates",
         "rank",
         "balanced_accuracy_gap_to_best",
@@ -496,6 +503,7 @@ def curve_state_summary(config: ProjectConfig) -> pd.DataFrame:
             mean_balanced_accuracy=("balanced_accuracy", "mean"),
             mean_macro_f1=("macro_f1", "mean"),
             mean_accuracy=("accuracy", "mean"),
+            mean_true_classes=("true_classes", "mean"),
             mean_test_dates=("test_dates", "mean"),
         )
         .reset_index()
