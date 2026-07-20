@@ -15,6 +15,7 @@ Current evaluation covers:
 - residual relative-value ranking metrics
 - curve-level volatility-regime classification
 - PCA-defined curve-state classification
+- cross-market representation diagnostics
 
 ## Metric Hierarchy
 
@@ -48,6 +49,10 @@ baseline for most evaluated country/horizon pairs.
 For curve-state classification, the project evaluates whether current PCA,
 Nelson-Siegel, and engineered curve features predict future PCA state buckets
 for the first three components.
+
+Cross-market diagnostics compare PCA variance, PCA score co-movement,
+Nelson-Siegel factor co-movement, and PCA state overlap across US, Canada, and
+the euro-area aggregate curve.
 
 ## Interpretation
 

@@ -258,6 +258,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "curve_state.csv"
 
     @property
+    def cross_market_summary_table_path(self) -> Path:
+        return self.tables_dir / "cross_market_summary.csv"
+
+    @property
     def overlap_sensitivity_table_path(self) -> Path:
         return self.tables_dir / "overlap_sensitivity.csv"
 

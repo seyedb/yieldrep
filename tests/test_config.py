@@ -42,6 +42,7 @@ def test_load_config_reads_project_paths() -> None:
         "reports/tables/volatility_regime_benchmark.csv"
     )
     assert config.curve_state_table_path == Path("reports/tables/curve_state.csv")
+    assert config.cross_market_summary_table_path == Path("reports/tables/cross_market_summary.csv")
     assert config.baseline_residual_rv_spread_path == Path(
         "data/processed/evaluation/residual_rv_spread.parquet"
     )

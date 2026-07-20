@@ -593,6 +593,14 @@ cross-sectional rankings:
 reports/tables/residual_relative_value_rank_ic_coverage.csv
 ```
 
+Cross-market diagnostics compare representation behavior across US, Canada, and
+the euro-area aggregate curve:
+
+```text
+reports/tables/cross_market_summary.csv
+reports/figures/cross_market_pca_loadings.html
+```
+
 ## Current Scope
 
 Included now:
@@ -606,6 +614,7 @@ Included now:
 - residual RV ranking metrics for maturity-level feature sets
 - curve-level volatility-regime classification
 - PCA-defined curve-state classification
+- cross-market PCA, Nelson-Siegel, and state diagnostics
 - chronological, non-overlapping, and walk-forward evaluation checks
 - Plotly figures and CSV report tables
 

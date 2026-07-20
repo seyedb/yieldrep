@@ -6,6 +6,7 @@ from yieldrep.config import ProjectConfig, load_config
 from yieldrep.data.ingest import ingest_sources
 from yieldrep.data.normalize import build_curves_parquet
 from yieldrep.evaluation.datasets import build_modeling_datasets
+from yieldrep.evaluation.cross_market import build_cross_market_report
 from yieldrep.evaluation.diagnostics import diagnose_lagged_baseline
 from yieldrep.evaluation.reports import (
     build_overlap_sensitivity_report,
@@ -28,6 +29,7 @@ from yieldrep.factors.residual import build_residual_features
 from yieldrep.models.baselines import evaluate_baselines
 from yieldrep.models.forecasting import evaluate_supervised_forecasts
 from yieldrep.visualization.plotly_baselines import plot_baseline_metrics
+from yieldrep.visualization.plotly_cross_market import plot_cross_market_pca
 from yieldrep.visualization.plotly_curve_state import plot_curve_state
 from yieldrep.visualization.plotly_curves import plot_curves
 from yieldrep.visualization.plotly_nelson_siegel import plot_nelson_siegel
@@ -174,6 +176,15 @@ def diagnostics_command(config: Path = Path("configs/default.yaml")) -> None:
         typer.echo(output_path)
 
 
+@app.command("cross-market")
+def cross_market_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Write cross-market representation diagnostics."""
+    project_config = load_config(config)
+    typer.echo(build_cross_market_report(project_config))
+    for output_path in plot_cross_market_pca(project_config):
+        typer.echo(output_path)
+
+
 @app.command("reconstruction")
 def reconstruction_command(config: Path = Path("configs/default.yaml")) -> None:
     """Evaluate and plot classical curve reconstruction quality."""
@@ -244,6 +255,8 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.extend(summarize_baselines(project_config))
     output_paths.extend(plot_baseline_metrics(project_config))
     output_paths.extend(plot_curve_state(project_config))
+    output_paths.append(build_cross_market_report(project_config))
+    output_paths.extend(plot_cross_market_pca(project_config))
     return output_paths
 
 
