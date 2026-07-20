@@ -44,6 +44,11 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
 
     residual_rv_rank_ic = residual_relative_value_rank_ic_summary(rank_table)
     residual_rv_rank_ic.to_csv(config.residual_relative_value_rank_ic_table_path, index=False)
+    residual_rv_rank_ic_coverage = residual_relative_value_rank_ic_coverage(rank_table)
+    residual_rv_rank_ic_coverage.to_csv(
+        config.residual_relative_value_rank_ic_coverage_table_path,
+        index=False,
+    )
 
     winners = baseline_winners(rank_table)
     winners.to_csv(config.baseline_winners_table_path, index=False)
@@ -67,6 +72,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.baseline_summary_table_path,
         config.baseline_rank_table_path,
         config.residual_relative_value_rank_ic_table_path,
+        config.residual_relative_value_rank_ic_coverage_table_path,
         config.baseline_winners_table_path,
         config.baseline_by_maturity_bucket_table_path,
         config.residual_relative_value_table_path,
@@ -368,6 +374,49 @@ def residual_relative_value_rank_ic_summary(rank_table: pd.DataFrame) -> pd.Data
         .loc[:, available_columns]
         .reset_index(drop=True)
     )
+
+
+def residual_relative_value_rank_ic_coverage(rank_table: pd.DataFrame) -> pd.DataFrame:
+    """Audit which residual-change baselines have valid cross-sectional rank IC."""
+    columns = [
+        "country",
+        "horizon_days",
+        "representation",
+        "model",
+        "rows",
+        "mean_rank_ic",
+        "rank_ic_dates",
+        "has_valid_rank_ic",
+        "has_maturity_specific_features",
+        "rank_ic_status",
+    ]
+    if not {"mean_rank_ic", "rank_ic_dates"}.issubset(rank_table.columns):
+        return pd.DataFrame(columns=columns)
+
+    residual = rank_table.loc[rank_table["target"] == "residual_change"].copy()
+    if residual.empty:
+        return pd.DataFrame(columns=columns)
+
+    residual["has_valid_rank_ic"] = residual["mean_rank_ic"].notna() & (
+        residual["rank_ic_dates"] > 0
+    )
+    residual["has_maturity_specific_features"] = residual["representation"].isin(
+        ["carry_roll", "lagged", "residual_feature"]
+    )
+    residual["rank_ic_status"] = residual.apply(_rank_ic_status, axis=1)
+    return (
+        residual.loc[:, columns]
+        .sort_values(["country", "horizon_days", "representation", "model"])
+        .reset_index(drop=True)
+    )
+
+
+def _rank_ic_status(row: pd.Series) -> str:
+    if bool(row["has_valid_rank_ic"]):
+        return "valid"
+    if not bool(row["has_maturity_specific_features"]):
+        return "undefined_for_date_level_features"
+    return "undefined"
 
 
 def _naive_residual_rows(residual: pd.DataFrame, rank_groups: list[str]) -> pd.DataFrame:

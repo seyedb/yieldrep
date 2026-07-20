@@ -37,6 +37,7 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
         tmp_path / "reports" / "tables" / "baseline_summary.csv",
         tmp_path / "reports" / "tables" / "baseline_rank.csv",
         tmp_path / "reports" / "tables" / "residual_relative_value_rank_ic.csv",
+        tmp_path / "reports" / "tables" / "residual_relative_value_rank_ic_coverage.csv",
         tmp_path / "reports" / "tables" / "baseline_winners.csv",
         tmp_path / "reports" / "tables" / "baseline_by_maturity_bucket.csv",
         tmp_path / "reports" / "tables" / "residual_relative_value.csv",
@@ -45,16 +46,18 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     summary = pd.read_csv(output_paths[0])
     rank_table = pd.read_csv(output_paths[1])
     residual_rv_rank_ic = pd.read_csv(output_paths[2])
-    winners = pd.read_csv(output_paths[3])
-    bucket_summary = pd.read_csv(output_paths[4])
-    residual_rv = pd.read_csv(output_paths[5])
-    point_top = pd.read_csv(output_paths[6])
+    residual_rv_rank_ic_coverage = pd.read_csv(output_paths[3])
+    winners = pd.read_csv(output_paths[4])
+    bucket_summary = pd.read_csv(output_paths[5])
+    residual_rv = pd.read_csv(output_paths[6])
+    point_top = pd.read_csv(output_paths[7])
     assert {"target", "representation", "model", "mean_rmse"}.issubset(summary.columns)
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best", "mean_rank_ic"}.issubset(
         rank_table.columns
     )
     assert {"rank_ic_rank", "rank_ic_gap_to_best"}.issubset(residual_rv_rank_ic.columns)
     assert residual_rv_rank_ic.loc[0, "representation"] == "residual_feature"
+    assert {"has_valid_rank_ic", "rank_ic_status"}.issubset(residual_rv_rank_ic_coverage.columns)
     yield_winner = winners.loc[winners["target"] == "yield_change"].iloc[0]
     assert yield_winner["best_representation"] == "pca"
     assert yield_winner["lagged_rmse_gap_to_best"] == pytest.approx(0.02)
