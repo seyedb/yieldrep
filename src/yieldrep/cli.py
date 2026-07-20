@@ -28,6 +28,7 @@ from yieldrep.factors.residual import build_residual_features
 from yieldrep.models.baselines import evaluate_baselines
 from yieldrep.models.forecasting import evaluate_supervised_forecasts
 from yieldrep.visualization.plotly_baselines import plot_baseline_metrics
+from yieldrep.visualization.plotly_curve_state import plot_curve_state
 from yieldrep.visualization.plotly_curves import plot_curves
 from yieldrep.visualization.plotly_nelson_siegel import plot_nelson_siegel
 from yieldrep.visualization.plotly_pca import plot_pca
@@ -199,6 +200,14 @@ def plot_baseline_metrics_command(config: Path = Path("configs/default.yaml")) -
         typer.echo(output_path)
 
 
+@app.command("plot-curve-state")
+def plot_curve_state_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Generate Plotly HTML figures for PCA curve states."""
+    project_config = load_config(config)
+    for output_path in plot_curve_state(project_config):
+        typer.echo(output_path)
+
+
 @app.command("plot-nelson-siegel")
 def plot_nelson_siegel_command(config: Path = Path("configs/default.yaml")) -> None:
     """Generate Plotly HTML figures from Nelson-Siegel outputs."""
@@ -234,6 +243,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.extend(evaluate_supervised_forecasts(project_config))
     output_paths.extend(summarize_baselines(project_config))
     output_paths.extend(plot_baseline_metrics(project_config))
+    output_paths.extend(plot_curve_state(project_config))
     return output_paths
 
 

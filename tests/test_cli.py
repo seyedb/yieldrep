@@ -175,6 +175,7 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr(cli, "evaluate_supervised_forecasts", multi_step("evaluate_supervised_forecasts"))
     monkeypatch.setattr(cli, "summarize_baselines", multi_step("summarize_baselines"))
     monkeypatch.setattr(cli, "plot_baseline_metrics", multi_step("plot_baseline_metrics"))
+    monkeypatch.setattr(cli, "plot_curve_state", multi_step("plot_curve_state"))
 
     output_paths = run_baseline_pipeline(config)
 
@@ -195,6 +196,7 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "evaluate_supervised_forecasts",
         "summarize_baselines",
         "plot_baseline_metrics",
+        "plot_curve_state",
     ]
     assert len(output_paths) == len(calls)
 

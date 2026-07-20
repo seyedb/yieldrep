@@ -504,6 +504,13 @@ Curve-state classification is summarized here:
 reports/tables/curve_state.csv
 ```
 
+Curve-state timelines and transition matrices are written to:
+
+```text
+reports/figures/*_curve_state_*.html
+reports/figures/*_state_transitions_*d.html
+```
+
 Regression metrics:
 
 ```math
