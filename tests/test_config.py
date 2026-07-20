@@ -78,6 +78,9 @@ def test_load_config_reads_project_paths() -> None:
     assert config.residual_relative_value_spread_table_path == Path(
         "reports/tables/residual_relative_value_spread.csv"
     )
+    assert config.residual_relative_value_benchmark_table_path == Path(
+        "reports/tables/residual_relative_value_benchmark.csv"
+    )
     assert config.overlap_sensitivity_table_path == Path("reports/tables/overlap_sensitivity.csv")
     assert config.supervised_walk_forward_summary_table_path == Path(
         "reports/tables/supervised_walk_forward_summary.csv"

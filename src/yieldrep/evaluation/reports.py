@@ -51,6 +51,14 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
     )
     residual_rv_spread = residual_relative_value_spread_summary(config)
     residual_rv_spread.to_csv(config.residual_relative_value_spread_table_path, index=False)
+    residual_rv_benchmark = residual_relative_value_benchmark_summary(
+        spread_summary=residual_rv_spread,
+        rank_ic_summary=residual_rv_rank_ic,
+    )
+    residual_rv_benchmark.to_csv(
+        config.residual_relative_value_benchmark_table_path,
+        index=False,
+    )
 
     winners = baseline_winners(rank_table)
     winners.to_csv(config.baseline_winners_table_path, index=False)
@@ -76,6 +84,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.residual_relative_value_rank_ic_table_path,
         config.residual_relative_value_rank_ic_coverage_table_path,
         config.residual_relative_value_spread_table_path,
+        config.residual_relative_value_benchmark_table_path,
         config.baseline_winners_table_path,
         config.baseline_by_maturity_bucket_table_path,
         config.residual_relative_value_table_path,
@@ -471,6 +480,130 @@ def residual_relative_value_spread_summary(config: ProjectConfig) -> pd.DataFram
         .sort_values([*rank_groups, "spread_rank", "representation", "model"])
         .reset_index(drop=True)
     )
+
+
+def residual_relative_value_benchmark_summary(
+    spread_summary: pd.DataFrame,
+    rank_ic_summary: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build one compact interpretation table for residual relative-value benchmarks."""
+    columns = [
+        "country",
+        "horizon_days",
+        "best_by_spread",
+        "best_spread_score",
+        "best_spread_t_stat",
+        "best_hit_rate",
+        "best_by_rank_ic",
+        "best_rank_ic",
+        "residual_feature_spread_rank",
+        "residual_feature_rank_ic_rank",
+        "pca_maturity_spread_rank",
+        "pca_maturity_rank_ic_rank",
+        "nelson_siegel_maturity_spread_rank",
+        "nelson_siegel_maturity_rank_ic_rank",
+        "curve_maturity_spread_rank",
+        "curve_maturity_rank_ic_rank",
+    ]
+    if spread_summary.empty and rank_ic_summary.empty:
+        return pd.DataFrame(columns=columns)
+
+    keys = ["country", "horizon_days"]
+    key_frame = pd.concat(
+        [
+            spread_summary.loc[:, keys] if not spread_summary.empty else pd.DataFrame(columns=keys),
+            rank_ic_summary.loc[:, keys] if not rank_ic_summary.empty else pd.DataFrame(columns=keys),
+        ],
+        ignore_index=True,
+    ).drop_duplicates()
+
+    rows: list[dict[str, object]] = []
+    for key_values in key_frame.sort_values(keys).itertuples(index=False):
+        country = str(key_values.country)
+        horizon_days = int(str(key_values.horizon_days))
+        spread_group = _group_for_key(spread_summary, country, horizon_days)
+        rank_ic_group = _group_for_key(rank_ic_summary, country, horizon_days)
+        rows.append(
+            {
+                "country": country,
+                "horizon_days": horizon_days,
+                **_best_spread_values(spread_group),
+                **_best_rank_ic_values(rank_ic_group),
+                **_representation_rank_values(spread_group, rank_ic_group, "residual_feature"),
+                **_representation_rank_values(spread_group, rank_ic_group, "pca_maturity"),
+                **_representation_rank_values(
+                    spread_group,
+                    rank_ic_group,
+                    "nelson_siegel_maturity",
+                ),
+                **_representation_rank_values(spread_group, rank_ic_group, "curve_maturity"),
+            }
+        )
+    return pd.DataFrame(rows).loc[:, columns]
+
+
+def _group_for_key(data: pd.DataFrame, country: str, horizon_days: int) -> pd.DataFrame:
+    if data.empty:
+        return data
+    return data.loc[(data["country"] == country) & (data["horizon_days"] == horizon_days)]
+
+
+def _best_spread_values(group: pd.DataFrame) -> dict[str, object]:
+    if group.empty:
+        return {
+            "best_by_spread": None,
+            "best_spread_score": None,
+            "best_spread_t_stat": None,
+            "best_hit_rate": None,
+        }
+    best = group.sort_values(["spread_rank", "representation", "model"]).iloc[0]
+    return {
+        "best_by_spread": f"{best['representation']}/{best['model']}",
+        "best_spread_score": best["mean_spread_score"],
+        "best_spread_t_stat": best["spread_t_stat"],
+        "best_hit_rate": best["hit_rate"],
+    }
+
+
+def _best_rank_ic_values(group: pd.DataFrame) -> dict[str, object]:
+    if group.empty:
+        return {"best_by_rank_ic": None, "best_rank_ic": None}
+    best = group.sort_values(["rank_ic_rank", "representation", "model"]).iloc[0]
+    return {
+        "best_by_rank_ic": f"{best['representation']}/{best['model']}",
+        "best_rank_ic": best["mean_rank_ic"],
+    }
+
+
+def _representation_rank_values(
+    spread_group: pd.DataFrame,
+    rank_ic_group: pd.DataFrame,
+    representation: str,
+) -> dict[str, object]:
+    prefix = representation
+    return {
+        f"{prefix}_spread_rank": _rank_for_representation(
+            spread_group,
+            representation,
+            "spread_rank",
+        ),
+        f"{prefix}_rank_ic_rank": _rank_for_representation(
+            rank_ic_group,
+            representation,
+            "rank_ic_rank",
+        ),
+    }
+
+
+def _rank_for_representation(
+    group: pd.DataFrame,
+    representation: str,
+    rank_column: str,
+) -> float | None:
+    rows = group.loc[group["representation"] == representation]
+    if rows.empty:
+        return None
+    return float(rows.sort_values([rank_column, "model"]).iloc[0][rank_column])
 
 
 def _naive_residual_rows(residual: pd.DataFrame, rank_groups: list[str]) -> pd.DataFrame:

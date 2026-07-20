@@ -222,6 +222,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "residual_relative_value_spread.csv"
 
     @property
+    def residual_relative_value_benchmark_table_path(self) -> Path:
+        return self.tables_dir / "residual_relative_value_benchmark.csv"
+
+    @property
     def baseline_by_maturity_point_top_table_path(self) -> Path:
         return self.tables_dir / "baseline_by_maturity_point_top.csv"
 
