@@ -54,6 +54,7 @@ CURVE_VOL_REGIME_TARGET_COLUMNS = (
     "future_curve_move_rms",
     "available_maturities",
 )
+CURVE_STATE_TARGET_BASE_COLUMNS = ("date", "country", "horizon_days")
 
 
 def build_targets(config: ProjectConfig) -> Path:
@@ -108,6 +109,20 @@ def build_vol_targets(config: ProjectConfig) -> list[Path]:
     targets.to_parquet(config.vol_targets_path, index=False)
     curve_regime_targets.to_parquet(config.curve_vol_regime_targets_path, index=False)
     return [config.vol_targets_path, config.curve_vol_regime_targets_path]
+
+
+def build_curve_state_targets(config: ProjectConfig) -> Path:
+    """Build future PCA-state targets from country-level PCA scores."""
+    scores = _read_pca_scores(config)
+    targets = make_forward_curve_state_targets(
+        scores,
+        horizons_days=config.targets.horizons_days,
+        n_components=min(3, config.pca.n_components),
+    )
+
+    config.processed_dir.mkdir(parents=True, exist_ok=True)
+    targets.to_parquet(config.curve_state_targets_path, index=False)
+    return config.curve_state_targets_path
 
 
 def make_forward_yield_change_targets(
@@ -232,6 +247,33 @@ def make_forward_curve_vol_regime_targets(
     return pd.concat(frames, ignore_index=True).loc[:, CURVE_VOL_REGIME_TARGET_COLUMNS]
 
 
+def make_forward_curve_state_targets(
+    scores: pd.DataFrame,
+    horizons_days: list[int],
+    n_components: int = 3,
+) -> pd.DataFrame:
+    """Create future PCA-score targets for curve-state classification."""
+    if not horizons_days:
+        raise ValueError("At least one target horizon is required")
+    if any(horizon <= 0 for horizon in horizons_days):
+        raise ValueError("Target horizons must be positive")
+    if n_components <= 0:
+        raise ValueError("n_components must be positive")
+
+    components = [f"PC{index}" for index in range(1, n_components + 1)]
+    missing = [component for component in components if component not in scores.columns]
+    if missing:
+        raise ValueError(f"Missing PCA score columns: {missing}")
+
+    base = scores.loc[:, ["date", "country", *components]].copy()
+    base["date"] = pd.to_datetime(base["date"])
+    base = base.sort_values(["country", "date"]).reset_index(drop=True)
+
+    frames = [_make_horizon_curve_state_targets(base, horizon, components) for horizon in horizons_days]
+    columns = [*CURVE_STATE_TARGET_BASE_COLUMNS, *[f"future_{component}" for component in components]]
+    return pd.concat(frames, ignore_index=True).loc[:, columns]
+
+
 def _make_horizon_targets(curves: pd.DataFrame, horizon_days: int) -> pd.DataFrame:
     target = curves.copy()
     grouped = target.groupby(["country", "maturity_years"], sort=False)["yield"]
@@ -299,6 +341,22 @@ def _make_horizon_curve_vol_regime_targets(
     return summary.dropna(subset=["future_curve_move_rms", "realized_curve_vol"])
 
 
+def _make_horizon_curve_state_targets(
+    scores: pd.DataFrame,
+    horizon_days: int,
+    components: list[str],
+) -> pd.DataFrame:
+    target = scores.copy()
+    grouped = target.groupby("country", sort=False)
+    future_columns: list[str] = []
+    for component in components:
+        future_column = f"future_{component}"
+        target[future_column] = grouped[component].shift(-horizon_days)
+        future_columns.append(future_column)
+    target["horizon_days"] = horizon_days
+    return target.dropna(subset=future_columns)
+
+
 def _future_vol_regime(curves: pd.DataFrame) -> pd.Series:
     return curves.groupby(["country", "maturity_years"], sort=False)["realized_vol"].transform(
         _vol_regime
@@ -325,4 +383,16 @@ def _read_nelson_siegel_fitted(config: ProjectConfig) -> pd.DataFrame:
         raise FileNotFoundError(
             f"No Nelson-Siegel fitted curve files found in {config.nelson_siegel_dir}"
         )
+    return pd.concat(frames, ignore_index=True)
+
+
+def _read_pca_scores(config: ProjectConfig) -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
+    for scores_path in sorted(config.pca_dir.glob("*_scores.parquet")):
+        country = scores_path.name.removesuffix("_scores.parquet").upper()
+        scores = pd.read_parquet(scores_path)
+        scores["country"] = country
+        frames.append(scores)
+    if not frames:
+        raise FileNotFoundError(f"No PCA score files found in {config.pca_dir}")
     return pd.concat(frames, ignore_index=True)

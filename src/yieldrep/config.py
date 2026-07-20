@@ -114,6 +114,10 @@ class ProjectConfig(BaseModel):
         return self.processed_dir / "curve_vol_regime_targets.parquet"
 
     @property
+    def curve_state_targets_path(self) -> Path:
+        return self.processed_dir / "curve_state_targets.parquet"
+
+    @property
     def residual_features_path(self) -> Path:
         return self.processed_dir / "residual_features.parquet"
 
@@ -248,6 +252,10 @@ class ProjectConfig(BaseModel):
     @property
     def volatility_regime_benchmark_table_path(self) -> Path:
         return self.tables_dir / "volatility_regime_benchmark.csv"
+
+    @property
+    def curve_state_table_path(self) -> Path:
+        return self.tables_dir / "curve_state.csv"
 
     @property
     def overlap_sensitivity_table_path(self) -> Path:

@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from yieldrep.evaluation.targets import (
+    make_forward_curve_state_targets,
     make_forward_curve_vol_regime_targets,
     make_forward_residual_change_targets,
     make_forward_standardized_yield_change_targets,
@@ -70,6 +71,24 @@ def test_make_forward_curve_vol_regime_targets() -> None:
     }.issubset(targets.columns)
     assert set(targets["horizon_days"]) == {1}
     assert targets["future_curve_move_rms"].notna().all()
+
+
+def test_make_forward_curve_state_targets() -> None:
+    scores = pd.DataFrame(
+        {
+            "date": pd.date_range("2024-01-01", periods=5),
+            "country": ["US"] * 5,
+            "PC1": [1.0, 1.1, 1.2, 1.3, 1.4],
+            "PC2": [0.1, 0.2, 0.3, 0.4, 0.5],
+            "PC3": [-0.2, -0.1, 0.0, 0.1, 0.2],
+        }
+    )
+
+    targets = make_forward_curve_state_targets(scores, horizons_days=[1, 2], n_components=3)
+
+    assert {"future_PC1", "future_PC2", "future_PC3"}.issubset(targets.columns)
+    assert set(targets["horizon_days"]) == {1, 2}
+    assert targets["future_PC1"].notna().all()
 
 
 def test_make_forward_standardized_yield_change_targets() -> None:

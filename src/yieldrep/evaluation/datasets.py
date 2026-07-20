@@ -57,6 +57,16 @@ def build_modeling_datasets(config: ProjectConfig) -> list[Path]:
             )
         )
 
+    if config.curve_state_targets_path.exists():
+        curve_state_targets = pd.read_parquet(config.curve_state_targets_path)
+        output_paths.extend(
+            _build_curve_level_target_family(
+                config,
+                curve_state_targets,
+                suffix="_curve_state",
+            )
+        )
+
     return output_paths
 
 
@@ -303,10 +313,11 @@ def _build_curve_level_target_family(
         merged.to_parquet(output_path, index=False)
         output_paths.append(output_path)
 
-    curve_vol = targets.copy()
-    curve_vol_path = config.modeling_dir / f"curve_vol{suffix}_targets.parquet"
-    curve_vol.to_parquet(curve_vol_path, index=False)
-    output_paths.append(curve_vol_path)
+    if "realized_curve_vol" in targets.columns:
+        curve_vol = targets.copy()
+        curve_vol_path = config.modeling_dir / f"curve_vol{suffix}_targets.parquet"
+        curve_vol.to_parquet(curve_vol_path, index=False)
+        output_paths.append(curve_vol_path)
     return output_paths
 
 

@@ -14,6 +14,7 @@ Current evaluation covers:
 - curve reconstruction metrics
 - residual relative-value ranking metrics
 - curve-level volatility-regime classification
+- PCA-defined curve-state classification
 
 ## Metric Hierarchy
 
@@ -44,6 +45,10 @@ future curve-move magnitude labels assigned from training-sample quantiles.
 Recent realized curve volatility is the current hurdle, and it is the strongest
 baseline for most evaluated country/horizon pairs.
 
+For curve-state classification, the project evaluates whether current PCA,
+Nelson-Siegel, and engineered curve features predict future PCA state buckets
+for the first three components.
+
 ## Interpretation
 
 PCA and Nelson-Siegel remain useful curve-level representations. They are most
@@ -67,5 +72,5 @@ indices are not yet included.
 ## Next Step
 
 The next research step should review the volatility-regime results and decide
-whether to strengthen classical state features or add macro and policy-rate
-context before moving to learned representations.
+whether to strengthen classical state features, visualize state transitions, or
+add macro and policy-rate context before moving to learned representations.

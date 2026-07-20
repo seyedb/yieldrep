@@ -75,6 +75,16 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
             "available_maturities": [2, 2],
         }
     ).to_parquet(processed_dir / "curve_vol_regime_targets.parquet", index=False)
+    pd.DataFrame(
+        {
+            "date": dates,
+            "country": ["US", "US"],
+            "horizon_days": [1, 1],
+            "future_PC1": [1.1, 1.2],
+            "future_PC2": [0.2, 0.3],
+            "future_PC3": [-0.1, 0.0],
+        }
+    ).to_parquet(processed_dir / "curve_state_targets.parquet", index=False)
     pd.DataFrame({"date": dates, "PC1": [1.0, 1.1], "PC2": [0.1, 0.2]}).to_parquet(
         pca_dir / "us_scores.parquet",
         index=False,
@@ -154,6 +164,9 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
             processed_dir / "modeling" / "residual_feature_vol_targets.parquet",
             processed_dir / "modeling" / "pca_curve_vol_regime_targets.parquet",
             processed_dir / "modeling" / "curve_vol_curve_vol_regime_targets.parquet",
+            processed_dir / "modeling" / "pca_curve_state_targets.parquet",
+            processed_dir / "modeling" / "nelson_siegel_curve_state_targets.parquet",
+            processed_dir / "modeling" / "curve_curve_state_targets.parquet",
         }
     )
     pca_targets = pd.read_parquet(processed_dir / "modeling" / "pca_targets.parquet")
@@ -178,6 +191,9 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     )
     curve_vol_regime_targets = pd.read_parquet(
         processed_dir / "modeling" / "curve_vol_curve_vol_regime_targets.parquet"
+    )
+    pca_curve_state_targets = pd.read_parquet(
+        processed_dir / "modeling" / "pca_curve_state_targets.parquet"
     )
     residual_feature_targets = pd.read_parquet(
         processed_dir / "modeling" / "residual_feature_targets.parquet"
@@ -230,6 +246,7 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     assert {"realized_curve_vol", "future_curve_move_rms"}.issubset(
         curve_vol_regime_targets.columns
     )
+    assert {"PC1", "future_PC1", "future_PC3"}.issubset(pca_curve_state_targets.columns)
     assert {"residual_z_60", "residual_change_5", "target_yield_change"}.issubset(
         residual_feature_targets.columns
     )

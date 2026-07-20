@@ -14,6 +14,7 @@ from yieldrep.evaluation.reports import (
 )
 from yieldrep.evaluation.reconstruction import evaluate_reconstruction
 from yieldrep.evaluation.targets import (
+    build_curve_state_targets,
     build_residual_targets,
     build_standardized_targets,
     build_targets,
@@ -99,6 +100,13 @@ def build_vol_targets_command(config: Path = Path("configs/default.yaml")) -> No
     project_config = load_config(config)
     for output_path in build_vol_targets(project_config):
         typer.echo(output_path)
+
+
+@app.command("build-curve-state-targets")
+def build_curve_state_targets_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Build future PCA curve-state targets."""
+    project_config = load_config(config)
+    typer.echo(build_curve_state_targets(project_config))
 
 
 @app.command("build-curve-features")
@@ -220,6 +228,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_standardized_targets(project_config))
     output_paths.append(build_residual_targets(project_config))
     output_paths.extend(build_vol_targets(project_config))
+    output_paths.append(build_curve_state_targets(project_config))
     output_paths.extend(build_modeling_datasets(project_config))
     output_paths.append(evaluate_baselines(project_config))
     output_paths.extend(evaluate_supervised_forecasts(project_config))

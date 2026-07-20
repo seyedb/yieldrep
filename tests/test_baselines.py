@@ -151,6 +151,12 @@ def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
         modeling_dir / "pca_curve_vol_regime_targets.parquet",
         index=False,
     )
+    _sample_curve_level_data(feature_prefix="pca").assign(
+        future_PC1=lambda data: data["PC1"].shift(-1).bfill(),
+    ).to_parquet(
+        modeling_dir / "pca_curve_state_targets.parquet",
+        index=False,
+    )
     config = ProjectConfig(
         data_dir=tmp_path / "data",
         reports_dir=tmp_path / "reports",
@@ -164,7 +170,7 @@ def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
 
     assert set(metrics["target"]) == {"vol_change"}
     assert set(metrics["representation"]) == {"pca"}
-    assert set(classification_metrics["target"]) == {"curve_vol_regime"}
+    assert set(classification_metrics["target"]) == {"curve_state_pc1", "curve_vol_regime"}
     assert set(classification_metrics["representation"]) == {"pca"}
     assert set(classification_metrics["model"]) == {"train_mode", "logistic_l2"}
     assert {"accuracy", "balanced_accuracy", "macro_f1"}.issubset(classification_metrics.columns)

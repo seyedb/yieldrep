@@ -300,6 +300,29 @@ This avoids using full-sample regime thresholds and makes PCA, Nelson-Siegel,
 engineered curve features, and recent realized curve volatility comparable on a
 natural curve-level classification task.
 
+### Curve-State Classification
+
+Curve-state classification uses PCA scores as empirical state coordinates. The
+first three components are treated as level, slope, and curvature-like state
+axes:
+
+```math
+s_{k,t+h}^{(c)}
+=
+PC_{k,t+h}^{(c)}
+```
+
+For each component \(k \in \{1,2,3\}\), the future score is bucketed into low,
+medium, or high regimes using training-sample terciles inside each split. This
+creates a simple transition question:
+
+```text
+given today's curve representation, predict the future PCA state bucket
+```
+
+This is a representation benchmark, not a claim that PCA states are the final
+economic regime definition.
+
 ## Evaluation Protocol
 
 ### Reconstruction
@@ -372,7 +395,7 @@ separates curve-level and maturity-level evaluation:
 
 | Level | Natural representations | Natural tasks |
 | --- | --- | --- |
-| Curve-level | PCA scores, Nelson-Siegel factors, curve-shape features | reconstruction, volatility regimes, aggregate curve-move forecasting |
+| Curve-level | PCA scores, Nelson-Siegel factors, curve-shape features | reconstruction, volatility regimes, curve-state classification |
 | State-maturity panel | PCA/NS/curve factors with maturity basis interactions | residual RV ranking as a stronger classical comparator |
 | Maturity-level | residual features, lagged maturity moves, carry/roll-down proxies | residual relative value, cross-sectional maturity ranking |
 
@@ -400,6 +423,7 @@ The current metric hierarchy is:
 | Residual relative value | residual RV spread score | cross-sectional rank IC | RMSE, MAE, directional accuracy |
 | Outright yield-change forecasting | RMSE / MAE | directional accuracy | rank IC where valid |
 | Volatility-regime classification | balanced accuracy / macro F1 | accuracy | class support |
+| Curve-state classification | balanced accuracy / macro F1 | accuracy | class support |
 
 This hierarchy is intentionally narrow. New metrics should only be added if they
 answer a distinct research question that the current set does not cover.
@@ -472,6 +496,12 @@ recent realized curve volatility as the direct persistence hurdle:
 
 ```text
 reports/tables/volatility_regime_benchmark.csv
+```
+
+Curve-state classification is summarized here:
+
+```text
+reports/tables/curve_state.csv
 ```
 
 Regression metrics:
@@ -564,6 +594,7 @@ Included now:
 - classical supervised forecasting baselines
 - residual RV ranking metrics for maturity-level feature sets
 - curve-level volatility-regime classification
+- PCA-defined curve-state classification
 - chronological, non-overlapping, and walk-forward evaluation checks
 - Plotly figures and CSV report tables
 

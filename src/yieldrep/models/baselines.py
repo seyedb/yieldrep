@@ -507,7 +507,7 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
 
 
 def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
-    return [
+    specs = [
         EvaluationSpec(
             target="curve_vol_regime",
             target_column="future_curve_move_rms",
@@ -541,6 +541,39 @@ def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
             base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
         ),
     ]
+    for component in range(1, min(3, config.pca.n_components) + 1):
+        target = f"curve_state_pc{component}"
+        target_column = f"future_PC{component}"
+        suffix = "_curve_state"
+        specs.extend(
+            [
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
+                    representation="pca",
+                    path=config.modeling_dir / f"pca{suffix}_targets.parquet",
+                    features=_pca_features(config),
+                    base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
+                ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
+                    representation="nelson_siegel",
+                    path=config.modeling_dir / f"nelson_siegel{suffix}_targets.parquet",
+                    features=NELSON_SIEGEL_FEATURES,
+                    base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
+                ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
+                    representation="curve",
+                    path=config.modeling_dir / f"curve{suffix}_targets.parquet",
+                    features=CURVE_FEATURES,
+                    base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
+                ),
+            ]
+        )
+    return specs
 
 
 def maturity_bucket(maturity_years: pd.Series) -> pd.Series:

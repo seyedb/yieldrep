@@ -70,6 +70,8 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.volatility_regime_benchmark_table_path,
         index=False,
     )
+    curve_state = curve_state_summary(config)
+    curve_state.to_csv(config.curve_state_table_path, index=False)
 
     bucket_summary = summarize_metrics(
         pd.read_parquet(config.baseline_metrics_by_maturity_path),
@@ -96,6 +98,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.baseline_winners_table_path,
         config.volatility_regime_table_path,
         config.volatility_regime_benchmark_table_path,
+        config.curve_state_table_path,
         config.baseline_by_maturity_bucket_table_path,
         config.residual_relative_value_table_path,
         config.baseline_by_maturity_point_top_table_path,
@@ -456,6 +459,62 @@ def volatility_regime_benchmark_summary(summary: pd.DataFrame) -> pd.DataFrame:
         )
 
     return pd.DataFrame(rows).loc[:, columns]
+
+
+def curve_state_summary(config: ProjectConfig) -> pd.DataFrame:
+    """Rank future PCA-state classifiers by balanced accuracy."""
+    columns = [
+        "state",
+        "country",
+        "horizon_days",
+        "representation",
+        "model",
+        "rows",
+        "mean_balanced_accuracy",
+        "mean_macro_f1",
+        "mean_accuracy",
+        "mean_test_dates",
+        "rank",
+        "balanced_accuracy_gap_to_best",
+    ]
+    if not config.baseline_classification_metrics_path.exists():
+        return pd.DataFrame(columns=columns)
+
+    metrics = pd.read_parquet(config.baseline_classification_metrics_path)
+    metrics = metrics.loc[metrics["target"].str.startswith("curve_state_pc")].copy()
+    if metrics.empty:
+        return pd.DataFrame(columns=columns)
+
+    metrics["state"] = metrics["target"].str.removeprefix("curve_state_")
+    summary = (
+        metrics.groupby(
+            ["state", "country", "horizon_days", "representation", "model"],
+            sort=True,
+        )
+        .agg(
+            rows=("balanced_accuracy", "size"),
+            mean_balanced_accuracy=("balanced_accuracy", "mean"),
+            mean_macro_f1=("macro_f1", "mean"),
+            mean_accuracy=("accuracy", "mean"),
+            mean_test_dates=("test_dates", "mean"),
+        )
+        .reset_index()
+    )
+    rank_groups = ["state", "country", "horizon_days"]
+    summary["rank"] = summary.groupby(rank_groups)["mean_balanced_accuracy"].rank(
+        method="min",
+        ascending=False,
+    )
+    best = summary.groupby(rank_groups)["mean_balanced_accuracy"].transform("max")
+    summary["balanced_accuracy_gap_to_best"] = best - summary["mean_balanced_accuracy"]
+    return (
+        summary.loc[:, columns]
+        .sort_values(
+            [*rank_groups, "rank", "mean_macro_f1", "representation", "model"],
+            ascending=[True, True, True, True, False, True, True],
+        )
+        .reset_index(drop=True)
+    )
 
 
 def _beats_hurdle(score: float | None, hurdle: float | None) -> bool | None:
