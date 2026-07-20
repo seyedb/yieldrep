@@ -386,12 +386,10 @@ Not included yet:
 
 ## Current Limitations
 
-The classical forecasting results are preliminary and weak. This is an important
-finding, not a failure to hide. Outright yield changes are noisy, directional
-accuracy is generally close to chance, and reconstruction quality does not
-automatically imply forecastability.
+The current forecasting benchmarks are preliminary. Outright yield-change
+prediction is a noisy task, and strong curve reconstruction does not by itself
+imply forecastability.
 
-The next defensible research step is to focus the evaluation around standard
-relative-value questions, especially Nelson-Siegel residual dynamics and
-cross-sectional ranking across maturities. Learned representations should only
-be added after this classical protocol is stable.
+Near-term extensions should focus on relative-value evaluation, especially
+Nelson-Siegel residual dynamics and cross-sectional ranking across maturities,
+before introducing learned representations.
