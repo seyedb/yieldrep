@@ -42,6 +42,9 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
     rank_table = rank_baselines(metrics)
     rank_table.to_csv(config.baseline_rank_table_path, index=False)
 
+    residual_rv_rank_ic = residual_relative_value_rank_ic_summary(rank_table)
+    residual_rv_rank_ic.to_csv(config.residual_relative_value_rank_ic_table_path, index=False)
+
     winners = baseline_winners(rank_table)
     winners.to_csv(config.baseline_winners_table_path, index=False)
 
@@ -63,6 +66,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
     return [
         config.baseline_summary_table_path,
         config.baseline_rank_table_path,
+        config.residual_relative_value_rank_ic_table_path,
         config.baseline_winners_table_path,
         config.baseline_by_maturity_bucket_table_path,
         config.residual_relative_value_table_path,
@@ -314,6 +318,53 @@ def residual_relative_value_summary(bucket_summary: pd.DataFrame) -> pd.DataFram
     available_columns = [column for column in columns if column in residual.columns]
     return (
         residual.sort_values([*rank_groups, "rank", "mean_mae", "representation", "model"])
+        .loc[:, available_columns]
+        .reset_index(drop=True)
+    )
+
+
+def residual_relative_value_rank_ic_summary(rank_table: pd.DataFrame) -> pd.DataFrame:
+    """Rank residual-change baselines by cross-sectional rank IC."""
+    columns = [
+        "country",
+        "horizon_days",
+        "representation",
+        "model",
+        "rows",
+        "mean_rank_ic",
+        "rank_ic_dates",
+        "mean_rmse",
+        "mean_mae",
+        "mean_directional_accuracy",
+        "rank_ic_rank",
+        "rank_ic_gap_to_best",
+    ]
+    if not {"mean_rank_ic", "rank_ic_dates"}.issubset(rank_table.columns):
+        return pd.DataFrame(columns=columns)
+
+    residual = rank_table.loc[
+        (rank_table["target"] == "residual_change")
+        & rank_table["mean_rank_ic"].notna()
+        & (rank_table["rank_ic_dates"] > 0)
+    ].copy()
+    if residual.empty:
+        return pd.DataFrame(columns=columns)
+
+    rank_groups = ["country", "horizon_days"]
+    residual["rank_ic_rank"] = residual.groupby(rank_groups)["mean_rank_ic"].rank(
+        method="min",
+        ascending=False,
+        na_option="bottom",
+    )
+    best_rank_ic = residual.groupby(rank_groups)["mean_rank_ic"].transform("max")
+    residual["rank_ic_gap_to_best"] = best_rank_ic - residual["mean_rank_ic"]
+
+    available_columns = [column for column in columns if column in residual.columns]
+    return (
+        residual.sort_values(
+            [*rank_groups, "rank_ic_rank", "mean_rmse", "representation", "model"],
+            na_position="last",
+        )
         .loc[:, available_columns]
         .reset_index(drop=True)
     )
