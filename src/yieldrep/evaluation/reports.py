@@ -65,6 +65,11 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
 
     volatility_regime = volatility_regime_summary(config)
     volatility_regime.to_csv(config.volatility_regime_table_path, index=False)
+    volatility_regime_benchmark = volatility_regime_benchmark_summary(volatility_regime)
+    volatility_regime_benchmark.to_csv(
+        config.volatility_regime_benchmark_table_path,
+        index=False,
+    )
 
     bucket_summary = summarize_metrics(
         pd.read_parquet(config.baseline_metrics_by_maturity_path),
@@ -90,6 +95,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.residual_relative_value_benchmark_table_path,
         config.baseline_winners_table_path,
         config.volatility_regime_table_path,
+        config.volatility_regime_benchmark_table_path,
         config.baseline_by_maturity_bucket_table_path,
         config.residual_relative_value_table_path,
         config.baseline_by_maturity_point_top_table_path,
@@ -394,6 +400,68 @@ def volatility_regime_summary(config: ProjectConfig) -> pd.DataFrame:
         )
         .reset_index(drop=True)
     )
+
+
+def volatility_regime_benchmark_summary(summary: pd.DataFrame) -> pd.DataFrame:
+    """Build a compact hurdle table for curve-volatility regime classification."""
+    columns = [
+        "country",
+        "horizon_days",
+        "best_model",
+        "best_balanced_accuracy",
+        "curve_vol_balanced_accuracy",
+        "pca_balanced_accuracy",
+        "nelson_siegel_balanced_accuracy",
+        "curve_balanced_accuracy",
+        "pca_beats_curve_vol",
+        "nelson_siegel_beats_curve_vol",
+        "curve_beats_curve_vol",
+    ]
+    if summary.empty:
+        return pd.DataFrame(columns=columns)
+
+    logistic = summary.loc[summary["model"] == "logistic_l2"].copy()
+    if logistic.empty:
+        return pd.DataFrame(columns=columns)
+
+    rows: list[dict[str, object]] = []
+    for group_values, group in logistic.groupby(["country", "horizon_days"], sort=True):
+        country, horizon_days = group_values
+        best = group.sort_values(
+            ["rank", "mean_macro_f1", "representation"],
+            ascending=[True, False, True],
+        ).iloc[0]
+        scores = {
+            str(row["representation"]): float(row["mean_balanced_accuracy"])
+            for row in group.to_dict("records")
+        }
+        curve_vol_score = scores.get("curve_vol")
+        rows.append(
+            {
+                "country": country,
+                "horizon_days": horizon_days,
+                "best_model": f"{best['representation']}/{best['model']}",
+                "best_balanced_accuracy": float(best["mean_balanced_accuracy"]),
+                "curve_vol_balanced_accuracy": curve_vol_score,
+                "pca_balanced_accuracy": scores.get("pca"),
+                "nelson_siegel_balanced_accuracy": scores.get("nelson_siegel"),
+                "curve_balanced_accuracy": scores.get("curve"),
+                "pca_beats_curve_vol": _beats_hurdle(scores.get("pca"), curve_vol_score),
+                "nelson_siegel_beats_curve_vol": _beats_hurdle(
+                    scores.get("nelson_siegel"),
+                    curve_vol_score,
+                ),
+                "curve_beats_curve_vol": _beats_hurdle(scores.get("curve"), curve_vol_score),
+            }
+        )
+
+    return pd.DataFrame(rows).loc[:, columns]
+
+
+def _beats_hurdle(score: float | None, hurdle: float | None) -> bool | None:
+    if score is None or hurdle is None:
+        return None
+    return score > hurdle
 
 
 def residual_relative_value_rank_ic_summary(rank_table: pd.DataFrame) -> pd.DataFrame:

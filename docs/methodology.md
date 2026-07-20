@@ -467,6 +467,13 @@ Macro F1 computes F1 for each regime and averages the class-level scores:
 }
 ```
 
+The compact volatility benchmark report compares curve representations against
+recent realized curve volatility as the direct persistence hurdle:
+
+```text
+reports/tables/volatility_regime_benchmark.csv
+```
+
 Regression metrics:
 
 ```math

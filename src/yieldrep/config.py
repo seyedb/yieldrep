@@ -246,6 +246,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "volatility_regime.csv"
 
     @property
+    def volatility_regime_benchmark_table_path(self) -> Path:
+        return self.tables_dir / "volatility_regime_benchmark.csv"
+
+    @property
     def overlap_sensitivity_table_path(self) -> Path:
         return self.tables_dir / "overlap_sensitivity.csv"
 

@@ -41,6 +41,8 @@ residual dynamic feature baseline.
 
 For volatility regimes, the project now evaluates curve-level classifiers using
 future curve-move magnitude labels assigned from training-sample quantiles.
+Recent realized curve volatility is the current hurdle, and it is the strongest
+baseline for most evaluated country/horizon pairs.
 
 ## Interpretation
 

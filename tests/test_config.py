@@ -37,6 +37,9 @@ def test_load_config_reads_project_paths() -> None:
         "data/processed/evaluation/baseline_classification_metrics.parquet"
     )
     assert config.volatility_regime_table_path == Path("reports/tables/volatility_regime.csv")
+    assert config.volatility_regime_benchmark_table_path == Path(
+        "reports/tables/volatility_regime_benchmark.csv"
+    )
     assert config.baseline_residual_rv_spread_path == Path(
         "data/processed/evaluation/residual_rv_spread.parquet"
     )
