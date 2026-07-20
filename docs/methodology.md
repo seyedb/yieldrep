@@ -328,6 +328,27 @@ this task because an RV workflow often cares more about ordering maturities from
 rich to cheap, or from likely convergence to likely widening, than minimizing a
 pooled basis-point error.
 
+The residual RV spread score is a second ranking metric. For each date, country,
+and horizon, maturities are sorted by predicted residual change. The score is
+the realized average residual change of the top-ranked maturities minus the
+realized average residual change of the bottom-ranked maturities:
+
+```math
+S_{t,h}^{(c)}
+=
+\frac{1}{|T_t|}
+\sum_{m \in T_t}
+y_{t,h}^{(c,m)}
+-
+\frac{1}{|B_t|}
+\sum_{m \in B_t}
+y_{t,h}^{(c,m)}
+```
+
+where \(T_t\) and \(B_t\) are the top and bottom predicted maturity groups. This
+is a cross-sectional ranking score, not a tradable PnL or duration-neutral
+backtest.
+
 Volatility-regime classification is evaluated separately with classification
 metrics from the baseline classifier output.
 
@@ -401,6 +422,12 @@ cross-sectional rankings:
 
 ```text
 reports/tables/residual_relative_value_rank_ic_coverage.csv
+```
+
+The top-minus-bottom residual RV spread score is reported in:
+
+```text
+reports/tables/residual_relative_value_spread.csv
 ```
 
 ## Current Scope

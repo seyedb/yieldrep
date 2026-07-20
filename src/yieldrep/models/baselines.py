@@ -79,6 +79,7 @@ class BaselineEvaluationFrames:
     metrics: pd.DataFrame
     metrics_by_maturity: pd.DataFrame
     metrics_by_maturity_point: pd.DataFrame
+    residual_rv_spread_metrics: pd.DataFrame
     classification_metrics: pd.DataFrame
 
 
@@ -91,6 +92,10 @@ def evaluate_baselines(config: ProjectConfig) -> Path:
     frames.metrics_by_maturity.to_parquet(config.baseline_metrics_by_maturity_path, index=False)
     frames.metrics_by_maturity_point.to_parquet(
         config.baseline_metrics_by_maturity_point_path,
+        index=False,
+    )
+    frames.residual_rv_spread_metrics.to_parquet(
+        config.baseline_residual_rv_spread_path,
         index=False,
     )
     frames.classification_metrics.to_parquet(
@@ -107,17 +112,19 @@ def evaluate_baseline_frames(config: ProjectConfig) -> BaselineEvaluationFrames:
     rows: list[dict[str, object]] = []
     maturity_rows: list[dict[str, object]] = []
     maturity_point_rows: list[dict[str, object]] = []
+    residual_rv_spread_rows: list[dict[str, object]] = []
     for spec in specs:
         prepared = _prepare_evaluation_data(spec)
         if prepared is None:
             continue
 
-        spec_rows, spec_maturity_rows, spec_maturity_point_rows = (
+        spec_rows, spec_maturity_rows, spec_maturity_point_rows, spec_residual_rv_spread_rows = (
             _evaluate_regression_representation(config, spec, prepared)
         )
         rows.extend(spec_rows)
         maturity_rows.extend(spec_maturity_rows)
         maturity_point_rows.extend(spec_maturity_point_rows)
+        residual_rv_spread_rows.extend(spec_residual_rv_spread_rows)
 
     classification_rows: list[dict[str, object]] = []
     for spec in _classification_specs(config):
@@ -129,6 +136,7 @@ def evaluate_baseline_frames(config: ProjectConfig) -> BaselineEvaluationFrames:
         metrics=pd.DataFrame(rows),
         metrics_by_maturity=pd.DataFrame(maturity_rows),
         metrics_by_maturity_point=pd.DataFrame(maturity_point_rows),
+        residual_rv_spread_metrics=pd.DataFrame(residual_rv_spread_rows),
         classification_metrics=pd.DataFrame(classification_rows),
     )
 
@@ -137,11 +145,17 @@ def _evaluate_regression_representation(
     config: ProjectConfig,
     spec: EvaluationSpec,
     prepared: PreparedEvaluationData,
-) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
+) -> tuple[
+    list[dict[str, object]],
+    list[dict[str, object]],
+    list[dict[str, object]],
+    list[dict[str, object]],
+]:
     data = prepared.data.dropna(subset=[*prepared.feature_columns, spec.target_column])
     rows: list[dict[str, object]] = []
     maturity_rows: list[dict[str, object]] = []
     maturity_point_rows: list[dict[str, object]] = []
+    residual_rv_spread_rows: list[dict[str, object]] = []
     for group_values, group in data.groupby(GROUP_COLUMNS, sort=True):
         group_key = dict(zip(GROUP_COLUMNS, _as_tuple(group_values), strict=True))
         group = group.sort_values("date")
@@ -189,8 +203,19 @@ def _evaluate_regression_representation(
                 rows.extend(model_rows)
                 maturity_rows.extend(model_maturity_rows)
                 maturity_point_rows.extend(model_maturity_point_rows)
+                residual_rv_spread_rows.extend(
+                    _residual_rv_spread_rows(
+                        spec=spec,
+                        split=split,
+                        country=country,
+                        horizon_days=horizon_days,
+                        model_name=model_name,
+                        y_true=y_test,
+                        y_pred=y_pred,
+                    )
+                )
 
-    return rows, maturity_rows, maturity_point_rows
+    return rows, maturity_rows, maturity_point_rows, residual_rv_spread_rows
 
 
 def _prepare_evaluation_data(spec: EvaluationSpec) -> PreparedEvaluationData | None:
@@ -553,6 +578,85 @@ def _regression_metric_rows(
         _aggregate_regression_metrics(eval_frame, ["maturity_bucket"], common),
         _aggregate_regression_metrics(eval_frame, ["maturity_years"], common),
     )
+
+
+def _residual_rv_spread_rows(
+    spec: EvaluationSpec,
+    split: SplitWindow,
+    country: str,
+    horizon_days: int,
+    model_name: str,
+    y_true: NDArray[np.float64],
+    y_pred: NDArray[np.float64],
+) -> list[dict[str, object]]:
+    if spec.target != "residual_change":
+        return []
+
+    eval_frame = pd.DataFrame(
+        {
+            "date": split.test["date"].to_numpy(),
+            "maturity_years": split.test["maturity_years"].to_numpy(dtype=float),
+            "y_true": y_true,
+            "y_pred": y_pred,
+        }
+    )
+    spreads = _top_bottom_residual_spreads(eval_frame)
+    if spreads.empty:
+        return []
+
+    spread_values = spreads["spread_score"].to_numpy(dtype=float)
+    spread_std = float(np.std(spread_values, ddof=1)) if len(spread_values) > 1 else float("nan")
+    spread_t_stat = (
+        float(np.mean(spread_values) / spread_std * np.sqrt(len(spread_values)))
+        if len(spread_values) > 1 and not np.isclose(spread_std, 0.0)
+        else float("nan")
+    )
+    return [
+        {
+            "target": spec.target,
+            "representation": spec.representation,
+            "model": model_name,
+            "split_method": split.method,
+            "window_id": split.window_id,
+            "country": country,
+            "horizon_days": horizon_days,
+            "dates": len(spreads),
+            "mean_spread_score": float(np.mean(spread_values)),
+            "spread_t_stat": spread_t_stat,
+            "hit_rate": float(np.mean(spread_values > 0.0)),
+            "mean_top_realized": float(spreads["top_realized"].mean()),
+            "mean_bottom_realized": float(spreads["bottom_realized"].mean()),
+            "mean_leg_size": float(spreads["leg_size"].mean()),
+        }
+    ]
+
+
+def _top_bottom_residual_spreads(eval_frame: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    for date, group in eval_frame.groupby("date", sort=True):
+        if group["y_pred"].nunique(dropna=True) < 2:
+            continue
+
+        leg_size = max(1, int(np.floor(len(group) * 0.2)))
+        leg_size = min(leg_size, len(group) // 2)
+        if leg_size < 1:
+            continue
+
+        ranked = group.sort_values(["y_pred", "maturity_years"])
+        bottom = ranked.head(leg_size)
+        top = ranked.tail(leg_size)
+        top_realized = float(top["y_true"].mean())
+        bottom_realized = float(bottom["y_true"].mean())
+        rows.append(
+            {
+                "date": date,
+                "leg_size": leg_size,
+                "top_realized": top_realized,
+                "bottom_realized": bottom_realized,
+                "spread_score": top_realized - bottom_realized,
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def _aggregate_regression_metrics(

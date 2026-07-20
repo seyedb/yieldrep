@@ -158,6 +158,10 @@ class ProjectConfig(BaseModel):
         return self.evaluation_dir / "baseline_classification_metrics.parquet"
 
     @property
+    def baseline_residual_rv_spread_path(self) -> Path:
+        return self.evaluation_dir / "residual_rv_spread.parquet"
+
+    @property
     def supervised_forecast_metrics_path(self) -> Path:
         return self.evaluation_dir / "supervised_forecast_metrics.parquet"
 
@@ -212,6 +216,10 @@ class ProjectConfig(BaseModel):
     @property
     def residual_relative_value_rank_ic_coverage_table_path(self) -> Path:
         return self.tables_dir / "residual_relative_value_rank_ic_coverage.csv"
+
+    @property
+    def residual_relative_value_spread_table_path(self) -> Path:
+        return self.tables_dir / "residual_relative_value_spread.csv"
 
     @property
     def baseline_by_maturity_point_top_table_path(self) -> Path:

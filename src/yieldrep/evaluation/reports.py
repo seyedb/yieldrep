@@ -49,6 +49,8 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.residual_relative_value_rank_ic_coverage_table_path,
         index=False,
     )
+    residual_rv_spread = residual_relative_value_spread_summary(config)
+    residual_rv_spread.to_csv(config.residual_relative_value_spread_table_path, index=False)
 
     winners = baseline_winners(rank_table)
     winners.to_csv(config.baseline_winners_table_path, index=False)
@@ -73,6 +75,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.baseline_rank_table_path,
         config.residual_relative_value_rank_ic_table_path,
         config.residual_relative_value_rank_ic_coverage_table_path,
+        config.residual_relative_value_spread_table_path,
         config.baseline_winners_table_path,
         config.baseline_by_maturity_bucket_table_path,
         config.residual_relative_value_table_path,
@@ -417,6 +420,57 @@ def _rank_ic_status(row: pd.Series) -> str:
     if not bool(row["has_maturity_specific_features"]):
         return "undefined_for_date_level_features"
     return "undefined"
+
+
+def residual_relative_value_spread_summary(config: ProjectConfig) -> pd.DataFrame:
+    """Rank residual relative-value baselines by top-minus-bottom spread score."""
+    columns = [
+        "country",
+        "horizon_days",
+        "representation",
+        "model",
+        "dates",
+        "mean_spread_score",
+        "spread_t_stat",
+        "hit_rate",
+        "mean_top_realized",
+        "mean_bottom_realized",
+        "mean_leg_size",
+        "spread_rank",
+        "spread_gap_to_best",
+    ]
+    if not config.baseline_residual_rv_spread_path.exists():
+        return pd.DataFrame(columns=columns)
+
+    spreads = pd.read_parquet(config.baseline_residual_rv_spread_path)
+    if spreads.empty:
+        return pd.DataFrame(columns=columns)
+
+    summary = (
+        spreads.groupby(["country", "horizon_days", "representation", "model"], sort=True)
+        .agg(
+            dates=("dates", "sum"),
+            mean_spread_score=("mean_spread_score", "mean"),
+            spread_t_stat=("spread_t_stat", "mean"),
+            hit_rate=("hit_rate", "mean"),
+            mean_top_realized=("mean_top_realized", "mean"),
+            mean_bottom_realized=("mean_bottom_realized", "mean"),
+            mean_leg_size=("mean_leg_size", "mean"),
+        )
+        .reset_index()
+    )
+    rank_groups = ["country", "horizon_days"]
+    summary["spread_rank"] = summary.groupby(rank_groups)["mean_spread_score"].rank(
+        method="min",
+        ascending=False,
+    )
+    best_spread = summary.groupby(rank_groups)["mean_spread_score"].transform("max")
+    summary["spread_gap_to_best"] = best_spread - summary["mean_spread_score"]
+    return (
+        summary.loc[:, columns]
+        .sort_values([*rank_groups, "spread_rank", "representation", "model"])
+        .reset_index(drop=True)
+    )
 
 
 def _naive_residual_rows(residual: pd.DataFrame, rank_groups: list[str]) -> pd.DataFrame:

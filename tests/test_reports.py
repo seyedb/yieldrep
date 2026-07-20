@@ -38,6 +38,7 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
         tmp_path / "reports" / "tables" / "baseline_rank.csv",
         tmp_path / "reports" / "tables" / "residual_relative_value_rank_ic.csv",
         tmp_path / "reports" / "tables" / "residual_relative_value_rank_ic_coverage.csv",
+        tmp_path / "reports" / "tables" / "residual_relative_value_spread.csv",
         tmp_path / "reports" / "tables" / "baseline_winners.csv",
         tmp_path / "reports" / "tables" / "baseline_by_maturity_bucket.csv",
         tmp_path / "reports" / "tables" / "residual_relative_value.csv",
@@ -47,16 +48,20 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     rank_table = pd.read_csv(output_paths[1])
     residual_rv_rank_ic = pd.read_csv(output_paths[2])
     residual_rv_rank_ic_coverage = pd.read_csv(output_paths[3])
-    winners = pd.read_csv(output_paths[4])
-    bucket_summary = pd.read_csv(output_paths[5])
-    residual_rv = pd.read_csv(output_paths[6])
-    point_top = pd.read_csv(output_paths[7])
+    residual_rv_spread = pd.read_csv(output_paths[4])
+    winners = pd.read_csv(output_paths[5])
+    bucket_summary = pd.read_csv(output_paths[6])
+    residual_rv = pd.read_csv(output_paths[7])
+    point_top = pd.read_csv(output_paths[8])
     assert {"target", "representation", "model", "mean_rmse"}.issubset(summary.columns)
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best", "mean_rank_ic"}.issubset(
         rank_table.columns
     )
     assert {"rank_ic_rank", "rank_ic_gap_to_best"}.issubset(residual_rv_rank_ic.columns)
     assert {"has_valid_rank_ic", "rank_ic_status"}.issubset(residual_rv_rank_ic_coverage.columns)
+    assert {"mean_spread_score", "spread_t_stat", "hit_rate"}.issubset(
+        residual_rv_spread.columns
+    )
     assert {"best_representation", "pca_rank", "lagged_rank"}.issubset(winners.columns)
     assert "maturity_bucket" in bucket_summary.columns
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best"}.issubset(residual_rv.columns)
