@@ -11,6 +11,12 @@ from yieldrep.data.sources.bank_of_canada import (
     bank_of_canada_maturity_columns,
     load_bank_of_canada_raw,
 )
+from yieldrep.data.sources.ecb import (
+    ecb_date_column,
+    ecb_maturity_from_code,
+    ecb_spot_rate_columns,
+    load_ecb_yield_curve_raw,
+)
 from yieldrep.data.sources.fed_gsw import (
     fed_gsw_date_column,
     fed_gsw_maturity_columns,
@@ -69,6 +75,48 @@ def normalize_bank_of_canada(
     )
 
 
+def normalize_ecb_yield_curve(
+    frame: pd.DataFrame,
+    country: str = "EA",
+    source: str = "ecb_yield_curve",
+) -> pd.DataFrame:
+    """Normalize ECB euro-area zero-coupon spot rates to the common curve schema."""
+    if {"TIME_PERIOD", "OBS_VALUE", "DATA_TYPE_FM"}.issubset(frame.columns):
+        return _normalize_ecb_long_curve(frame, country=country, source=source)
+
+    date_column = ecb_date_column(frame)
+    maturity_columns = ecb_spot_rate_columns(frame)
+    if not maturity_columns:
+        raise ValueError("ECB raw data does not contain SR_* spot-rate maturity columns")
+
+    return _normalize_wide_curve(
+        frame=frame,
+        date_column=date_column,
+        maturity_columns=maturity_columns,
+        country=country,
+        source=source,
+        yield_scale=1.0,
+    )
+
+
+def _normalize_ecb_long_curve(
+    frame: pd.DataFrame,
+    country: str,
+    source: str,
+) -> pd.DataFrame:
+    data = frame.loc[:, ["TIME_PERIOD", "DATA_TYPE_FM", "OBS_VALUE"]].copy()
+    data["maturity_years"] = data["DATA_TYPE_FM"].astype(str).map(ecb_maturity_from_code)
+    data = data.dropna(subset=["maturity_years"])
+    if data.empty:
+        raise ValueError("ECB raw data does not contain SR_* spot-rate observations")
+
+    data["date"] = data["TIME_PERIOD"]
+    data["country"] = country
+    data["yield"] = pd.to_numeric(data["OBS_VALUE"], errors="coerce")
+    data["source"] = source
+    return validate_curve_frame(data.dropna(subset=["yield"]))
+
+
 def _normalize_wide_curve(
     frame: pd.DataFrame,
     date_column: str,
@@ -99,6 +147,13 @@ def _normalize_source(name: str, source_config: SourceConfig) -> pd.DataFrame:
     if name == "bank_of_canada":
         raw = load_bank_of_canada_raw(source_config.raw_file)
         return normalize_bank_of_canada(
+            raw,
+            country=source_config.country,
+            source=source_config.source,
+        )
+    if name == "ecb_yield_curve":
+        raw = load_ecb_yield_curve_raw(source_config.raw_file)
+        return normalize_ecb_yield_curve(
             raw,
             country=source_config.country,
             source=source_config.source,

@@ -7,7 +7,7 @@ not a claim of tradable performance.
 
 Current evaluation covers:
 
-- US and Canada public zero-coupon sovereign yield curves
+- US, Canada, and euro-area public zero-coupon yield curves
 - PCA and Nelson-Siegel curve representations
 - curve-shape, carry/roll-down, lagged, residual-dynamic, and state-maturity
   linear baselines
@@ -65,9 +65,9 @@ The residual RV spread score is a ranking metric, not a tradable PnL. It does
 not include duration-neutral construction, transaction costs, liquidity,
 financing, or execution constraints.
 
-The current data scope is limited to US and Canada curves. Macro variables,
-policy-rate variables, inflation, labor-market data, and market volatility
-indices are not yet included.
+The euro-area ECB source is an aggregate all-issuers curve, not a single
+sovereign issuer. Macro variables, policy-rate variables, inflation,
+labor-market data, and market volatility indices are not yet included.
 
 ## Next Step
 

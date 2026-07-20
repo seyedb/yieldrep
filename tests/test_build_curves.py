@@ -35,6 +35,18 @@ def test_build_curves_parquet_from_configured_raw_files(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
+    ecb_raw = raw_dir / "ecb_yield_curve.csv"
+    ecb_raw.write_text(
+        "\n".join(
+            [
+                "TIME_PERIOD,DATA_TYPE_FM,OBS_VALUE",
+                "2024-01-02,SR_3M,3.00",
+                "2024-01-02,SR_10Y,3.25",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
     config = ProjectConfig(
         data_dir=tmp_path / "data",
         reports_dir=tmp_path / "reports",
@@ -45,6 +57,11 @@ def test_build_curves_parquet_from_configured_raw_files(tmp_path: Path) -> None:
                 source="bank_of_canada",
                 raw_file=boc_raw,
             ),
+            "ecb_yield_curve": SourceConfig(
+                country="EA",
+                source="ecb_yield_curve",
+                raw_file=ecb_raw,
+            ),
         },
     )
 
@@ -53,9 +70,9 @@ def test_build_curves_parquet_from_configured_raw_files(tmp_path: Path) -> None:
 
     assert output_path == tmp_path / "data" / "processed" / "curves.parquet"
     assert tuple(curves.columns) == CURVE_COLUMNS
-    assert len(curves) == 4
-    assert set(curves["country"]) == {"US", "CA"}
-    assert set(curves["source"]) == {"fed_gsw", "bank_of_canada"}
+    assert len(curves) == 6
+    assert set(curves["country"]) == {"US", "CA", "EA"}
+    assert set(curves["source"]) == {"fed_gsw", "bank_of_canada", "ecb_yield_curve"}
 
 
 def test_build_curves_parquet_rejects_unsupported_source(tmp_path: Path) -> None:

@@ -120,11 +120,14 @@ def test_load_config_reads_project_paths() -> None:
 def test_load_config_reads_source_metadata() -> None:
     config = load_config(Path("configs/default.yaml"))
 
-    assert set(config.sources) == {"fed_gsw", "bank_of_canada"}
+    assert set(config.sources) == {"fed_gsw", "bank_of_canada", "ecb_yield_curve"}
     assert config.sources["fed_gsw"].country == "US"
     assert config.sources["bank_of_canada"].raw_file == Path("data/raw/boc_zero_coupon.csv")
+    assert config.sources["ecb_yield_curve"].country == "EA"
+    assert config.sources["ecb_yield_curve"].raw_file == Path("data/raw/ecb_yield_curve.csv")
     assert config.sources["fed_gsw"].url is not None
     assert config.sources["bank_of_canada"].url is not None
+    assert config.sources["ecb_yield_curve"].url is not None
     assert config.pca.n_components == 5
     assert config.pca.min_maturities == 3
     assert config.nelson_siegel.tau == 1.5

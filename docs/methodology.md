@@ -45,6 +45,10 @@ r_t^{(c,m_M)}
 \right]
 ```
 
+The ECB source is treated as an aggregate euro-area curve (`EA`), not as a
+single sovereign issuer. The configured ECB series uses all-issuer euro-area
+zero-coupon spot rates.
+
 ## Classical Representations
 
 ### PCA
@@ -593,7 +597,7 @@ reports/tables/residual_relative_value_rank_ic_coverage.csv
 
 Included now:
 
-- public US and Canada zero-coupon curve data
+- public US, Canada, and euro-area zero-coupon curve data
 - normalized long-format curve schema
 - PCA and Nelson-Siegel curve representations
 - engineered slope, curvature, carry, roll-down, lagged, and residual features
