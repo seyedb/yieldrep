@@ -38,13 +38,15 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
         tmp_path / "reports" / "tables" / "baseline_rank.csv",
         tmp_path / "reports" / "tables" / "baseline_winners.csv",
         tmp_path / "reports" / "tables" / "baseline_by_maturity_bucket.csv",
+        tmp_path / "reports" / "tables" / "residual_relative_value.csv",
         tmp_path / "reports" / "tables" / "baseline_by_maturity_point_top.csv",
     ]
     summary = pd.read_csv(output_paths[0])
     rank_table = pd.read_csv(output_paths[1])
     winners = pd.read_csv(output_paths[2])
     bucket_summary = pd.read_csv(output_paths[3])
-    point_top = pd.read_csv(output_paths[4])
+    residual_rv = pd.read_csv(output_paths[4])
+    point_top = pd.read_csv(output_paths[5])
     assert {"target", "representation", "model", "mean_rmse"}.issubset(summary.columns)
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best", "mean_rank_ic"}.issubset(
         rank_table.columns
@@ -52,6 +54,8 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     assert winners.loc[0, "best_representation"] == "pca"
     assert winners.loc[0, "lagged_rmse_gap_to_best"] == pytest.approx(0.02)
     assert "maturity_bucket" in bucket_summary.columns
+    assert set(residual_rv["maturity_bucket"]) == {"front_end"}
+    assert residual_rv.loc[0, "representation"] == "residual_feature"
     assert len(point_top) == 2
     assert point_top["rmse"].tolist() == sorted(point_top["rmse"].tolist())
 
@@ -144,8 +148,20 @@ def _sample_bucket_metrics() -> pd.DataFrame:
     rows = [
         _metric_row(representation="pca", rmse=0.10, maturity_years=None),
         _metric_row(representation="curve", rmse=0.15, maturity_years=None),
+        _metric_row(
+            representation="residual_feature",
+            rmse=0.08,
+            maturity_years=None,
+            target="residual_change",
+        ),
+        _metric_row(
+            representation="pca",
+            rmse=0.10,
+            maturity_years=None,
+            target="residual_change",
+        ),
     ]
-    for row, bucket in zip(rows, ["front_end", "belly"], strict=True):
+    for row, bucket in zip(rows, ["front_end", "belly", "front_end", "front_end"], strict=True):
         row["maturity_bucket"] = bucket
     return pd.DataFrame(rows).drop(columns=["maturity_years"])
 
@@ -164,9 +180,10 @@ def _metric_row(
     representation: str,
     rmse: float,
     maturity_years: float | None,
+    target: str = "yield_change",
 ) -> dict[str, object]:
     return {
-        "target": "yield_change",
+        "target": target,
         "representation": representation,
         "model": "ridge",
         "split_method": "date_ordered",

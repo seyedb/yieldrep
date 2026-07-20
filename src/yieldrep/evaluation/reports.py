@@ -18,7 +18,14 @@ from yieldrep.models.forecasting import (
 )
 
 SUMMARY_GROUP_COLUMNS = ["target", "representation", "model"]
-BUCKET_GROUP_COLUMNS = ["target", "representation", "model", "maturity_bucket"]
+BUCKET_GROUP_COLUMNS = [
+    "target",
+    "country",
+    "horizon_days",
+    "maturity_bucket",
+    "representation",
+    "model",
+]
 RANK_GROUP_COLUMNS = ["target", "country", "horizon_days"]
 METRIC_COLUMNS = ["rmse", "mae", "directional_accuracy", "mean_rank_ic", "rank_ic_dates"]
 
@@ -44,6 +51,9 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
     )
     bucket_summary.to_csv(config.baseline_by_maturity_bucket_table_path, index=False)
 
+    residual_rv = residual_relative_value_summary(bucket_summary)
+    residual_rv.to_csv(config.residual_relative_value_table_path, index=False)
+
     maturity_point_top = top_maturity_point_metrics(
         pd.read_parquet(config.baseline_metrics_by_maturity_point_path),
         top_n=top_n,
@@ -55,6 +65,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.baseline_rank_table_path,
         config.baseline_winners_table_path,
         config.baseline_by_maturity_bucket_table_path,
+        config.residual_relative_value_table_path,
         config.baseline_by_maturity_point_top_table_path,
     ]
 
@@ -262,6 +273,72 @@ def top_maturity_point_metrics(metrics: pd.DataFrame, top_n: int = 100) -> pd.Da
         .head(top_n)
         .reset_index(drop=True)
     )
+
+
+def residual_relative_value_summary(bucket_summary: pd.DataFrame) -> pd.DataFrame:
+    """Rank residual-change baselines by country, horizon, and maturity bucket."""
+    columns = [
+        "country",
+        "horizon_days",
+        "maturity_bucket",
+        "representation",
+        "model",
+        "rows",
+        "mean_rmse",
+        "mean_mae",
+        "mean_directional_accuracy",
+        "mean_rank_ic",
+        "rank_ic_dates",
+        "rank",
+        "rmse_gap_to_best",
+        "pct_gap_to_best",
+    ]
+    residual = bucket_summary.loc[bucket_summary["target"] == "residual_change"].copy()
+    if residual.empty:
+        return pd.DataFrame(columns=columns)
+
+    rank_groups = ["country", "horizon_days", "maturity_bucket"]
+    naive = _naive_residual_rows(residual, rank_groups)
+    residual = pd.concat(
+        [naive, residual.loc[residual["model"] != "train_mean"]],
+        ignore_index=True,
+    )
+    residual["rank"] = residual.groupby(rank_groups)["mean_rmse"].rank(
+        method="min",
+        ascending=True,
+    )
+    best_rmse = residual.groupby(rank_groups)["mean_rmse"].transform("min")
+    residual["rmse_gap_to_best"] = residual["mean_rmse"] - best_rmse
+    residual["pct_gap_to_best"] = residual["rmse_gap_to_best"] / best_rmse
+
+    available_columns = [column for column in columns if column in residual.columns]
+    return (
+        residual.sort_values([*rank_groups, "rank", "mean_mae", "representation", "model"])
+        .loc[:, available_columns]
+        .reset_index(drop=True)
+    )
+
+
+def _naive_residual_rows(residual: pd.DataFrame, rank_groups: list[str]) -> pd.DataFrame:
+    naive = residual.loc[residual["model"] == "train_mean"]
+    if naive.empty:
+        return naive
+
+    aggregations = {
+        "rows": ("rows", "sum"),
+        "mean_rmse": ("mean_rmse", "mean"),
+        "mean_mae": ("mean_mae", "mean"),
+        "mean_directional_accuracy": ("mean_directional_accuracy", "mean"),
+    }
+    if "mean_rank_ic" in naive.columns:
+        aggregations["mean_rank_ic"] = ("mean_rank_ic", "mean")
+    if "rank_ic_dates" in naive.columns:
+        aggregations["rank_ic_dates"] = ("rank_ic_dates", "sum")
+
+    rows = naive.groupby(rank_groups, sort=True).agg(**aggregations).reset_index()
+    rows["representation"] = "naive"
+    rows["model"] = "train_mean"
+    return rows
 
 
 def rank_baselines(metrics: pd.DataFrame) -> pd.DataFrame:
