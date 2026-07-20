@@ -47,6 +47,7 @@ RESIDUAL_DYNAMIC_FEATURES = [
     "residual_change_5",
     "residual_vol_20",
 ]
+MATURITY_BASIS_FEATURES = ["maturity", "maturity_squared", "log_maturity"]
 BASE_EVALUATION_COLUMNS = ["date", "country", "maturity_years", "horizon_days"]
 VOL_REGIME_LABELS = ["low", "medium", "high"]
 
@@ -66,6 +67,7 @@ class EvaluationSpec:
     features: list[str]
     target: str
     target_column: str
+    required_features: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -228,6 +230,8 @@ def _prepare_evaluation_data(spec: EvaluationSpec) -> PreparedEvaluationData | N
 
     feature_columns = [column for column in spec.features if column in available_columns]
     if not feature_columns:
+        return None
+    if any(column not in available_columns for column in spec.required_features):
         return None
 
     required_columns = [*BASE_EVALUATION_COLUMNS, spec.target_column]
@@ -439,6 +443,35 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                 ),
             ]
         )
+        if target == "residual_change":
+            specs.extend(
+                [
+                    EvaluationSpec(
+                        target=target,
+                        target_column=target_column,
+                        representation="pca_maturity",
+                        path=config.modeling_dir / f"pca{suffix}_targets.parquet",
+                        features=_state_maturity_features(_pca_features(config)),
+                        required_features=tuple(MATURITY_BASIS_FEATURES),
+                    ),
+                    EvaluationSpec(
+                        target=target,
+                        target_column=target_column,
+                        representation="nelson_siegel_maturity",
+                        path=config.modeling_dir / f"nelson_siegel{suffix}_targets.parquet",
+                        features=_state_maturity_features(NELSON_SIEGEL_FEATURES),
+                        required_features=tuple(MATURITY_BASIS_FEATURES),
+                    ),
+                    EvaluationSpec(
+                        target=target,
+                        target_column=target_column,
+                        representation="curve_maturity",
+                        path=config.modeling_dir / f"curve{suffix}_targets.parquet",
+                        features=_state_maturity_features(CURVE_FEATURES),
+                        required_features=tuple(MATURITY_BASIS_FEATURES),
+                    ),
+                ]
+            )
     return specs
 
 
@@ -835,3 +868,12 @@ def _ordered_unique(values: list[str]) -> list[str]:
 
 def _pca_features(config: ProjectConfig) -> list[str]:
     return [f"PC{i}" for i in range(1, config.pca.n_components + 1)]
+
+
+def _state_maturity_features(state_features: list[str]) -> list[str]:
+    interaction_features = [
+        f"{state_feature}_x_{maturity_feature}"
+        for state_feature in state_features
+        for maturity_feature in MATURITY_BASIS_FEATURES
+    ]
+    return _ordered_unique([*state_features, *MATURITY_BASIS_FEATURES, *interaction_features])

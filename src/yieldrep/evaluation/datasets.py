@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from yieldrep.config import ProjectConfig
@@ -282,7 +283,11 @@ def _join_pca_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFr
         return pd.DataFrame()
 
     features = pd.concat(frames, ignore_index=True)
-    return targets.merge(features, on=["date", "country"], how="inner")
+    merged = targets.merge(features, on=["date", "country"], how="inner")
+    return _add_state_maturity_features(
+        merged,
+        state_columns=[f"PC{index}" for index in range(1, config.pca.n_components + 1)],
+    )
 
 
 def _join_nelson_siegel_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFrame:
@@ -293,7 +298,11 @@ def _join_nelson_siegel_targets(config: ProjectConfig, targets: pd.DataFrame) ->
         return pd.DataFrame()
 
     features = pd.concat(frames, ignore_index=True)
-    return targets.merge(features, on=["date", "country"], how="inner")
+    merged = targets.merge(features, on=["date", "country"], how="inner")
+    return _add_state_maturity_features(
+        merged,
+        state_columns=["beta_level", "beta_slope", "beta_curvature", "rmse"],
+    )
 
 
 def _join_lagged_targets(
@@ -310,7 +319,17 @@ def _join_curve_feature_targets(config: ProjectConfig, targets: pd.DataFrame) ->
         return pd.DataFrame()
 
     features = pd.read_parquet(config.curve_features_path)
-    return targets.merge(features, on=["date", "country"], how="inner")
+    merged = targets.merge(features, on=["date", "country"], how="inner")
+    return _add_state_maturity_features(
+        merged,
+        state_columns=[
+            "level",
+            "slope_10y_2y",
+            "curvature_2s5s10s",
+            "front_slope_2y_1y",
+            "long_slope_30y_10y",
+        ],
+    )
 
 
 def _join_carry_roll_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFrame:
@@ -327,6 +346,24 @@ def _join_residual_feature_targets(config: ProjectConfig, targets: pd.DataFrame)
 
     features = pd.read_parquet(config.residual_features_path)
     return targets.merge(features, on=["date", "country", "maturity_years"], how="inner")
+
+
+def _add_state_maturity_features(data: pd.DataFrame, state_columns: list[str]) -> pd.DataFrame:
+    frame = data.copy()
+    available_state_columns = [column for column in state_columns if column in frame.columns]
+    if not available_state_columns:
+        return frame
+
+    frame["maturity"] = frame["maturity_years"].astype(float)
+    frame["maturity_squared"] = frame["maturity"] ** 2
+    frame["log_maturity"] = np.log1p(frame["maturity"])
+    maturity_basis = ["maturity", "maturity_squared", "log_maturity"]
+    for state_column in available_state_columns:
+        for maturity_column in maturity_basis:
+            frame[f"{state_column}_x_{maturity_column}"] = (
+                frame[state_column] * frame[maturity_column]
+            )
+    return frame
 
 
 def make_lagged_yield_change_features(

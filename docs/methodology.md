@@ -147,6 +147,25 @@ e_t^{(c,m)} - \mu_{t,W}^{(c,m)}
 These features are included because residual mean reversion and local
 richness/cheapness are standard relative-value ideas in rates research.
 
+### State-Maturity Linear Baselines
+
+For residual relative-value evaluation, the project also includes maturity-aware
+classical panel baselines. These combine curve-level state variables with a
+continuous maturity basis:
+
+```text
+maturity
+maturity_squared
+log_maturity
+```
+
+and state-by-maturity interactions. The intent is to test whether a curve-level
+state representation, such as PCA scores or Nelson-Siegel factors, can imply
+different residual-change forecasts at different points on the curve.
+
+These baselines are not interpreted as new representations. They are stronger
+linear classical comparators for maturity-level residual RV ranking.
+
 ## Targets
 
 ### Outright Yield Change
@@ -316,6 +335,7 @@ separates curve-level and maturity-level evaluation:
 | Level | Natural representations | Natural tasks |
 | --- | --- | --- |
 | Curve-level | PCA scores, Nelson-Siegel factors, curve-shape features | reconstruction, curve-state summaries, aggregate curve-move forecasting |
+| State-maturity panel | PCA/NS/curve factors with maturity basis interactions | residual RV ranking as a stronger classical comparator |
 | Maturity-level | residual features, lagged maturity moves, carry/roll-down proxies | residual relative value, cross-sectional maturity ranking |
 
 PCA and Nelson-Siegel are currently date/country-level curve representations.
