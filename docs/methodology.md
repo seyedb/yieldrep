@@ -308,7 +308,28 @@ This reduces artificial predictability from overlapping forward-change labels.
 Walk-forward evaluation is available as a robustness check, not the main
 headline result.
 
-### Metrics
+### Metric Protocol
+
+Metrics are interpreted by task. A single pooled error number is not treated as
+the universal objective.
+
+Reconstruction uses RMSE and MAE as primary metrics because the task is curve
+compression: the question is whether the representation reproduces observed
+yield levels.
+
+Outright yield-change and volatility-change forecasting use RMSE and MAE as
+point-forecast metrics. Directional accuracy is reported as a secondary sign
+metric, but it is not sufficient on its own because it ignores forecast
+magnitude.
+
+Residual relative-value evaluation uses cross-sectional rank IC as the primary
+ranking metric. RMSE and MAE remain useful context, but they are secondary for
+this task because an RV workflow often cares more about ordering maturities from
+rich to cheap, or from likely convergence to likely widening, than minimizing a
+pooled basis-point error.
+
+Volatility-regime classification is evaluated separately with classification
+metrics from the baseline classifier output.
 
 Regression metrics:
 
@@ -362,6 +383,25 @@ IC_t
 
 This metric is included because relative-value research often cares about
 cross-sectional ordering more than pooled point forecast error.
+
+For residual relative value, the main report is:
+
+```text
+reports/tables/residual_relative_value_rank_ic.csv
+```
+
+The bucket-level RMSE table is kept as supporting context:
+
+```text
+reports/tables/residual_relative_value.csv
+```
+
+The rank-IC coverage audit explains which feature sets can produce valid
+cross-sectional rankings:
+
+```text
+reports/tables/residual_relative_value_rank_ic_coverage.csv
+```
 
 ## Current Scope
 
