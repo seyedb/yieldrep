@@ -313,6 +313,18 @@ headline result.
 Metrics are interpreted by task. A single pooled error number is not treated as
 the universal objective.
 
+The current metric hierarchy is:
+
+| Task | Primary metric | Secondary metric | Context metrics |
+| --- | --- | --- | --- |
+| Curve reconstruction | RMSE / MAE | PCA explained variance | maturity-level reconstruction error |
+| Residual relative value | residual RV spread score | cross-sectional rank IC | RMSE, MAE, directional accuracy |
+| Outright yield-change forecasting | RMSE / MAE | directional accuracy | rank IC where valid |
+| Volatility-regime classification | balanced accuracy / macro F1 | accuracy | class support |
+
+This hierarchy is intentionally narrow. New metrics should only be added if they
+answer a distinct research question that the current set does not cover.
+
 Reconstruction uses RMSE and MAE as primary metrics because the task is curve
 compression: the question is whether the representation reproduces observed
 yield levels.
@@ -322,16 +334,11 @@ point-forecast metrics. Directional accuracy is reported as a secondary sign
 metric, but it is not sufficient on its own because it ignores forecast
 magnitude.
 
-Residual relative-value evaluation uses cross-sectional rank IC as the primary
-ranking metric. RMSE and MAE remain useful context, but they are secondary for
-this task because an RV workflow often cares more about ordering maturities from
-rich to cheap, or from likely convergence to likely widening, than minimizing a
-pooled basis-point error.
-
-The residual RV spread score is a second ranking metric. For each date, country,
-and horizon, maturities are sorted by predicted residual change. The score is
-the realized average residual change of the top-ranked maturities minus the
-realized average residual change of the bottom-ranked maturities:
+Residual relative-value evaluation uses the residual RV spread score as the
+primary ranking metric. For each date, country, and horizon, maturities are
+sorted by predicted residual change. The score is the realized average residual
+change of the top-ranked maturities minus the realized average residual change
+of the bottom-ranked maturities:
 
 ```math
 S_{t,h}^{(c)}
@@ -348,6 +355,11 @@ y_{t,h}^{(c,m)}
 where \(T_t\) and \(B_t\) are the top and bottom predicted maturity groups. This
 is a cross-sectional ranking score, not a tradable PnL or duration-neutral
 backtest.
+
+Cross-sectional rank IC is the secondary residual RV metric. RMSE and MAE remain
+useful context, but they are not headline metrics for this task because an RV
+workflow often cares more about ordering maturities than minimizing pooled
+basis-point error.
 
 Volatility-regime classification is evaluated separately with classification
 metrics from the baseline classifier output.
@@ -408,6 +420,12 @@ cross-sectional ordering more than pooled point forecast error.
 For residual relative value, the main report is:
 
 ```text
+reports/tables/residual_relative_value_spread.csv
+```
+
+The rank-IC report is kept as a secondary ranking view:
+
+```text
 reports/tables/residual_relative_value_rank_ic.csv
 ```
 
@@ -422,12 +440,6 @@ cross-sectional rankings:
 
 ```text
 reports/tables/residual_relative_value_rank_ic_coverage.csv
-```
-
-The top-minus-bottom residual RV spread score is reported in:
-
-```text
-reports/tables/residual_relative_value_spread.csv
 ```
 
 ## Current Scope
