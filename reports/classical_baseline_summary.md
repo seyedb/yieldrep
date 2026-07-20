@@ -13,6 +13,7 @@ Current evaluation covers:
   linear baselines
 - curve reconstruction metrics
 - residual relative-value ranking metrics
+- curve-level volatility-regime classification
 
 ## Metric Hierarchy
 
@@ -38,6 +39,9 @@ cross-sectional RV metrics, which makes the comparison more structurally fair
 than using curve-level factors alone. They do not currently outperform the
 residual dynamic feature baseline.
 
+For volatility regimes, the project now evaluates curve-level classifiers using
+future curve-move magnitude labels assigned from training-sample quantiles.
+
 ## Interpretation
 
 PCA and Nelson-Siegel remain useful curve-level representations. They are most
@@ -60,6 +64,6 @@ indices are not yet included.
 
 ## Next Step
 
-The next research step should keep the metric hierarchy fixed and focus on a
-curve-level downstream task where PCA and Nelson-Siegel are natural baselines,
-such as curve volatility or curve-state regime classification.
+The next research step should review the volatility-regime results and decide
+whether to strengthen classical state features or add macro and policy-rate
+context before moving to learned representations.

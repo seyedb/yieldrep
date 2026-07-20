@@ -49,6 +49,7 @@ RESIDUAL_DYNAMIC_FEATURES = [
 ]
 MATURITY_BASIS_FEATURES = ["maturity", "maturity_squared", "log_maturity"]
 BASE_EVALUATION_COLUMNS = ["date", "country", "maturity_years", "horizon_days"]
+CURVE_LEVEL_EVALUATION_COLUMNS = ["date", "country", "horizon_days"]
 VOL_REGIME_LABELS = ["low", "medium", "high"]
 
 __all__ = [
@@ -68,6 +69,7 @@ class EvaluationSpec:
     target: str
     target_column: str
     required_features: tuple[str, ...] = ()
+    base_columns: tuple[str, ...] = tuple(BASE_EVALUATION_COLUMNS)
 
 
 @dataclass(frozen=True)
@@ -234,7 +236,7 @@ def _prepare_evaluation_data(spec: EvaluationSpec) -> PreparedEvaluationData | N
     if any(column not in available_columns for column in spec.required_features):
         return None
 
-    required_columns = [*BASE_EVALUATION_COLUMNS, spec.target_column]
+    required_columns = [*spec.base_columns, spec.target_column]
     columns = _ordered_unique([*required_columns, *feature_columns])
     if any(column not in available_columns for column in required_columns):
         return None
@@ -290,9 +292,14 @@ def _evaluate_classification_representation(
 
             train = _limit_classification_training_rows(split.train, config)
             x_train = train[prepared.feature_columns].to_numpy(dtype=float)
-            y_train = train[spec.target_column].astype(str).to_numpy()
+            train_target = train[spec.target_column]
+            test_target = split.test[spec.target_column]
+            if pd.api.types.is_numeric_dtype(train_target):
+                y_train, y_test = _regime_labels_from_train_quantiles(train_target, test_target)
+            else:
+                y_train = train_target.astype(str).to_numpy()
+                y_test = test_target.astype(str).to_numpy()
             x_test = split.test[prepared.feature_columns].to_numpy(dtype=float)
-            y_test = split.test[spec.target_column].astype(str).to_numpy()
 
             rows.extend(
                 _evaluate_classification_split(
@@ -383,6 +390,30 @@ def _mode_predictions(y_train: NDArray[np.str_], rows: int) -> NDArray[np.str_]:
     labels, counts = np.unique(y_train, return_counts=True)
     mode_label = labels[int(np.argmax(counts))]
     return np.full(rows, mode_label, dtype=labels.dtype)
+
+
+def _regime_labels_from_train_quantiles(
+    train_target: pd.Series,
+    test_target: pd.Series,
+) -> tuple[NDArray[np.str_], NDArray[np.str_]]:
+    thresholds = train_target.quantile([1 / 3, 2 / 3]).to_numpy(dtype=float)
+    return (
+        _apply_regime_thresholds(train_target.to_numpy(dtype=float), thresholds),
+        _apply_regime_thresholds(test_target.to_numpy(dtype=float), thresholds),
+    )
+
+
+def _apply_regime_thresholds(
+    values: NDArray[np.float64],
+    thresholds: NDArray[np.float64],
+) -> NDArray[np.str_]:
+    lower, upper = thresholds
+    labels = np.select(
+        [values <= lower, values <= upper],
+        ["low", "medium"],
+        default="high",
+    )
+    return labels.astype(np.str_)
 
 
 def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
@@ -478,46 +509,36 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
 def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
     return [
         EvaluationSpec(
-            target="future_vol_regime",
-            target_column="future_vol_regime",
+            target="curve_vol_regime",
+            target_column="future_curve_move_rms",
             representation="pca",
-            path=config.modeling_dir / "pca_vol_targets.parquet",
+            path=config.modeling_dir / "pca_curve_vol_regime_targets.parquet",
             features=_pca_features(config),
+            base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
         ),
         EvaluationSpec(
-            target="future_vol_regime",
-            target_column="future_vol_regime",
+            target="curve_vol_regime",
+            target_column="future_curve_move_rms",
             representation="nelson_siegel",
-            path=config.modeling_dir / "nelson_siegel_vol_targets.parquet",
+            path=config.modeling_dir / "nelson_siegel_curve_vol_regime_targets.parquet",
             features=NELSON_SIEGEL_FEATURES,
+            base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
         ),
         EvaluationSpec(
-            target="future_vol_regime",
-            target_column="future_vol_regime",
-            representation="lagged",
-            path=config.modeling_dir / "lagged_vol_targets.parquet",
-            features=[f"lag_{lag}_change" for lag in config.evaluation.lag_days],
-        ),
-        EvaluationSpec(
-            target="future_vol_regime",
-            target_column="future_vol_regime",
+            target="curve_vol_regime",
+            target_column="future_curve_move_rms",
             representation="curve",
-            path=config.modeling_dir / "curve_vol_targets.parquet",
+            path=config.modeling_dir / "curve_curve_vol_regime_targets.parquet",
             features=CURVE_FEATURES,
+            base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
         ),
         EvaluationSpec(
-            target="future_vol_regime",
-            target_column="future_vol_regime",
-            representation="carry_roll",
-            path=config.modeling_dir / "carry_roll_vol_targets.parquet",
-            features=CARRY_ROLL_FEATURES,
-        ),
-        EvaluationSpec(
-            target="future_vol_regime",
-            target_column="future_vol_regime",
-            representation="residual_feature",
-            path=config.modeling_dir / "residual_feature_vol_targets.parquet",
-            features=RESIDUAL_DYNAMIC_FEATURES,
+            target="curve_vol_regime",
+            target_column="future_curve_move_rms",
+            representation="curve_vol",
+            path=config.modeling_dir / "curve_vol_curve_vol_regime_targets.parquet",
+            features=["realized_curve_vol"],
+            base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
         ),
     ]
 

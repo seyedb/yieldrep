@@ -41,6 +41,7 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
         tmp_path / "reports" / "tables" / "residual_relative_value_spread.csv",
         tmp_path / "reports" / "tables" / "residual_relative_value_benchmark.csv",
         tmp_path / "reports" / "tables" / "baseline_winners.csv",
+        tmp_path / "reports" / "tables" / "volatility_regime.csv",
         tmp_path / "reports" / "tables" / "baseline_by_maturity_bucket.csv",
         tmp_path / "reports" / "tables" / "residual_relative_value.csv",
         tmp_path / "reports" / "tables" / "baseline_by_maturity_point_top.csv",
@@ -52,9 +53,10 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     residual_rv_spread = pd.read_csv(output_paths[4])
     residual_rv_benchmark = pd.read_csv(output_paths[5])
     winners = pd.read_csv(output_paths[6])
-    bucket_summary = pd.read_csv(output_paths[7])
-    residual_rv = pd.read_csv(output_paths[8])
-    point_top = pd.read_csv(output_paths[9])
+    volatility_regime = pd.read_csv(output_paths[7])
+    bucket_summary = pd.read_csv(output_paths[8])
+    residual_rv = pd.read_csv(output_paths[9])
+    point_top = pd.read_csv(output_paths[10])
     assert {"target", "representation", "model", "mean_rmse"}.issubset(summary.columns)
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best", "mean_rank_ic"}.issubset(
         rank_table.columns
@@ -68,6 +70,9 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
         residual_rv_benchmark.columns
     )
     assert {"best_representation", "pca_rank", "lagged_rank"}.issubset(winners.columns)
+    assert {"mean_balanced_accuracy", "mean_macro_f1", "rank"}.issubset(
+        volatility_regime.columns
+    )
     assert "maturity_bucket" in bucket_summary.columns
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best"}.issubset(residual_rv.columns)
     assert len(point_top) <= 2

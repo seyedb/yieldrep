@@ -95,9 +95,10 @@ def build_residual_targets_command(config: Path = Path("configs/default.yaml")) 
 
 @app.command("build-vol-targets")
 def build_vol_targets_command(config: Path = Path("configs/default.yaml")) -> None:
-    """Build realized-volatility-change prediction targets."""
+    """Build realized-volatility target datasets."""
     project_config = load_config(config)
-    typer.echo(build_vol_targets(project_config))
+    for output_path in build_vol_targets(project_config):
+        typer.echo(output_path)
 
 
 @app.command("build-curve-features")
@@ -218,7 +219,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_targets(project_config))
     output_paths.append(build_standardized_targets(project_config))
     output_paths.append(build_residual_targets(project_config))
-    output_paths.append(build_vol_targets(project_config))
+    output_paths.extend(build_vol_targets(project_config))
     output_paths.extend(build_modeling_datasets(project_config))
     output_paths.append(evaluate_baselines(project_config))
     output_paths.extend(evaluate_supervised_forecasts(project_config))

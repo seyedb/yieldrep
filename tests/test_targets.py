@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from yieldrep.evaluation.targets import (
+    make_forward_curve_vol_regime_targets,
     make_forward_residual_change_targets,
     make_forward_standardized_yield_change_targets,
     make_forward_vol_change_targets,
@@ -51,6 +52,24 @@ def test_make_forward_vol_change_targets() -> None:
     )
     assert set(targets["future_vol_regime"]).issubset({"low", "medium", "high"})
     assert targets["target_vol_change"].notna().all()
+
+
+def test_make_forward_curve_vol_regime_targets() -> None:
+    curves = _sample_curves(periods=8)
+
+    targets = make_forward_curve_vol_regime_targets(
+        curves,
+        horizons_days=[1],
+        realized_vol_window=2,
+    )
+
+    assert {
+        "realized_curve_vol",
+        "future_curve_move_rms",
+        "available_maturities",
+    }.issubset(targets.columns)
+    assert set(targets["horizon_days"]) == {1}
+    assert targets["future_curve_move_rms"].notna().all()
 
 
 def test_make_forward_standardized_yield_change_targets() -> None:

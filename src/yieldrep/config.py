@@ -110,6 +110,10 @@ class ProjectConfig(BaseModel):
         return self.processed_dir / "vol_targets.parquet"
 
     @property
+    def curve_vol_regime_targets_path(self) -> Path:
+        return self.processed_dir / "curve_vol_regime_targets.parquet"
+
+    @property
     def residual_features_path(self) -> Path:
         return self.processed_dir / "residual_features.parquet"
 
@@ -236,6 +240,10 @@ class ProjectConfig(BaseModel):
     @property
     def baseline_winners_table_path(self) -> Path:
         return self.tables_dir / "baseline_winners.csv"
+
+    @property
+    def volatility_regime_table_path(self) -> Path:
+        return self.tables_dir / "volatility_regime.csv"
 
     @property
     def overlap_sensitivity_table_path(self) -> Path:

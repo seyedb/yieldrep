@@ -16,6 +16,9 @@ def test_load_config_reads_project_paths() -> None:
     assert config.standardized_targets_path == Path("data/processed/standardized_targets.parquet")
     assert config.residual_targets_path == Path("data/processed/residual_targets.parquet")
     assert config.vol_targets_path == Path("data/processed/vol_targets.parquet")
+    assert config.curve_vol_regime_targets_path == Path(
+        "data/processed/curve_vol_regime_targets.parquet"
+    )
     assert config.residual_features_path == Path("data/processed/residual_features.parquet")
     assert config.carry_roll_features_path == Path("data/processed/carry_roll_features.parquet")
     assert config.modeling_dir == Path("data/processed/modeling")
@@ -33,6 +36,7 @@ def test_load_config_reads_project_paths() -> None:
     assert config.baseline_classification_metrics_path == Path(
         "data/processed/evaluation/baseline_classification_metrics.parquet"
     )
+    assert config.volatility_regime_table_path == Path("reports/tables/volatility_regime.csv")
     assert config.baseline_residual_rv_spread_path == Path(
         "data/processed/evaluation/residual_rv_spread.parquet"
     )

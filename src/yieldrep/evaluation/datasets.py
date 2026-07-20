@@ -47,6 +47,16 @@ def build_modeling_datasets(config: ProjectConfig) -> list[Path]:
         output_paths.append(config.supervised_vol_change_path)
         output_paths.extend(_build_target_family(config, vol_targets, curves, suffix="_vol"))
 
+    if config.curve_vol_regime_targets_path.exists():
+        curve_vol_regime_targets = pd.read_parquet(config.curve_vol_regime_targets_path)
+        output_paths.extend(
+            _build_curve_level_target_family(
+                config,
+                curve_vol_regime_targets,
+                suffix="_curve_vol_regime",
+            )
+        )
+
     return output_paths
 
 
@@ -269,6 +279,34 @@ def _build_target_family(
         residual_feature_targets.to_parquet(residual_feature_path, index=False)
         output_paths.append(residual_feature_path)
 
+    return output_paths
+
+
+def _build_curve_level_target_family(
+    config: ProjectConfig,
+    targets: pd.DataFrame,
+    suffix: str,
+) -> list[Path]:
+    output_paths: list[Path] = []
+
+    for representation, features in [
+        ("pca", _read_pca_features(config)),
+        ("nelson_siegel", _read_nelson_siegel_features(config)),
+        ("curve", _read_curve_features(config)),
+    ]:
+        if features.empty:
+            continue
+        merged = targets.merge(features, on=["date", "country"], how="inner")
+        if merged.empty:
+            continue
+        output_path = config.modeling_dir / f"{representation}{suffix}_targets.parquet"
+        merged.to_parquet(output_path, index=False)
+        output_paths.append(output_path)
+
+    curve_vol = targets.copy()
+    curve_vol_path = config.modeling_dir / f"curve_vol{suffix}_targets.parquet"
+    curve_vol.to_parquet(curve_vol_path, index=False)
+    output_paths.append(curve_vol_path)
     return output_paths
 
 

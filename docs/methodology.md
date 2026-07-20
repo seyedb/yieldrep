@@ -227,7 +227,7 @@ e_t^{(c,m)}
 This is the current relative-value target. It is more aligned with curve
 representation research than outright yield-change prediction.
 
-### Volatility Change And Regime
+### Volatility Change
 
 Realized volatility is estimated from rolling yield changes:
 
@@ -252,15 +252,53 @@ y_{t,h,\mathrm{vol}}^{(c,m)}
 \sigma_t^{(c,m)}
 ```
 
-The pipeline also stores empirical future volatility-regime labels:
+### Curve Volatility Regime
+
+Curve-level volatility regimes are defined from the forward root-mean-square
+move of the whole curve:
 
 ```math
-g_{t,h}^{(c,m)}
+v_{t,h}^{(c)}
+=
+\sqrt{
+\frac{1}{M}
+\sum_m
+\left(
+r_{t+h}^{(c,m)}
+-
+r_t^{(c,m)}
+\right)^2
+}
+```
+
+The current realized curve volatility feature is the root-mean-square of
+trailing maturity-level realized volatilities:
+
+```math
+\sigma_{t,\mathrm{curve}}^{(c)}
+=
+\sqrt{
+\frac{1}{M}
+\sum_m
+\left(
+\sigma_t^{(c,m)}
+\right)^2
+}
+```
+
+Low, medium, and high regimes are assigned inside each train/test split using
+training-sample terciles of \(v_{t,h}^{(c)}\). The test set is then labeled with
+the training thresholds:
+
+```math
+g_{t,h}^{(c)}
 \in
 \{\mathrm{low}, \mathrm{medium}, \mathrm{high}\}
 ```
 
-These are early curve-state labels, not a final regime model.
+This avoids using full-sample regime thresholds and makes PCA, Nelson-Siegel,
+engineered curve features, and recent realized curve volatility comparable on a
+natural curve-level classification task.
 
 ## Evaluation Protocol
 
@@ -334,7 +372,7 @@ separates curve-level and maturity-level evaluation:
 
 | Level | Natural representations | Natural tasks |
 | --- | --- | --- |
-| Curve-level | PCA scores, Nelson-Siegel factors, curve-shape features | reconstruction, curve-state summaries, aggregate curve-move forecasting |
+| Curve-level | PCA scores, Nelson-Siegel factors, curve-shape features | reconstruction, volatility regimes, aggregate curve-move forecasting |
 | State-maturity panel | PCA/NS/curve factors with maturity basis interactions | residual RV ranking as a stronger classical comparator |
 | Maturity-level | residual features, lagged maturity moves, carry/roll-down proxies | residual relative value, cross-sectional maturity ranking |
 
@@ -404,6 +442,30 @@ basis-point error.
 
 Volatility-regime classification is evaluated separately with classification
 metrics from the baseline classifier output.
+
+Balanced accuracy averages recall across regimes:
+
+```math
+\mathrm{Balanced\ Accuracy}
+=
+\frac{1}{K}
+\sum_{k=1}^{K}
+\frac{TP_k}{TP_k + FN_k}
+```
+
+Macro F1 computes F1 for each regime and averages the class-level scores:
+
+```math
+\mathrm{Macro\ F1}
+=
+\frac{1}{K}
+\sum_{k=1}^{K}
+\frac{
+2\,\mathrm{Precision}_k\,\mathrm{Recall}_k
+}{
+\mathrm{Precision}_k + \mathrm{Recall}_k
+}
+```
 
 Regression metrics:
 
@@ -494,6 +556,7 @@ Included now:
 - reconstruction evaluation
 - classical supervised forecasting baselines
 - residual RV ranking metrics for maturity-level feature sets
+- curve-level volatility-regime classification
 - chronological, non-overlapping, and walk-forward evaluation checks
 - Plotly figures and CSV report tables
 
@@ -511,6 +574,5 @@ The current forecasting benchmarks are preliminary. Outright yield-change
 prediction is a noisy task, and strong curve reconstruction does not by itself
 imply forecastability.
 
-Near-term extensions should focus on relative-value evaluation, especially
-Nelson-Siegel residual dynamics and cross-sectional ranking across maturities,
-before introducing learned representations.
+Near-term extensions should keep the task definitions fixed while improving the
+classical benchmark set and adding macro or policy-rate context.

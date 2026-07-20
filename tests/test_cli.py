@@ -168,9 +168,10 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr(cli, "build_targets", single_step("build_targets"))
     monkeypatch.setattr(cli, "build_standardized_targets", single_step("build_standardized_targets"))
     monkeypatch.setattr(cli, "build_residual_targets", single_step("build_residual_targets"))
-    monkeypatch.setattr(cli, "build_vol_targets", single_step("build_vol_targets"))
+    monkeypatch.setattr(cli, "build_vol_targets", multi_step("build_vol_targets"))
     monkeypatch.setattr(cli, "build_modeling_datasets", multi_step("build_modeling_datasets"))
     monkeypatch.setattr(cli, "evaluate_baselines", single_step("evaluate_baselines"))
+    monkeypatch.setattr(cli, "evaluate_supervised_forecasts", multi_step("evaluate_supervised_forecasts"))
     monkeypatch.setattr(cli, "summarize_baselines", multi_step("summarize_baselines"))
     monkeypatch.setattr(cli, "plot_baseline_metrics", multi_step("plot_baseline_metrics"))
 
@@ -189,6 +190,7 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_vol_targets",
         "build_modeling_datasets",
         "evaluate_baselines",
+        "evaluate_supervised_forecasts",
         "summarize_baselines",
         "plot_baseline_metrics",
     ]

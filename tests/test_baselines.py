@@ -147,6 +147,10 @@ def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
         modeling_dir / "pca_vol_targets.parquet",
         index=False,
     )
+    _sample_curve_level_data(feature_prefix="pca").to_parquet(
+        modeling_dir / "pca_curve_vol_regime_targets.parquet",
+        index=False,
+    )
     config = ProjectConfig(
         data_dir=tmp_path / "data",
         reports_dir=tmp_path / "reports",
@@ -160,7 +164,8 @@ def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
 
     assert set(metrics["target"]) == {"vol_change"}
     assert set(metrics["representation"]) == {"pca"}
-    assert set(classification_metrics["target"]) == {"future_vol_regime"}
+    assert set(classification_metrics["target"]) == {"curve_vol_regime"}
+    assert set(classification_metrics["representation"]) == {"pca"}
     assert set(classification_metrics["model"]) == {"train_mode", "logistic_l2"}
     assert {"accuracy", "balanced_accuracy", "macro_f1"}.issubset(classification_metrics.columns)
 
@@ -427,4 +432,33 @@ def _sample_modeling_data(
                         }
                     )
                 rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def _sample_curve_level_data(feature_prefix: str) -> pd.DataFrame:
+    dates = pd.date_range("2024-01-01", periods=12)
+    rows = []
+    for horizon in [1, 5]:
+        for index, date in enumerate(dates):
+            row = {
+                "date": date,
+                "country": "US",
+                "horizon_days": horizon,
+                "realized_curve_vol": 0.01 + index * 0.001,
+                "future_curve_move_rms": 0.02 + index * 0.002 + horizon * 0.0001,
+                "available_maturities": 3,
+            }
+            if feature_prefix == "pca":
+                row.update({"PC1": float(index), "PC2": float(horizon)})
+            elif feature_prefix == "curve":
+                row.update(
+                    {
+                        "level": 4.0 + index * 0.01,
+                        "slope_10y_2y": index * 0.001,
+                        "curvature_2s5s10s": horizon * 0.001,
+                        "front_slope_2y_1y": 0.1,
+                        "long_slope_30y_10y": 0.5,
+                    }
+                )
+            rows.append(row)
     return pd.DataFrame(rows)
