@@ -243,6 +243,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "residual_relative_value_benchmark.csv"
 
     @property
+    def residual_relative_value_overview_table_path(self) -> Path:
+        return self.tables_dir / "residual_relative_value_overview.csv"
+
+    @property
     def residual_mean_reversion_table_path(self) -> Path:
         return self.tables_dir / "residual_mean_reversion.csv"
 

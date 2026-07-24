@@ -40,6 +40,7 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
         tmp_path / "reports" / "tables" / "residual_relative_value_rank_ic_coverage.csv",
         tmp_path / "reports" / "tables" / "residual_relative_value_spread.csv",
         tmp_path / "reports" / "tables" / "residual_relative_value_benchmark.csv",
+        tmp_path / "reports" / "tables" / "residual_relative_value_overview.csv",
         tmp_path / "reports" / "tables" / "baseline_winners.csv",
         tmp_path / "reports" / "tables" / "volatility_regime.csv",
         tmp_path / "reports" / "tables" / "volatility_regime_benchmark.csv",
@@ -54,13 +55,14 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     residual_rv_rank_ic_coverage = pd.read_csv(output_paths[3])
     residual_rv_spread = pd.read_csv(output_paths[4])
     residual_rv_benchmark = pd.read_csv(output_paths[5])
-    winners = pd.read_csv(output_paths[6])
-    volatility_regime = pd.read_csv(output_paths[7])
-    volatility_regime_benchmark = pd.read_csv(output_paths[8])
-    curve_state = pd.read_csv(output_paths[9])
-    bucket_summary = pd.read_csv(output_paths[10])
-    residual_rv = pd.read_csv(output_paths[11])
-    point_top = pd.read_csv(output_paths[12])
+    residual_rv_overview = pd.read_csv(output_paths[6])
+    winners = pd.read_csv(output_paths[7])
+    volatility_regime = pd.read_csv(output_paths[8])
+    volatility_regime_benchmark = pd.read_csv(output_paths[9])
+    curve_state = pd.read_csv(output_paths[10])
+    bucket_summary = pd.read_csv(output_paths[11])
+    residual_rv = pd.read_csv(output_paths[12])
+    point_top = pd.read_csv(output_paths[13])
     assert {"target", "representation", "model", "mean_rmse"}.issubset(summary.columns)
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best", "mean_rank_ic"}.issubset(
         rank_table.columns
@@ -72,6 +74,9 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     )
     assert {"best_by_spread", "best_by_rank_ic", "pca_maturity_spread_rank"}.issubset(
         residual_rv_benchmark.columns
+    )
+    assert {"mean_reversion_hit_rate", "evidence_label"}.issubset(
+        residual_rv_overview.columns
     )
     assert {"best_representation", "pca_rank", "lagged_rank"}.issubset(winners.columns)
     assert {"mean_balanced_accuracy", "mean_macro_f1", "rank"}.issubset(

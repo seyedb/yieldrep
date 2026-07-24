@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from yieldrep.config import ProjectConfig
@@ -61,8 +62,18 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         index=False,
     )
     residual_mean_reversion_path = None
-    if config.residual_features_path.exists() and config.residual_targets_path.exists():
+    residual_mean_reversion = pd.DataFrame()
+    if config.residual_mean_reversion_table_path.exists():
+        residual_mean_reversion_path = config.residual_mean_reversion_table_path
+        residual_mean_reversion = pd.read_csv(residual_mean_reversion_path)
+    elif config.residual_features_path.exists() and config.residual_targets_path.exists():
         residual_mean_reversion_path = build_residual_mean_reversion_report(config)
+        residual_mean_reversion = pd.read_csv(residual_mean_reversion_path)
+    residual_rv_overview = residual_relative_value_overview(
+        benchmark=residual_rv_benchmark,
+        mean_reversion=residual_mean_reversion,
+    )
+    residual_rv_overview.to_csv(config.residual_relative_value_overview_table_path, index=False)
 
     winners = baseline_winners(rank_table)
     winners.to_csv(config.baseline_winners_table_path, index=False)
@@ -99,6 +110,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.residual_relative_value_rank_ic_coverage_table_path,
         config.residual_relative_value_spread_table_path,
         config.residual_relative_value_benchmark_table_path,
+        config.residual_relative_value_overview_table_path,
         config.baseline_winners_table_path,
         config.volatility_regime_table_path,
         config.volatility_regime_benchmark_table_path,
@@ -108,7 +120,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.baseline_by_maturity_point_top_table_path,
     ]
     if residual_mean_reversion_path is not None:
-        output_paths.insert(6, residual_mean_reversion_path)
+        output_paths.insert(7, residual_mean_reversion_path)
     return output_paths
 
 
@@ -737,6 +749,124 @@ def residual_relative_value_benchmark_summary(
             }
         )
     return pd.DataFrame(rows).loc[:, columns]
+
+
+def residual_relative_value_overview(
+    benchmark: pd.DataFrame,
+    mean_reversion: pd.DataFrame,
+) -> pd.DataFrame:
+    """Combine residual RV ranking and direct mean-reversion evidence."""
+    columns = [
+        "country",
+        "horizon_days",
+        "best_by_spread",
+        "best_spread_score",
+        "best_spread_t_stat",
+        "best_hit_rate",
+        "best_by_rank_ic",
+        "best_rank_ic",
+        "residual_feature_spread_rank",
+        "residual_feature_rank_ic_rank",
+        "mean_reversion_hit_rate",
+        "mean_reversion_score",
+        "mean_reversion_rank_ic",
+        "mean_reversion_dates",
+        "evidence_label",
+    ]
+    if benchmark.empty:
+        return pd.DataFrame(columns=columns)
+
+    overview = benchmark.copy()
+    if not mean_reversion.empty:
+        overview = overview.merge(
+            _mean_reversion_overview(mean_reversion),
+            on=["country", "horizon_days"],
+            how="left",
+        )
+
+    for column in [
+        "mean_reversion_hit_rate",
+        "mean_reversion_score",
+        "mean_reversion_rank_ic",
+        "mean_reversion_dates",
+    ]:
+        if column not in overview.columns:
+            overview[column] = pd.NA
+    overview["evidence_label"] = overview.apply(_residual_rv_evidence_label, axis=1)
+    return (
+        overview.loc[:, columns]
+        .sort_values(["country", "horizon_days"])
+        .reset_index(drop=True)
+    )
+
+
+def _mean_reversion_overview(mean_reversion: pd.DataFrame) -> pd.DataFrame:
+    focused = mean_reversion.loc[
+        (mean_reversion["sample"] == "abs_z_ge_1")
+        & (mean_reversion["signal"] == "residual_z_252")
+    ].copy()
+    if focused.empty:
+        return pd.DataFrame(
+            columns=[
+                "country",
+                "horizon_days",
+                "mean_reversion_hit_rate",
+                "mean_reversion_score",
+                "mean_reversion_rank_ic",
+                "mean_reversion_dates",
+            ]
+        )
+
+    rows: list[dict[str, object]] = []
+    for group_values, group in focused.groupby(["country", "horizon_days"], sort=True):
+        country, horizon_days = group_values
+        rows.append(
+            {
+                "country": country,
+                "horizon_days": horizon_days,
+                "mean_reversion_hit_rate": _weighted_mean(
+                    group["convergence_hit_rate"],
+                    group["rows"],
+                ),
+                "mean_reversion_score": _weighted_mean(
+                    group["mean_convergence_score"],
+                    group["rows"],
+                ),
+                "mean_reversion_rank_ic": _weighted_mean(
+                    group["mean_rank_ic"],
+                    group["rank_ic_dates"],
+                ),
+                "mean_reversion_dates": int(group["dates"].max()),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _weighted_mean(values: pd.Series, weights: pd.Series) -> float:
+    valid = values.notna() & weights.notna() & (weights > 0)
+    if not valid.any():
+        return float("nan")
+    return float(np.average(values.loc[valid].to_numpy(dtype=float), weights=weights.loc[valid]))
+
+
+def _residual_rv_evidence_label(row: pd.Series) -> str:
+    hit_rate = row.get("mean_reversion_hit_rate")
+    spread_score = row.get("best_spread_score")
+    rank_ic = row.get("best_rank_ic")
+    horizon = int(row["horizon_days"])
+    has_positive_ranking = (
+        pd.notna(spread_score)
+        and pd.notna(rank_ic)
+        and float(spread_score) > 0.0
+        and float(rank_ic) > 0.0
+    )
+    if pd.notna(hit_rate) and float(hit_rate) >= 0.57 and has_positive_ranking:
+        return "moderate_positive_20d" if horizon >= 20 else "moderate_positive"
+    if pd.notna(hit_rate) and float(hit_rate) >= 0.52 and has_positive_ranking:
+        return "weak_positive"
+    if has_positive_ranking:
+        return "ranking_positive"
+    return "mixed"
 
 
 def _group_for_key(data: pd.DataFrame, country: str, horizon_days: int) -> pd.DataFrame:

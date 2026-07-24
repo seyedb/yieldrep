@@ -93,6 +93,9 @@ def test_load_config_reads_project_paths() -> None:
     assert config.residual_relative_value_benchmark_table_path == Path(
         "reports/tables/residual_relative_value_benchmark.csv"
     )
+    assert config.residual_relative_value_overview_table_path == Path(
+        "reports/tables/residual_relative_value_overview.csv"
+    )
     assert config.residual_mean_reversion_table_path == Path(
         "reports/tables/residual_mean_reversion.csv"
     )

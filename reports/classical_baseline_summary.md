@@ -41,6 +41,9 @@ The direct Nelson-Siegel residual mean-reversion diagnostic is now tracked
 separately. It checks whether positive residuals tend to fall and negative
 residuals tend to rise over the forward horizon.
 
+The concise RV overview table combines the benchmark winner, spread score, rank
+IC, and direct residual mean-reversion evidence by country and horizon.
+
 The maturity-aware PCA, Nelson-Siegel, and curve baselines produce valid
 cross-sectional RV metrics, which makes the comparison more structurally fair
 than using curve-level factors alone. They do not currently outperform the

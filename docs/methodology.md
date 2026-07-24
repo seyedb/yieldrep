@@ -628,7 +628,14 @@ IC_t
 This metric is included because relative-value research often cares about
 cross-sectional ordering more than pooled point forecast error.
 
-For residual relative value, the main report is:
+For residual relative value, the main overview report is:
+
+```text
+reports/tables/residual_relative_value_overview.csv
+```
+
+It combines the best RV ranking benchmark with the direct Nelson-Siegel residual
+mean-reversion diagnostic. The detailed spread-score report is:
 
 ```text
 reports/tables/residual_relative_value_spread.csv
