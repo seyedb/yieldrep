@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.express as px
 
 from yieldrep.config import ProjectConfig
+from yieldrep.visualization.plotly_residual_rv import plot_residual_zscores
 
 
 def plot_baseline_metrics(config: ProjectConfig) -> list[Path]:
@@ -27,6 +28,8 @@ def plot_baseline_metrics(config: ProjectConfig) -> list[Path]:
 
     output_paths = [summary_path, bucket_path, point_path]
     output_paths.extend(_plot_supervised_metrics(config))
+    if config.residual_features_path.exists():
+        output_paths.extend(plot_residual_zscores(config))
     return output_paths
 
 

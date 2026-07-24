@@ -8,6 +8,7 @@ from yieldrep.config import ProjectConfig
 from yieldrep.evaluation.datasets import (
     make_supervised_feature_dataset,
 )
+from yieldrep.evaluation.residual_rv import build_residual_mean_reversion_report
 from yieldrep.models.baselines import evaluate_baseline_frames
 from yieldrep.models.forecasting import (
     TargetFrameSpec,
@@ -59,6 +60,9 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.residual_relative_value_benchmark_table_path,
         index=False,
     )
+    residual_mean_reversion_path = None
+    if config.residual_features_path.exists() and config.residual_targets_path.exists():
+        residual_mean_reversion_path = build_residual_mean_reversion_report(config)
 
     winners = baseline_winners(rank_table)
     winners.to_csv(config.baseline_winners_table_path, index=False)
@@ -88,7 +92,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
     )
     maturity_point_top.to_csv(config.baseline_by_maturity_point_top_table_path, index=False)
 
-    return [
+    output_paths = [
         config.baseline_summary_table_path,
         config.baseline_rank_table_path,
         config.residual_relative_value_rank_ic_table_path,
@@ -103,6 +107,9 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.residual_relative_value_table_path,
         config.baseline_by_maturity_point_top_table_path,
     ]
+    if residual_mean_reversion_path is not None:
+        output_paths.insert(6, residual_mean_reversion_path)
+    return output_paths
 
 
 def build_overlap_sensitivity_report(config: ProjectConfig) -> Path:

@@ -266,6 +266,27 @@ e_t^{(c,m)}
 This is the current relative-value target. It is more aligned with curve
 representation research than outright yield-change prediction.
 
+The direct residual mean-reversion diagnostic asks whether the current residual
+predicts movement back toward the fitted curve:
+
+```math
+C_{t,h}^{(c,m)}
+=
+-
+\mathrm{sign}
+\left(
+e_t^{(c,m)}
+\right)
+\left(
+e_{t+h}^{(c,m)}
+-
+e_t^{(c,m)}
+\right)
+```
+
+A positive value means the residual moved in the opposite direction from its
+current sign. This is a simple rich/cheap diagnostic, not a tradable spread PnL.
+
 ### Volatility Change
 
 Realized volatility is estimated from rolling yield changes:
@@ -459,7 +480,7 @@ The current metric hierarchy is:
 | Task | Primary metric | Secondary metric | Context metrics |
 | --- | --- | --- | --- |
 | Curve reconstruction | RMSE / MAE | PCA explained variance | maturity-level reconstruction error |
-| Residual relative value | residual RV spread score | cross-sectional rank IC | RMSE, MAE, directional accuracy |
+| Residual relative value | residual RV spread score | cross-sectional rank IC | mean-reversion hit rate, RMSE, MAE |
 | Outright yield-change forecasting | RMSE / MAE | directional accuracy | rank IC where valid |
 | Volatility-regime classification | balanced accuracy / macro F1 | accuracy | class support |
 | Curve-state classification | balanced accuracy / macro F1 | accuracy | class support |
@@ -502,6 +523,10 @@ Cross-sectional rank IC is the secondary residual RV metric. RMSE and MAE remain
 useful context, but they are not headline metrics for this task because an RV
 workflow often cares more about ordering maturities than minimizing pooled
 basis-point error.
+
+The residual mean-reversion table reports convergence scores and hit rates for
+raw residuals and rolling residual z-scores. This is used as an interpretable
+sanity check before treating richer representation models as RV signals.
 
 Volatility-regime classification is evaluated separately with classification
 metrics from the baseline classifier output.

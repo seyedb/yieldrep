@@ -12,7 +12,7 @@ Current evaluation covers:
 - curve-shape, carry/roll-down, lagged, residual-dynamic, and state-maturity
   linear baselines
 - curve reconstruction metrics
-- residual relative-value ranking metrics
+- residual relative-value ranking and mean-reversion diagnostics
 - curve-level volatility-regime classification
 - PCA-defined curve-state classification
 - cross-market representation diagnostics
@@ -25,17 +25,21 @@ The current primary metrics are:
 | Task | Primary metric | Secondary/context metrics |
 | --- | --- | --- |
 | Curve reconstruction | RMSE / MAE | PCA explained variance |
-| Residual relative value | residual RV spread score | rank IC, RMSE, MAE |
+| Residual relative value | residual RV spread score | rank IC, convergence hit rate |
 | Outright yield-change forecasting | RMSE / MAE | directional accuracy |
 | Volatility regime classification | balanced accuracy / macro F1 | accuracy |
 
 ## Headline Results
 
 For residual relative value, `residual_feature / ridge` is currently the best
-classical baseline across both countries and all tested horizons by:
+classical baseline across the evaluated markets and horizons by:
 
 - residual RV spread score
 - cross-sectional rank IC
+
+The direct Nelson-Siegel residual mean-reversion diagnostic is now tracked
+separately. It checks whether positive residuals tend to fall and negative
+residuals tend to rise over the forward horizon.
 
 The maturity-aware PCA, Nelson-Siegel, and curve baselines produce valid
 cross-sectional RV metrics, which makes the comparison more structurally fair
@@ -81,6 +85,6 @@ are not yet included.
 
 ## Next Step
 
-The next research step should review the volatility-regime results and decide
-whether to strengthen classical state features, visualize state transitions, or
-add macro and policy-rate context before moving to learned representations.
+The next research step should use the residual mean-reversion and RV ranking
+tables to decide which relative-value protocol is stable enough to become the
+main benchmark before adding learned representations.

@@ -243,6 +243,14 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "residual_relative_value_benchmark.csv"
 
     @property
+    def residual_mean_reversion_table_path(self) -> Path:
+        return self.tables_dir / "residual_mean_reversion.csv"
+
+    @property
+    def residual_zscores_figure_path(self) -> Path:
+        return self.figures_dir / "residual_zscores.html"
+
+    @property
     def baseline_by_maturity_point_top_table_path(self) -> Path:
         return self.tables_dir / "baseline_by_maturity_point_top.csv"
 
