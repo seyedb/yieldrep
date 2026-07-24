@@ -158,6 +158,29 @@ p_t^{(c)}
 
 These are macro-policy context features, not learned representations.
 
+### Market-Volatility Regimes
+
+Market-volatility indicators add broad risk-regime context without becoming a
+large macro feature set. The current indicators are VIX and MOVE. VIX proxies
+equity volatility; MOVE is the more directly rates-volatility proxy.
+
+Each indicator is normalized to:
+
+```text
+date, indicator, value, source
+```
+
+Low, medium, and high regimes are assigned with expanding historical terciles.
+At date \(t\), the thresholds use only indicator observations available before
+that date:
+
+```math
+q_{1/3,t}^{(j)}, q_{2/3,t}^{(j)}
+```
+
+These regimes are used as conditioning variables for relative-value
+diagnostics, not as standalone trading signals.
+
 ### Lagged And Residual Features
 
 Lagged yield-change features are included as a simple autoregressive hurdle:
@@ -668,6 +691,12 @@ reports/tables/cross_market_summary.csv
 reports/figures/cross_market_pca_loadings.html
 ```
 
+Market-volatility conditioning for residual relative value is reported in:
+
+```text
+reports/tables/residual_rv_by_market_regime.csv
+```
+
 ## Current Scope
 
 Included now:
@@ -677,6 +706,7 @@ Included now:
 - PCA and Nelson-Siegel curve representations
 - engineered slope, curvature, carry, roll-down, lagged, and residual features
 - policy-rate level, change, and curve-policy spread features
+- VIX and MOVE market-volatility regimes for residual RV conditioning
 - reconstruction evaluation
 - classical supervised forecasting baselines
 - residual RV ranking metrics for maturity-level feature sets
@@ -692,7 +722,7 @@ Not included yet:
 - claim of tradable alpha or state-of-the-art forecasting performance
 - bond-level total return targets
 - transaction costs, RFQ execution constraints, or backtesting
-- inflation, unemployment, VIX, MOVE, or broader macro feature sets
+- inflation, unemployment, or broader macro feature sets
 
 ## Current Limitations
 

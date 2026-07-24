@@ -12,6 +12,8 @@ def test_load_config_reads_project_paths() -> None:
     assert config.curves_path == Path("data/processed/curves.parquet")
     assert config.policy_rates_path == Path("data/processed/policy_rates.parquet")
     assert config.policy_features_path == Path("data/processed/policy_features.parquet")
+    assert config.market_indicators_path == Path("data/processed/market_indicators.parquet")
+    assert config.market_regimes_path == Path("data/processed/market_regimes.parquet")
     assert config.pca_dir == Path("data/processed/pca")
     assert config.nelson_siegel_dir == Path("data/processed/nelson_siegel")
     assert config.targets_path == Path("data/processed/targets.parquet")
@@ -96,6 +98,9 @@ def test_load_config_reads_project_paths() -> None:
     assert config.residual_relative_value_overview_table_path == Path(
         "reports/tables/residual_relative_value_overview.csv"
     )
+    assert config.residual_rv_by_market_regime_table_path == Path(
+        "reports/tables/residual_rv_by_market_regime.csv"
+    )
     assert config.residual_mean_reversion_table_path == Path(
         "reports/tables/residual_mean_reversion.csv"
     )
@@ -146,6 +151,9 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.policy_rates["fed_funds"].country == "US"
     assert config.policy_rates["boc_target_overnight"].country == "CA"
     assert config.policy_rates["ecb_deposit_facility"].country == "EA"
+    assert set(config.market_indicators) == {"vix", "move"}
+    assert config.market_indicators["vix"].source == "fred_vixcls"
+    assert config.market_indicators["move"].source == "yahoo_move"
     assert config.pca.n_components == 5
     assert config.pca.min_maturities == 3
     assert config.nelson_siegel.tau == 1.5

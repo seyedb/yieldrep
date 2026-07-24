@@ -18,6 +18,11 @@ def ingest_policy_rates(config: ProjectConfig, overwrite: bool = False) -> list[
     return _ingest_configured_sources(config.policy_rates, overwrite=overwrite)
 
 
+def ingest_market_indicators(config: ProjectConfig, overwrite: bool = False) -> list[Path]:
+    """Download configured market-indicator source files into local raw data paths."""
+    return _ingest_configured_sources(config.market_indicators, overwrite=overwrite)
+
+
 def _ingest_configured_sources(
     sources: dict[str, SourceConfig],
     overwrite: bool,

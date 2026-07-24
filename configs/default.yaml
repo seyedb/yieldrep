@@ -65,3 +65,16 @@ policy_rates:
     source: ecb_deposit_facility
     raw_file: data/raw/policy_ecb_deposit_facility.csv
     url: https://data-api.ecb.europa.eu/service/data/FM/B.U2.EUR.4F.KR.DFR.LEV?format=csvdata
+
+market_indicators:
+  vix:
+    country: GLOBAL
+    source: fred_vixcls
+    raw_file: data/raw/market_vixcls.csv
+    url: https://fred.stlouisfed.org/graph/fredgraph.csv?id=VIXCLS
+
+  move:
+    country: GLOBAL
+    source: yahoo_move
+    raw_file: data/raw/market_move.json
+    url: https://query1.finance.yahoo.com/v8/finance/chart/%5EMOVE?period1=1037111400&period2=1893456000&interval=1d

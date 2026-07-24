@@ -23,6 +23,18 @@ SUMMARY_COLUMNS = [
     "mean_rank_ic",
     "rank_ic_dates",
 ]
+REGIME_SUMMARY_COLUMNS = [
+    "indicator",
+    "market_vol_regime",
+    "country",
+    "horizon_days",
+    "rows",
+    "dates",
+    "mean_convergence_score",
+    "convergence_hit_rate",
+    "mean_rank_ic",
+    "rank_ic_dates",
+]
 
 
 def build_residual_mean_reversion_report(config: ProjectConfig) -> Path:
@@ -34,6 +46,18 @@ def build_residual_mean_reversion_report(config: ProjectConfig) -> Path:
     config.tables_dir.mkdir(parents=True, exist_ok=True)
     report.to_csv(config.residual_mean_reversion_table_path, index=False)
     return config.residual_mean_reversion_table_path
+
+
+def build_residual_rv_by_market_regime_report(config: ProjectConfig) -> Path:
+    """Summarize residual mean reversion conditional on VIX/MOVE regimes."""
+    features = pd.read_parquet(config.residual_features_path)
+    targets = pd.read_parquet(config.residual_targets_path)
+    regimes = pd.read_parquet(config.market_regimes_path)
+    report = residual_rv_by_market_regime_summary(features, targets, regimes)
+
+    config.tables_dir.mkdir(parents=True, exist_ok=True)
+    report.to_csv(config.residual_rv_by_market_regime_table_path, index=False)
+    return config.residual_rv_by_market_regime_table_path
 
 
 def residual_mean_reversion_summary(
@@ -69,6 +93,51 @@ def residual_mean_reversion_summary(
     )
 
 
+def residual_rv_by_market_regime_summary(
+    features: pd.DataFrame,
+    targets: pd.DataFrame,
+    market_regimes: pd.DataFrame,
+    z_threshold: float = 1.0,
+) -> pd.DataFrame:
+    """Split direct residual mean reversion by market-volatility regime."""
+    data = _merge_residual_data(features, targets)
+    data = data.dropna(subset=["residual_z_252", "target_residual_change"])
+    data = data.loc[data["residual_z_252"].abs() >= z_threshold].copy()
+    if data.empty or market_regimes.empty:
+        return pd.DataFrame(columns=REGIME_SUMMARY_COLUMNS)
+
+    data = _attach_market_regimes(data, market_regimes)
+    if data.empty:
+        return pd.DataFrame(columns=REGIME_SUMMARY_COLUMNS)
+
+    rows: list[dict[str, object]] = []
+    group_columns = ["indicator", "market_vol_regime", "country", "horizon_days"]
+    for group_values, group in data.groupby(group_columns, sort=True):
+        signal_values = group["residual_z_252"].to_numpy(dtype=float)
+        target_values = group["target_residual_change"].to_numpy(dtype=float)
+        convergence_score = -np.sign(signal_values) * target_values
+        rank_ic = _rank_ic(group, "residual_z_252")
+        rows.append(
+            {
+                **dict(zip(group_columns, group_values, strict=True)),
+                "rows": len(group),
+                "dates": group["date"].nunique(),
+                "mean_convergence_score": float(np.mean(convergence_score)),
+                "convergence_hit_rate": float(np.mean(convergence_score > 0.0)),
+                "mean_rank_ic": rank_ic["mean_rank_ic"],
+                "rank_ic_dates": rank_ic["rank_ic_dates"],
+            }
+        )
+    if not rows:
+        return pd.DataFrame(columns=REGIME_SUMMARY_COLUMNS)
+    return (
+        pd.DataFrame(rows)
+        .loc[:, REGIME_SUMMARY_COLUMNS]
+        .sort_values(["indicator", "country", "horizon_days", "market_vol_regime"])
+        .reset_index(drop=True)
+    )
+
+
 def _merge_residual_data(features: pd.DataFrame, targets: pd.DataFrame) -> pd.DataFrame:
     feature_columns = [*KEY_COLUMNS, "residual", "residual_z_252"]
     target_columns = [*KEY_COLUMNS, "horizon_days", "target_residual_change"]
@@ -80,6 +149,27 @@ def _merge_residual_data(features: pd.DataFrame, targets: pd.DataFrame) -> pd.Da
     data["date"] = pd.to_datetime(data["date"])
     data["maturity_bucket"] = _maturity_bucket(data["maturity_years"])
     return data
+
+
+def _attach_market_regimes(data: pd.DataFrame, market_regimes: pd.DataFrame) -> pd.DataFrame:
+    regime_columns = ["date", "indicator", "market_vol_regime"]
+    regimes = market_regimes.loc[:, regime_columns].copy()
+    regimes["date"] = pd.to_datetime(regimes["date"])
+    regimes = regimes.dropna(subset=["market_vol_regime"])
+
+    frames: list[pd.DataFrame] = []
+    for indicator, indicator_regimes in regimes.groupby("indicator", sort=True):
+        aligned = pd.merge_asof(
+            data.sort_values("date"),
+            indicator_regimes.sort_values("date"),
+            on="date",
+            direction="backward",
+        )
+        aligned["indicator"] = indicator
+        frames.append(aligned.dropna(subset=["market_vol_regime"]))
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
 
 
 def _summary_rows(data: pd.DataFrame, signal: str, sample: str) -> list[dict[str, object]]:

@@ -3,7 +3,8 @@ from pathlib import Path
 import typer
 
 from yieldrep.config import ProjectConfig, load_config
-from yieldrep.data.ingest import ingest_policy_rates, ingest_sources
+from yieldrep.data.ingest import ingest_market_indicators, ingest_policy_rates, ingest_sources
+from yieldrep.data.market_indicators import build_market_indicators, build_market_regimes
 from yieldrep.data.normalize import build_curves_parquet
 from yieldrep.data.policy_rates import build_policy_rates
 from yieldrep.evaluation.datasets import build_modeling_datasets
@@ -65,6 +66,17 @@ def ingest_policy_rates_command(
         typer.echo(raw_path)
 
 
+@app.command("ingest-market-indicators")
+def ingest_market_indicators_command(
+    config: Path = Path("configs/default.yaml"),
+    overwrite: bool = False,
+) -> None:
+    """Download configured market-indicator source files."""
+    project_config = load_config(config)
+    for raw_path in ingest_market_indicators(project_config, overwrite=overwrite):
+        typer.echo(raw_path)
+
+
 @app.command()
 def normalize(config: Path = Path("configs/default.yaml")) -> None:
     """Build normalized yield curve parquet from local raw files."""
@@ -78,6 +90,14 @@ def build_policy_rates_command(config: Path = Path("configs/default.yaml")) -> N
     """Build normalized policy-rate parquet from local raw files."""
     project_config = load_config(config)
     typer.echo(build_policy_rates(project_config))
+
+
+@app.command("build-market-regimes")
+def build_market_regimes_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Build normalized market indicators and expanding-tercile regimes."""
+    project_config = load_config(config)
+    typer.echo(build_market_indicators(project_config))
+    typer.echo(build_market_regimes(project_config))
 
 
 @app.command("build-pca")
@@ -274,6 +294,9 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     if project_config.policy_rates:
         output_paths.append(build_policy_rates(project_config))
         output_paths.append(build_policy_features(project_config))
+    if project_config.market_indicators:
+        output_paths.append(build_market_indicators(project_config))
+        output_paths.append(build_market_regimes(project_config))
     output_paths.append(build_targets(project_config))
     output_paths.append(build_standardized_targets(project_config))
     output_paths.append(build_residual_targets(project_config))
