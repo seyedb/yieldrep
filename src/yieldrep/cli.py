@@ -3,7 +3,13 @@ from pathlib import Path
 import typer
 
 from yieldrep.config import ProjectConfig, load_config
-from yieldrep.data.ingest import ingest_market_indicators, ingest_policy_rates, ingest_sources
+from yieldrep.data.ingest import (
+    ingest_macro_indicators,
+    ingest_market_indicators,
+    ingest_policy_rates,
+    ingest_sources,
+)
+from yieldrep.data.macro_indicators import build_macro_indicators, build_macro_regimes
 from yieldrep.data.market_indicators import build_market_indicators, build_market_regimes
 from yieldrep.data.normalize import build_curves_parquet
 from yieldrep.data.policy_rates import build_policy_rates
@@ -77,6 +83,17 @@ def ingest_market_indicators_command(
         typer.echo(raw_path)
 
 
+@app.command("ingest-macro-indicators")
+def ingest_macro_indicators_command(
+    config: Path = Path("configs/default.yaml"),
+    overwrite: bool = False,
+) -> None:
+    """Download configured macro-indicator source files."""
+    project_config = load_config(config)
+    for raw_path in ingest_macro_indicators(project_config, overwrite=overwrite):
+        typer.echo(raw_path)
+
+
 @app.command()
 def normalize(config: Path = Path("configs/default.yaml")) -> None:
     """Build normalized yield curve parquet from local raw files."""
@@ -98,6 +115,14 @@ def build_market_regimes_command(config: Path = Path("configs/default.yaml")) ->
     project_config = load_config(config)
     typer.echo(build_market_indicators(project_config))
     typer.echo(build_market_regimes(project_config))
+
+
+@app.command("build-macro-regimes")
+def build_macro_regimes_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Build normalized macro indicators and expanding-tercile regimes."""
+    project_config = load_config(config)
+    typer.echo(build_macro_indicators(project_config))
+    typer.echo(build_macro_regimes(project_config))
 
 
 @app.command("build-pca")
@@ -297,6 +322,9 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     if project_config.market_indicators:
         output_paths.append(build_market_indicators(project_config))
         output_paths.append(build_market_regimes(project_config))
+    if project_config.macro_indicators:
+        output_paths.append(build_macro_indicators(project_config))
+        output_paths.append(build_macro_regimes(project_config))
     output_paths.append(build_targets(project_config))
     output_paths.append(build_standardized_targets(project_config))
     output_paths.append(build_residual_targets(project_config))

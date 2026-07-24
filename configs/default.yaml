@@ -78,3 +78,34 @@ market_indicators:
     source: yahoo_move
     raw_file: data/raw/market_move.json
     url: https://query1.finance.yahoo.com/v8/finance/chart/%5EMOVE?period1=1037111400&period2=1893456000&interval=1d
+
+macro_indicators:
+  us_inflation:
+    country: US
+    source: fred_cpi_index_yoy
+    raw_file: data/raw/macro_us_cpi.csv
+    url: https://fred.stlouisfed.org/graph/fredgraph.csv?id=CPIAUCSL
+
+  us_unemployment:
+    country: US
+    source: fred_unemployment_rate
+    raw_file: data/raw/macro_us_unrate.csv
+    url: https://fred.stlouisfed.org/graph/fredgraph.csv?id=UNRATE
+
+  ca_inflation:
+    country: CA
+    source: fred_inflation_yoy
+    raw_file: data/raw/macro_ca_inflation.csv
+    url: https://fred.stlouisfed.org/graph/fredgraph.csv?id=CPALTT01CAM659N
+
+  ca_unemployment:
+    country: CA
+    source: fred_unemployment_rate
+    raw_file: data/raw/macro_ca_unemployment.csv
+    url: https://fred.stlouisfed.org/graph/fredgraph.csv?id=LRHUTTTTCAM156S
+
+  ea_inflation:
+    country: EA
+    source: fred_hicp_index_yoy
+    raw_file: data/raw/macro_ea_hicp.csv
+    url: https://fred.stlouisfed.org/graph/fredgraph.csv?id=CP0000EZ19M086NEST

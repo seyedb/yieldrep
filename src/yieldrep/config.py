@@ -57,6 +57,7 @@ class ProjectConfig(BaseModel):
     sources: dict[str, SourceConfig]
     policy_rates: dict[str, SourceConfig] = Field(default_factory=dict)
     market_indicators: dict[str, SourceConfig] = Field(default_factory=dict)
+    macro_indicators: dict[str, SourceConfig] = Field(default_factory=dict)
     pca: PCAConfig = Field(default_factory=PCAConfig)
     nelson_siegel: NelsonSiegelConfig = Field(default_factory=NelsonSiegelConfig)
     targets: TargetConfig = Field(default_factory=TargetConfig)
@@ -102,6 +103,14 @@ class ProjectConfig(BaseModel):
     @property
     def market_regimes_path(self) -> Path:
         return self.processed_dir / "market_regimes.parquet"
+
+    @property
+    def macro_indicators_path(self) -> Path:
+        return self.processed_dir / "macro_indicators.parquet"
+
+    @property
+    def macro_regimes_path(self) -> Path:
+        return self.processed_dir / "macro_regimes.parquet"
 
     @property
     def pca_dir(self) -> Path:
@@ -258,6 +267,10 @@ class ProjectConfig(BaseModel):
     @property
     def residual_rv_by_market_regime_table_path(self) -> Path:
         return self.tables_dir / "residual_rv_by_market_regime.csv"
+
+    @property
+    def market_regime_rv_summary_table_path(self) -> Path:
+        return self.tables_dir / "market_regime_rv_summary.csv"
 
     @property
     def residual_mean_reversion_table_path(self) -> Path:

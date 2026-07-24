@@ -14,6 +14,7 @@ Current evaluation covers:
 - curve reconstruction metrics
 - residual relative-value ranking and mean-reversion diagnostics
 - VIX and MOVE market-volatility regime conditioning for residual RV
+- inflation and unemployment macro-regime data
 - curve-level volatility-regime classification
 - PCA-defined curve-state classification
 - cross-market representation diagnostics
@@ -48,6 +49,10 @@ IC, and direct residual mean-reversion evidence by country and horizon.
 Market-volatility conditioning now splits residual mean-reversion diagnostics by
 VIX and MOVE regimes. MOVE is the more directly rates-relevant conditioning
 variable.
+
+The compact market-regime RV summary shows the clearest high-volatility
+differentiation in MOVE regimes, especially for US residual RV at 5d and 20d and
+Canada at 20d.
 
 The maturity-aware PCA, Nelson-Siegel, and curve baselines produce valid
 cross-sectional RV metrics, which makes the comparison more structurally fair
@@ -88,7 +93,9 @@ not include duration-neutral construction, transaction costs, liquidity,
 financing, or execution constraints.
 
 The euro-area ECB source is an aggregate all-issuers curve, not a single
-sovereign issuer. Inflation and labor-market data are not yet included.
+sovereign issuer. Euro-area unemployment is not yet included because the simple
+FRED/OECD euro-area unemployment endpoint is stale relative to the current
+sample.
 
 ## Next Step
 

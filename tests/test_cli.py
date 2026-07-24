@@ -157,6 +157,13 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
                 raw_file=tmp_path / "vix.csv",
             )
         },
+        macro_indicators={
+            "us_unemployment": SourceConfig(
+                country="US",
+                source="fred_unemployment_rate",
+                raw_file=tmp_path / "unrate.csv",
+            )
+        },
     )
 
     def single_step(name: str):
@@ -183,6 +190,8 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr(cli, "build_policy_features", single_step("build_policy_features"))
     monkeypatch.setattr(cli, "build_market_indicators", single_step("build_market_indicators"))
     monkeypatch.setattr(cli, "build_market_regimes", single_step("build_market_regimes"))
+    monkeypatch.setattr(cli, "build_macro_indicators", single_step("build_macro_indicators"))
+    monkeypatch.setattr(cli, "build_macro_regimes", single_step("build_macro_regimes"))
     monkeypatch.setattr(cli, "build_targets", single_step("build_targets"))
     monkeypatch.setattr(cli, "build_standardized_targets", single_step("build_standardized_targets"))
     monkeypatch.setattr(cli, "build_residual_targets", single_step("build_residual_targets"))
@@ -210,6 +219,8 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_policy_features",
         "build_market_indicators",
         "build_market_regimes",
+        "build_macro_indicators",
+        "build_macro_regimes",
         "build_targets",
         "build_standardized_targets",
         "build_residual_targets",

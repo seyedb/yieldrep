@@ -82,6 +82,16 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         and config.market_regimes_path.exists()
     ):
         residual_rv_by_market_regime_path = build_residual_rv_by_market_regime_report(config)
+    market_regime_rv_summary_path = None
+    if config.residual_rv_by_market_regime_table_path.exists():
+        market_regime_rv_summary = market_regime_rv_summary_table(
+            pd.read_csv(config.residual_rv_by_market_regime_table_path)
+        )
+        market_regime_rv_summary.to_csv(
+            config.market_regime_rv_summary_table_path,
+            index=False,
+        )
+        market_regime_rv_summary_path = config.market_regime_rv_summary_table_path
 
     winners = baseline_winners(rank_table)
     winners.to_csv(config.baseline_winners_table_path, index=False)
@@ -131,6 +141,8 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         output_paths.insert(7, residual_mean_reversion_path)
     if residual_rv_by_market_regime_path is not None:
         output_paths.insert(8, residual_rv_by_market_regime_path)
+    if market_regime_rv_summary_path is not None:
+        output_paths.insert(9, market_regime_rv_summary_path)
     return output_paths
 
 
@@ -877,6 +889,81 @@ def _residual_rv_evidence_label(row: pd.Series) -> str:
     if has_positive_ranking:
         return "ranking_positive"
     return "mixed"
+
+
+def market_regime_rv_summary_table(regime_summary: pd.DataFrame) -> pd.DataFrame:
+    """Summarize high/low market-regime differences in residual RV diagnostics."""
+    columns = [
+        "indicator",
+        "country",
+        "horizon_days",
+        "best_regime",
+        "best_hit_rate",
+        "worst_regime",
+        "worst_hit_rate",
+        "high_minus_low_hit_rate",
+        "high_minus_low_rank_ic",
+        "interpretation",
+    ]
+    if regime_summary.empty:
+        return pd.DataFrame(columns=columns)
+
+    rows: list[dict[str, object]] = []
+    for group_values, group in regime_summary.groupby(
+        ["indicator", "country", "horizon_days"],
+        sort=True,
+    ):
+        indicator, country, horizon_days = group_values
+        best = group.sort_values(
+            ["convergence_hit_rate", "mean_rank_ic", "market_vol_regime"],
+            ascending=[False, False, True],
+        ).iloc[0]
+        worst = group.sort_values(
+            ["convergence_hit_rate", "mean_rank_ic", "market_vol_regime"],
+            ascending=[True, True, True],
+        ).iloc[0]
+        high = _regime_row(group, "high")
+        low = _regime_row(group, "low")
+        high_minus_low_hit = _difference(high, low, "convergence_hit_rate")
+        high_minus_low_rank_ic = _difference(high, low, "mean_rank_ic")
+        rows.append(
+            {
+                "indicator": indicator,
+                "country": country,
+                "horizon_days": horizon_days,
+                "best_regime": best["market_vol_regime"],
+                "best_hit_rate": best["convergence_hit_rate"],
+                "worst_regime": worst["market_vol_regime"],
+                "worst_hit_rate": worst["convergence_hit_rate"],
+                "high_minus_low_hit_rate": high_minus_low_hit,
+                "high_minus_low_rank_ic": high_minus_low_rank_ic,
+                "interpretation": _market_regime_interpretation(high_minus_low_hit),
+            }
+        )
+    return pd.DataFrame(rows).loc[:, columns]
+
+
+def _regime_row(group: pd.DataFrame, regime: str) -> pd.Series | None:
+    rows = group.loc[group["market_vol_regime"] == regime]
+    if rows.empty:
+        return None
+    return rows.iloc[0]
+
+
+def _difference(left: pd.Series | None, right: pd.Series | None, column: str) -> float | None:
+    if left is None or right is None:
+        return None
+    return float(left[column] - right[column])
+
+
+def _market_regime_interpretation(high_minus_low_hit_rate: float | None) -> str:
+    if high_minus_low_hit_rate is None:
+        return "insufficient_regime_coverage"
+    if high_minus_low_hit_rate >= 0.03:
+        return "stronger_in_high_vol"
+    if high_minus_low_hit_rate <= -0.03:
+        return "stronger_in_low_vol"
+    return "similar_across_regimes"
 
 
 def _group_for_key(data: pd.DataFrame, country: str, horizon_days: int) -> pd.DataFrame:

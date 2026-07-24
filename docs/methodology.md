@@ -181,6 +181,31 @@ q_{1/3,t}^{(j)}, q_{2/3,t}^{(j)}
 These regimes are used as conditioning variables for relative-value
 diagnostics, not as standalone trading signals.
 
+### Macro Regimes
+
+Macro indicators add slower-moving inflation and labor-market context. The
+current macro schema is:
+
+```text
+date, country, indicator, value, source
+```
+
+Current indicators are:
+
+```text
+inflation: US, Canada, euro area
+unemployment: US, Canada
+```
+
+US and euro-area inflation are computed as 12-month percentage changes from CPI
+or HICP index levels. Canada inflation is read directly from a FRED/OECD
+year-over-year inflation series. Unemployment rates are read as monthly
+seasonally adjusted rates where current public sources are available.
+
+Low, medium, and high macro regimes are assigned with expanding historical
+terciles by country and indicator, again using only prior observations for the
+thresholds.
+
 ### Lagged And Residual Features
 
 Lagged yield-change features are included as a simple autoregressive hurdle:
@@ -695,6 +720,7 @@ Market-volatility conditioning for residual relative value is reported in:
 
 ```text
 reports/tables/residual_rv_by_market_regime.csv
+reports/tables/market_regime_rv_summary.csv
 ```
 
 ## Current Scope
@@ -707,6 +733,7 @@ Included now:
 - engineered slope, curvature, carry, roll-down, lagged, and residual features
 - policy-rate level, change, and curve-policy spread features
 - VIX and MOVE market-volatility regimes for residual RV conditioning
+- inflation and unemployment macro regimes where current public sources are configured
 - reconstruction evaluation
 - classical supervised forecasting baselines
 - residual RV ranking metrics for maturity-level feature sets
@@ -722,7 +749,8 @@ Not included yet:
 - claim of tradable alpha or state-of-the-art forecasting performance
 - bond-level total return targets
 - transaction costs, RFQ execution constraints, or backtesting
-- inflation, unemployment, or broader macro feature sets
+- euro-area unemployment regime source
+- broader macro feature sets
 
 ## Current Limitations
 

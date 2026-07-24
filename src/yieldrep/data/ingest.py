@@ -23,6 +23,11 @@ def ingest_market_indicators(config: ProjectConfig, overwrite: bool = False) -> 
     return _ingest_configured_sources(config.market_indicators, overwrite=overwrite)
 
 
+def ingest_macro_indicators(config: ProjectConfig, overwrite: bool = False) -> list[Path]:
+    """Download configured macro-indicator source files into local raw data paths."""
+    return _ingest_configured_sources(config.macro_indicators, overwrite=overwrite)
+
+
 def _ingest_configured_sources(
     sources: dict[str, SourceConfig],
     overwrite: bool,
