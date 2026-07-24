@@ -54,6 +54,9 @@ The compact market-regime RV summary shows the clearest high-volatility
 differentiation in MOVE regimes, especially for US residual RV at 5d and 20d and
 Canada at 20d.
 
+Macro-regime conditioning shows stronger residual mean reversion in high
+inflation and high unemployment regimes, most clearly at the 20-day horizon.
+
 The maturity-aware PCA, Nelson-Siegel, and curve baselines produce valid
 cross-sectional RV metrics, which makes the comparison more structurally fair
 than using curve-level factors alone. They do not currently outperform the

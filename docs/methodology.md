@@ -723,6 +723,12 @@ reports/tables/residual_rv_by_market_regime.csv
 reports/tables/market_regime_rv_summary.csv
 ```
 
+Macro-regime conditioning for residual relative value is reported in:
+
+```text
+reports/tables/residual_rv_by_macro_regime.csv
+```
+
 ## Current Scope
 
 Included now:

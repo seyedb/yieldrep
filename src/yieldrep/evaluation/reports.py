@@ -10,6 +10,7 @@ from yieldrep.evaluation.datasets import (
     make_supervised_feature_dataset,
 )
 from yieldrep.evaluation.residual_rv import build_residual_mean_reversion_report
+from yieldrep.evaluation.residual_rv import build_residual_rv_by_macro_regime_report
 from yieldrep.evaluation.residual_rv import build_residual_rv_by_market_regime_report
 from yieldrep.models.baselines import evaluate_baseline_frames
 from yieldrep.models.forecasting import (
@@ -92,6 +93,13 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
             index=False,
         )
         market_regime_rv_summary_path = config.market_regime_rv_summary_table_path
+    residual_rv_by_macro_regime_path = None
+    if (
+        config.residual_features_path.exists()
+        and config.residual_targets_path.exists()
+        and config.macro_regimes_path.exists()
+    ):
+        residual_rv_by_macro_regime_path = build_residual_rv_by_macro_regime_report(config)
 
     winners = baseline_winners(rank_table)
     winners.to_csv(config.baseline_winners_table_path, index=False)
@@ -143,6 +151,8 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         output_paths.insert(8, residual_rv_by_market_regime_path)
     if market_regime_rv_summary_path is not None:
         output_paths.insert(9, market_regime_rv_summary_path)
+    if residual_rv_by_macro_regime_path is not None:
+        output_paths.insert(10, residual_rv_by_macro_regime_path)
     return output_paths
 
 

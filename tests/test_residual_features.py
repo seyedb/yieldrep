@@ -1,6 +1,9 @@
 import pandas as pd
 
-from yieldrep.evaluation.residual_rv import residual_mean_reversion_summary
+from yieldrep.evaluation.residual_rv import (
+    residual_mean_reversion_summary,
+    residual_rv_by_macro_regime_summary,
+)
 from yieldrep.factors.residual import make_residual_features
 
 
@@ -46,6 +49,44 @@ def test_residual_mean_reversion_summary_measures_convergence() -> None:
     assert not all_residual.empty
     assert all_residual["convergence_hit_rate"].eq(1.0).all()
     assert all_residual["mean_convergence_score"].gt(0.0).all()
+
+
+def test_residual_rv_by_macro_regime_summary_aligns_country_regimes() -> None:
+    features = pd.DataFrame(
+        {
+            "date": pd.date_range("2024-01-01", periods=3).repeat(2),
+            "country": ["US"] * 6,
+            "maturity_years": [2.0, 10.0] * 3,
+            "residual": [1.0, -1.0, 0.8, -0.8, 0.6, -0.6],
+            "residual_z_252": [1.2, -1.2, 1.1, -1.1, 1.0, -1.0],
+        }
+    )
+    targets = pd.DataFrame(
+        {
+            "date": pd.date_range("2024-01-01", periods=3).repeat(2),
+            "country": ["US"] * 6,
+            "maturity_years": [2.0, 10.0] * 3,
+            "horizon_days": [5] * 6,
+            "target_residual_change": [-0.2, 0.2, -0.1, 0.1, -0.05, 0.05],
+        }
+    )
+    regimes = pd.DataFrame(
+        {
+            "date": pd.date_range("2023-12-01", periods=3, freq="MS"),
+            "country": ["US"] * 3,
+            "indicator": ["inflation"] * 3,
+            "value": [2.0, 3.0, 4.0],
+            "macro_regime": ["low", "medium", "high"],
+            "source": ["test"] * 3,
+        }
+    )
+
+    summary = residual_rv_by_macro_regime_summary(features, targets, regimes)
+
+    assert not summary.empty
+    assert set(summary["indicator"]) == {"inflation"}
+    assert set(summary["macro_regime"]).issubset({"low", "medium", "high"})
+    assert summary["convergence_hit_rate"].eq(1.0).all()
 
 
 def _sample_fitted_curves() -> pd.DataFrame:
