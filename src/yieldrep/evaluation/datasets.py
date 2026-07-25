@@ -114,6 +114,7 @@ def make_supervised_feature_dataset(
 
     for features, keys in [
         (_read_pca_features(config), ["date", "country"]),
+        (_read_autoencoder_features(config), ["date", "country"]),
         (_read_nelson_siegel_features(config), ["date", "country"]),
         (_read_curve_features(config), ["date", "country"]),
         (
@@ -153,6 +154,16 @@ def _read_pca_features(config: ProjectConfig) -> pd.DataFrame:
         scores = pd.read_parquet(scores_path)
         scores["country"] = country
         frames.append(scores)
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
+
+
+def _read_autoencoder_features(config: ProjectConfig) -> pd.DataFrame:
+    frames = [
+        pd.read_parquet(embeddings_path).drop(columns=["split"], errors="ignore")
+        for embeddings_path in sorted(config.autoencoder_dir.glob("*_embeddings.parquet"))
+    ]
     if not frames:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True)
@@ -265,6 +276,12 @@ def _build_target_family(
         pca_targets.to_parquet(pca_path, index=False)
         output_paths.append(pca_path)
 
+    autoencoder_targets = _join_autoencoder_targets(config, targets)
+    if not autoencoder_targets.empty:
+        autoencoder_path = config.modeling_dir / f"autoencoder{suffix}_targets.parquet"
+        autoencoder_targets.to_parquet(autoencoder_path, index=False)
+        output_paths.append(autoencoder_path)
+
     nelson_siegel_targets = _join_nelson_siegel_targets(config, targets)
     if not nelson_siegel_targets.empty:
         ns_path = config.modeling_dir / f"nelson_siegel{suffix}_targets.parquet"
@@ -307,6 +324,7 @@ def _build_curve_level_target_family(
 
     for representation, features in [
         ("pca", _read_pca_features(config)),
+        ("autoencoder", _read_autoencoder_features(config)),
         ("nelson_siegel", _read_nelson_siegel_features(config)),
         ("curve", _read_curve_features(config)),
         ("policy", _read_policy_features(config)),
@@ -343,6 +361,18 @@ def _join_pca_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFr
     return _add_state_maturity_features(
         merged,
         state_columns=[f"PC{index}" for index in range(1, config.pca.n_components + 1)],
+    )
+
+
+def _join_autoencoder_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFrame:
+    features = _read_autoencoder_features(config)
+    if features.empty:
+        return pd.DataFrame()
+
+    merged = targets.merge(features, on=["date", "country"], how="inner")
+    return _add_state_maturity_features(
+        merged,
+        state_columns=[f"AE{index}" for index in range(1, config.autoencoder.latent_dim + 1)],
     )
 
 

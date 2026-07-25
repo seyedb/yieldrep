@@ -80,10 +80,12 @@ Policy-rate features currently improve euro-area volatility-regime
 classification for the 1-day and 20-day horizons. For US and Canada, recent
 realized curve volatility remains the stronger hurdle.
 
-The first autoencoder baseline is evaluated only on out-of-sample curve
-reconstruction. PCA-5 remains the strongest reconstruction benchmark overall.
-The autoencoder is competitive with lower-dimensional classical baselines for
-the euro-area curve, but it does not beat PCA-5.
+The first autoencoder baseline is evaluated on out-of-sample curve
+reconstruction and then reused as a learned embedding in the downstream
+forecasting, residual RV, volatility-regime, and curve-state protocols. PCA-5
+remains the strongest reconstruction benchmark overall. The autoencoder is
+competitive with lower-dimensional classical baselines for the euro-area curve,
+but it does not beat PCA-5.
 
 ## Interpretation
 
@@ -91,8 +93,8 @@ PCA and Nelson-Siegel remain useful curve-level representations. They are most
 clearly validated through reconstruction and curve-state summaries.
 
 The autoencoder result is a useful first learned-representation baseline, not a
-win. It establishes the PyTorch pipeline and gives future learned models a clear
-PCA reconstruction hurdle.
+win. It establishes the PyTorch pipeline and gives future learned models clear
+PCA reconstruction and downstream forecasting hurdles.
 
 Residual relative-value ranking is a maturity-level task. In the current
 classical setup, features that directly describe maturity-specific residual
@@ -112,6 +114,6 @@ sample.
 
 ## Next Step
 
-The next research step should evaluate whether autoencoder embeddings add value
-to the established residual RV or regime tasks. That should be done with the
-same conservative evaluation protocol already used for classical baselines.
+The next research step should improve the learned representation protocol
+itself, for example with better regularization, validation-based early stopping,
+or a masked-reconstruction objective, before moving to larger architectures.

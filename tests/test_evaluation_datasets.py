@@ -11,8 +11,10 @@ from yieldrep.evaluation.datasets import build_modeling_datasets, make_lagged_yi
 def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> None:
     processed_dir = tmp_path / "data" / "processed"
     pca_dir = processed_dir / "pca"
+    ae_dir = processed_dir / "autoencoder"
     ns_dir = processed_dir / "nelson_siegel"
     pca_dir.mkdir(parents=True)
+    ae_dir.mkdir(parents=True)
     ns_dir.mkdir(parents=True)
 
     dates = pd.date_range("2024-01-01", periods=2)
@@ -93,6 +95,15 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         {
             "date": dates,
             "country": ["US", "US"],
+            "split": ["train", "test"],
+            "AE1": [0.3, 0.4],
+            "AE2": [-0.1, -0.2],
+        }
+    ).to_parquet(ae_dir / "us_embeddings.parquet", index=False)
+    pd.DataFrame(
+        {
+            "date": dates,
+            "country": ["US", "US"],
             "beta_level": [4.0, 4.1],
             "beta_slope": [-1.0, -0.9],
             "beta_curvature": [0.5, 0.4],
@@ -152,6 +163,7 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
             processed_dir / "modeling" / "supervised_residual_change.parquet",
             processed_dir / "modeling" / "supervised_vol_change.parquet",
             processed_dir / "modeling" / "pca_targets.parquet",
+            processed_dir / "modeling" / "autoencoder_targets.parquet",
             processed_dir / "modeling" / "nelson_siegel_targets.parquet",
             processed_dir / "modeling" / "lagged_targets.parquet",
             processed_dir / "modeling" / "curve_targets.parquet",
@@ -159,17 +171,24 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
             processed_dir / "modeling" / "residual_feature_targets.parquet",
             processed_dir / "modeling" / "pca_standardized_targets.parquet",
             processed_dir / "modeling" / "pca_residual_targets.parquet",
+            processed_dir / "modeling" / "autoencoder_residual_targets.parquet",
             processed_dir / "modeling" / "residual_feature_residual_targets.parquet",
             processed_dir / "modeling" / "pca_vol_targets.parquet",
+            processed_dir / "modeling" / "autoencoder_vol_targets.parquet",
             processed_dir / "modeling" / "residual_feature_vol_targets.parquet",
             processed_dir / "modeling" / "pca_curve_vol_regime_targets.parquet",
+            processed_dir / "modeling" / "autoencoder_curve_vol_regime_targets.parquet",
             processed_dir / "modeling" / "curve_vol_curve_vol_regime_targets.parquet",
             processed_dir / "modeling" / "pca_curve_state_targets.parquet",
+            processed_dir / "modeling" / "autoencoder_curve_state_targets.parquet",
             processed_dir / "modeling" / "nelson_siegel_curve_state_targets.parquet",
             processed_dir / "modeling" / "curve_curve_state_targets.parquet",
         }
     )
     pca_targets = pd.read_parquet(processed_dir / "modeling" / "pca_targets.parquet")
+    autoencoder_targets = pd.read_parquet(
+        processed_dir / "modeling" / "autoencoder_targets.parquet"
+    )
     supervised = pd.read_parquet(processed_dir / "modeling" / "supervised_yield_change.parquet")
     supervised_residual = pd.read_parquet(
         processed_dir / "modeling" / "supervised_residual_change.parquet"
@@ -199,11 +218,13 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         processed_dir / "modeling" / "residual_feature_targets.parquet"
     )
     assert {"PC1", "PC2", "target_yield_change"}.issubset(pca_targets.columns)
+    assert {"AE1", "AE2", "target_yield_change"}.issubset(autoencoder_targets.columns)
     assert {
         "split",
         "split_method",
         "window_id",
         "PC1",
+        "AE1",
         "beta_level",
         "level",
         "carry_3m",
@@ -225,6 +246,7 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         ns_targets.columns
     )
     assert len(pca_targets) == 2
+    assert len(autoencoder_targets) == 2
     assert len(ns_targets) == 2
     assert {"lag_1_change", "target_yield_change"}.issubset(lagged_targets.columns)
     assert len(lagged_targets) == 1

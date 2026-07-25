@@ -374,6 +374,10 @@ def _summarize_metrics(
 def _feature_sets(config: ProjectConfig) -> list[FeatureSet]:
     return [
         FeatureSet("pca", [f"PC{index}" for index in range(1, config.pca.n_components + 1)]),
+        FeatureSet(
+            "autoencoder",
+            [f"AE{index}" for index in range(1, config.autoencoder.latent_dim + 1)],
+        ),
         FeatureSet("nelson_siegel", ["beta_level", "beta_slope", "beta_curvature", "rmse"]),
         FeatureSet(
             "curve",

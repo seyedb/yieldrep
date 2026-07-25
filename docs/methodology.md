@@ -450,16 +450,20 @@ reconstructs curves from the fitted parametric form. The first learned baseline
 is a small PyTorch MLP autoencoder trained only on the chronological train
 split. Its latent dimension is matched to the PCA component count.
 
-The autoencoder is currently evaluated only on out-of-sample reconstruction.
-It is not yet used for forecasting or relative-value prediction. This keeps the
-first learned-representation question narrow:
+The autoencoder is first evaluated on out-of-sample reconstruction:
 
 ```text
 does a nonlinear latent curve representation reconstruct held-out curves better
 than PCA or Nelson-Siegel?
 ```
 
-This is currently the cleanest representation-quality benchmark in the project.
+Its learned embeddings are then passed through the same downstream protocols as
+the classical curve-level representations: outright yield-change forecasting,
+standardized yield-change forecasting, residual-change forecasting, volatility
+change forecasting, curve-volatility regime classification, and PCA state
+classification. For residual relative value, maturity-interacted autoencoder
+features are evaluated alongside the maturity-aware PCA and Nelson-Siegel
+variants.
 
 ### Supervised Forecasting
 
@@ -746,7 +750,7 @@ Included now:
 - public US, Canada, and euro-area zero-coupon curve data
 - normalized long-format curve schema
 - PCA and Nelson-Siegel curve representations
-- PyTorch autoencoder reconstruction baseline
+- PyTorch autoencoder reconstruction baseline and downstream embedding benchmark
 - engineered slope, curvature, carry, roll-down, lagged, and residual features
 - policy-rate level, change, and curve-policy spread features
 - VIX and MOVE market-volatility regimes for residual RV conditioning
@@ -763,7 +767,6 @@ Included now:
 Not included yet:
 
 - Transformer or graph neural network models
-- autoencoder forecasting or RV-signal evaluation
 - claim of tradable alpha or state-of-the-art forecasting performance
 - bond-level total return targets
 - transaction costs, RFQ execution constraints, or backtesting

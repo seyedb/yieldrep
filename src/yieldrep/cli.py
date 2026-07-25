@@ -316,6 +316,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_curves_parquet(project_config))
     output_paths.extend(build_pca(project_config))
     output_paths.extend(build_nelson_siegel(project_config))
+    output_paths.extend(build_autoencoder(project_config))
     output_paths.append(build_curve_features(project_config))
     output_paths.append(build_carry_roll_features(project_config))
     output_paths.append(build_residual_features(project_config))

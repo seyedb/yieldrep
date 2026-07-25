@@ -72,9 +72,12 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     assert {"mean_spread_score", "spread_t_stat", "hit_rate"}.issubset(
         residual_rv_spread.columns
     )
-    assert {"best_by_spread", "best_by_rank_ic", "pca_maturity_spread_rank"}.issubset(
-        residual_rv_benchmark.columns
-    )
+    assert {
+        "best_by_spread",
+        "best_by_rank_ic",
+        "pca_maturity_spread_rank",
+        "autoencoder_maturity_spread_rank",
+    }.issubset(residual_rv_benchmark.columns)
     assert {"mean_reversion_hit_rate", "evidence_label"}.issubset(
         residual_rv_overview.columns
     )
@@ -82,9 +85,12 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     assert {"mean_balanced_accuracy", "mean_macro_f1", "rank"}.issubset(
         volatility_regime.columns
     )
-    assert {"best_model", "pca_beats_curve_vol", "nelson_siegel_beats_curve_vol"}.issubset(
-        volatility_regime_benchmark.columns
-    )
+    assert {
+        "best_model",
+        "pca_beats_curve_vol",
+        "autoencoder_beats_curve_vol",
+        "nelson_siegel_beats_curve_vol",
+    }.issubset(volatility_regime_benchmark.columns)
     assert {"state", "mean_balanced_accuracy", "rank"}.issubset(curve_state.columns)
     assert "maturity_bucket" in bucket_summary.columns
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best"}.issubset(residual_rv.columns)

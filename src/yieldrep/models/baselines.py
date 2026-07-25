@@ -46,6 +46,7 @@ POLICY_FEATURES = [
     "policy_change_252d",
     "policy_2y_spread",
 ]
+AUTOENCODER_FEATURES_PREFIX = "AE"
 RESIDUAL_DYNAMIC_FEATURES = [
     "residual",
     "residual_z_60",
@@ -447,6 +448,13 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                 EvaluationSpec(
                     target=target,
                     target_column=target_column,
+                    representation="autoencoder",
+                    path=config.modeling_dir / f"autoencoder{suffix}_targets.parquet",
+                    features=_autoencoder_features(config),
+                ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
                     representation="nelson_siegel",
                     path=config.modeling_dir / f"nelson_siegel{suffix}_targets.parquet",
                     features=NELSON_SIEGEL_FEATURES,
@@ -495,6 +503,14 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                     EvaluationSpec(
                         target=target,
                         target_column=target_column,
+                        representation="autoencoder_maturity",
+                        path=config.modeling_dir / f"autoencoder{suffix}_targets.parquet",
+                        features=_state_maturity_features(_autoencoder_features(config)),
+                        required_features=tuple(MATURITY_BASIS_FEATURES),
+                    ),
+                    EvaluationSpec(
+                        target=target,
+                        target_column=target_column,
                         representation="nelson_siegel_maturity",
                         path=config.modeling_dir / f"nelson_siegel{suffix}_targets.parquet",
                         features=_state_maturity_features(NELSON_SIEGEL_FEATURES),
@@ -521,6 +537,14 @@ def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
             representation="pca",
             path=config.modeling_dir / "pca_curve_vol_regime_targets.parquet",
             features=_pca_features(config),
+            base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
+        ),
+        EvaluationSpec(
+            target="curve_vol_regime",
+            target_column="future_curve_move_rms",
+            representation="autoencoder",
+            path=config.modeling_dir / "autoencoder_curve_vol_regime_targets.parquet",
+            features=_autoencoder_features(config),
             base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
         ),
         EvaluationSpec(
@@ -568,6 +592,14 @@ def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                     representation="pca",
                     path=config.modeling_dir / f"pca{suffix}_targets.parquet",
                     features=_pca_features(config),
+                    base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
+                ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
+                    representation="autoencoder",
+                    path=config.modeling_dir / f"autoencoder{suffix}_targets.parquet",
+                    features=_autoencoder_features(config),
                     base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
                 ),
                 EvaluationSpec(
@@ -947,6 +979,10 @@ def _ordered_unique(values: list[str]) -> list[str]:
 
 def _pca_features(config: ProjectConfig) -> list[str]:
     return [f"PC{i}" for i in range(1, config.pca.n_components + 1)]
+
+
+def _autoencoder_features(config: ProjectConfig) -> list[str]:
+    return [f"{AUTOENCODER_FEATURES_PREFIX}{i}" for i in range(1, config.autoencoder.latent_dim + 1)]
 
 
 def _state_maturity_features(state_features: list[str]) -> list[str]:
