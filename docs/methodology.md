@@ -446,8 +446,18 @@ r_t^{(m)}
 ```
 
 PCA reconstructs curves from the first \(K\) components. Nelson-Siegel
-reconstructs curves from the fitted parametric form. Metrics are reported
-overall and by maturity.
+reconstructs curves from the fitted parametric form. The first learned baseline
+is a small PyTorch MLP autoencoder trained only on the chronological train
+split. Its latent dimension is matched to the PCA component count.
+
+The autoencoder is currently evaluated only on out-of-sample reconstruction.
+It is not yet used for forecasting or relative-value prediction. This keeps the
+first learned-representation question narrow:
+
+```text
+does a nonlinear latent curve representation reconstruct held-out curves better
+than PCA or Nelson-Siegel?
+```
 
 This is currently the cleanest representation-quality benchmark in the project.
 
@@ -736,6 +746,7 @@ Included now:
 - public US, Canada, and euro-area zero-coupon curve data
 - normalized long-format curve schema
 - PCA and Nelson-Siegel curve representations
+- PyTorch autoencoder reconstruction baseline
 - engineered slope, curvature, carry, roll-down, lagged, and residual features
 - policy-rate level, change, and curve-policy spread features
 - VIX and MOVE market-volatility regimes for residual RV conditioning
@@ -751,7 +762,8 @@ Included now:
 
 Not included yet:
 
-- autoencoders, Transformers, or graph neural networks
+- Transformer or graph neural network models
+- autoencoder forecasting or RV-signal evaluation
 - claim of tradable alpha or state-of-the-art forecasting performance
 - bond-level total return targets
 - transaction costs, RFQ execution constraints, or backtesting
@@ -764,5 +776,5 @@ The current forecasting benchmarks are preliminary. Outright yield-change
 prediction is a noisy task, and strong curve reconstruction does not by itself
 imply forecastability.
 
-Near-term extensions should keep the task definitions fixed while improving the
-classical benchmark set and adding macro or policy-rate context.
+Near-term extensions should compare learned embeddings against the established
+classical protocol before adding more model complexity.

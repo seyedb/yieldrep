@@ -4,6 +4,7 @@ import pandas as pd
 
 from yieldrep.config import PCAConfig, ProjectConfig, SourceConfig
 from yieldrep.evaluation.reconstruction import evaluate_reconstruction
+from yieldrep.models.autoencoder import fit_autoencoder_panel
 
 
 def test_evaluate_reconstruction_writes_summary_tables(tmp_path: Path) -> None:
@@ -42,6 +43,33 @@ def test_evaluate_reconstruction_writes_summary_tables(tmp_path: Path) -> None:
     assert worst_maturities["rmse_rank"].min() == 1
     assert set(oos_summary["representation"]) == {"pca", "nelson_siegel"}
     assert {"maturity_years", "maturity_bucket"}.issubset(oos_by_maturity.columns)
+
+
+def test_fit_autoencoder_panel_returns_embeddings_and_reconstruction() -> None:
+    panel = _sample_curves().pivot(index="date", columns="maturity_years", values="yield")
+    panel.attrs["country"] = "US"
+
+    result = fit_autoencoder_panel(
+        panel=panel,
+        test_fraction=0.5,
+        latent_dim=2,
+        hidden_dim=4,
+        epochs=3,
+        learning_rate=0.01,
+        random_seed=42,
+    )
+
+    assert {"date", "country", "split", "AE1", "AE2"}.issubset(result.embeddings.columns)
+    assert {
+        "date",
+        "country",
+        "maturity_years",
+        "yield",
+        "fitted_yield",
+        "split",
+    }.issubset(result.reconstruction.columns)
+    assert set(result.reconstruction["split"]) == {"train", "test"}
+    assert len(result.reconstruction) == panel.size
 
 
 def _sample_curves() -> pd.DataFrame:

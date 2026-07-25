@@ -36,6 +36,7 @@ from yieldrep.factors.pca import build_pca
 from yieldrep.factors.policy import build_policy_features
 from yieldrep.factors.residual import build_residual_features
 from yieldrep.models.baselines import evaluate_baselines
+from yieldrep.models.autoencoder import build_autoencoder
 from yieldrep.models.forecasting import evaluate_supervised_forecasts
 from yieldrep.visualization.plotly_baselines import plot_baseline_metrics
 from yieldrep.visualization.plotly_cross_market import plot_cross_market_pca
@@ -259,8 +260,10 @@ def cross_market_command(config: Path = Path("configs/default.yaml")) -> None:
 
 @app.command("reconstruction")
 def reconstruction_command(config: Path = Path("configs/default.yaml")) -> None:
-    """Evaluate and plot classical curve reconstruction quality."""
+    """Evaluate and plot curve reconstruction quality."""
     project_config = load_config(config)
+    for output_path in build_autoencoder(project_config):
+        typer.echo(output_path)
     for output_path in evaluate_reconstruction(project_config):
         typer.echo(output_path)
     for output_path in plot_reconstruction(project_config):

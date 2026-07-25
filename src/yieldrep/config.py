@@ -24,6 +24,15 @@ class NelsonSiegelConfig(BaseModel):
     min_maturities: int = 3
 
 
+class AutoencoderConfig(BaseModel):
+    latent_dim: int = 5
+    hidden_dim: int = 64
+    epochs: int = 1200
+    learning_rate: float = 0.005
+    random_seed: int = 42
+    min_train_dates: int = 252
+
+
 class TargetConfig(BaseModel):
     horizons_days: list[int] = Field(default_factory=lambda: [1, 5, 20])
     realized_vol_window: int = 20
@@ -60,6 +69,7 @@ class ProjectConfig(BaseModel):
     macro_indicators: dict[str, SourceConfig] = Field(default_factory=dict)
     pca: PCAConfig = Field(default_factory=PCAConfig)
     nelson_siegel: NelsonSiegelConfig = Field(default_factory=NelsonSiegelConfig)
+    autoencoder: AutoencoderConfig = Field(default_factory=AutoencoderConfig)
     targets: TargetConfig = Field(default_factory=TargetConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     plots: PlotConfig = Field(default_factory=PlotConfig)
@@ -119,6 +129,10 @@ class ProjectConfig(BaseModel):
     @property
     def nelson_siegel_dir(self) -> Path:
         return self.processed_dir / "nelson_siegel"
+
+    @property
+    def autoencoder_dir(self) -> Path:
+        return self.processed_dir / "autoencoder"
 
     @property
     def targets_path(self) -> Path:

@@ -9,6 +9,14 @@ nelson_siegel:
   tau: 1.5
   min_maturities: 3
 
+autoencoder:
+  latent_dim: 5
+  hidden_dim: 64
+  epochs: 1200
+  learning_rate: 0.005
+  random_seed: 42
+  min_train_dates: 252
+
 targets:
   horizons_days: [1, 5, 20]
 
