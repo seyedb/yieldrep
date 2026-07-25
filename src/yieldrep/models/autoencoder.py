@@ -18,8 +18,15 @@ from yieldrep.factors.curve import curve_panel
 class CurveAutoencoder(nn.Module):
     """Small MLP autoencoder for curve reconstruction, not forecasting."""
 
-    def __init__(self, input_dim: int, hidden_dim: int, latent_dim: int) -> None:
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dim: int,
+        latent_dim: int,
+        output_dim: int | None = None,
+    ) -> None:
         super().__init__()
+        decoder_output_dim = output_dim if output_dim is not None else input_dim
         self.encoder = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.Tanh(),
@@ -28,7 +35,7 @@ class CurveAutoencoder(nn.Module):
         self.decoder = nn.Sequential(
             nn.Linear(latent_dim, hidden_dim),
             nn.Tanh(),
-            nn.Linear(hidden_dim, input_dim),
+            nn.Linear(hidden_dim, decoder_output_dim),
         )
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
@@ -61,6 +68,8 @@ def build_autoencoder(config: ProjectConfig) -> list[Path]:
             epochs=config.autoencoder.epochs,
             learning_rate=config.autoencoder.learning_rate,
             validation_fraction=config.autoencoder.validation_fraction,
+            mask_probability=config.autoencoder.mask_probability,
+            clean_loss_weight=config.autoencoder.clean_loss_weight,
             early_stopping_patience=config.autoencoder.early_stopping_patience,
             min_delta=config.autoencoder.min_delta,
             random_seed=config.autoencoder.random_seed,
@@ -68,11 +77,17 @@ def build_autoencoder(config: ProjectConfig) -> list[Path]:
         country_key = str(country).lower()
         embeddings_path = config.autoencoder_dir / f"{country_key}_embeddings.parquet"
         reconstruction_path = config.autoencoder_dir / f"{country_key}_reconstruction.parquet"
+        masked_reconstruction_path = (
+            config.autoencoder_dir / f"{country_key}_masked_reconstruction.parquet"
+        )
         metrics_path = config.autoencoder_dir / f"{country_key}_metrics.parquet"
         result.embeddings.to_parquet(embeddings_path, index=False)
         result.reconstruction.to_parquet(reconstruction_path, index=False)
+        result.masked_reconstruction.to_parquet(masked_reconstruction_path, index=False)
         result.metrics.to_parquet(metrics_path, index=False)
-        output_paths.extend([embeddings_path, reconstruction_path, metrics_path])
+        output_paths.extend(
+            [embeddings_path, reconstruction_path, masked_reconstruction_path, metrics_path]
+        )
 
     return output_paths
 
@@ -82,11 +97,19 @@ class AutoencoderResult:
         self,
         embeddings: pd.DataFrame,
         reconstruction: pd.DataFrame,
+        masked_reconstruction: pd.DataFrame,
         metrics: pd.DataFrame,
     ) -> None:
         self.embeddings = embeddings
         self.reconstruction = reconstruction
+        self.masked_reconstruction = masked_reconstruction
         self.metrics = metrics
+
+
+class MaskedPrediction:
+    def __init__(self, reconstructed: NDArray[np.float32], mask: NDArray[np.bool_]) -> None:
+        self.reconstructed = reconstructed
+        self.mask = mask
 
 
 def fit_autoencoder_panel(
@@ -97,6 +120,8 @@ def fit_autoencoder_panel(
     epochs: int,
     learning_rate: float,
     validation_fraction: float,
+    mask_probability: float,
+    clean_loss_weight: float,
     early_stopping_patience: int,
     min_delta: float,
     random_seed: int,
@@ -112,6 +137,10 @@ def fit_autoencoder_panel(
         raise ValueError("learning_rate must be positive")
     if not 0 < validation_fraction < 1:
         raise ValueError("validation_fraction must be between 0 and 1")
+    if not 0 < mask_probability < 1:
+        raise ValueError("mask_probability must be between 0 and 1")
+    if clean_loss_weight < 0:
+        raise ValueError("clean_loss_weight must be non-negative")
     if early_stopping_patience <= 0:
         raise ValueError("early_stopping_patience must be positive")
     if min_delta < 0:
@@ -136,14 +165,17 @@ def fit_autoencoder_panel(
     x_all = scaler.transform(panel).astype(np.float32)
 
     model = CurveAutoencoder(
-        input_dim=panel.shape[1],
+        input_dim=panel.shape[1] * 2,
         hidden_dim=hidden_dim,
         latent_dim=min(latent_dim, hidden_dim),
+        output_dim=panel.shape[1],
     )
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = nn.MSELoss()
     train_tensor = torch.from_numpy(x_train)
     validation_tensor = torch.from_numpy(x_validation)
+    generator = torch.Generator().manual_seed(random_seed)
+    validation_mask = _random_mask(validation_tensor.shape, mask_probability, generator)
 
     best_state: dict[str, Tensor] | None = None
     best_validation_loss = float("inf")
@@ -155,14 +187,29 @@ def fit_autoencoder_panel(
     for epoch in range(1, epochs + 1):
         model.train()
         optimizer.zero_grad()
-        reconstructed = model(train_tensor)
-        loss = loss_fn(reconstructed, train_tensor)
+        train_mask = _random_mask(train_tensor.shape, mask_probability, generator)
+        train_input = _model_input(train_tensor, train_mask)
+        reconstructed = model(train_input)
+        masked_loss = loss_fn(reconstructed[train_mask], train_tensor[train_mask])
+        clean_reconstructed = model(_model_input(train_tensor, torch.zeros_like(train_mask)))
+        clean_loss = loss_fn(clean_reconstructed, train_tensor)
+        loss = masked_loss + clean_loss_weight * clean_loss
         loss.backward()
         optimizer.step()
 
         model.eval()
         with torch.no_grad():
-            validation_loss = loss_fn(model(validation_tensor), validation_tensor)
+            validation_input = _model_input(validation_tensor, validation_mask)
+            validation_reconstructed = model(validation_input)
+            validation_masked_loss = loss_fn(
+                validation_reconstructed[validation_mask],
+                validation_tensor[validation_mask],
+            )
+            validation_clean_reconstructed = model(
+                _model_input(validation_tensor, torch.zeros_like(validation_mask))
+            )
+            validation_clean_loss = loss_fn(validation_clean_reconstructed, validation_tensor)
+            validation_loss = validation_masked_loss + clean_loss_weight * validation_clean_loss
 
         final_train_loss = float(loss.detach().item())
         final_validation_loss = float(validation_loss.detach().item())
@@ -185,10 +232,18 @@ def fit_autoencoder_panel(
     model.eval()
     with torch.no_grad():
         all_tensor = torch.from_numpy(x_all)
-        encoded = model.encoder(all_tensor).numpy()
-        reconstructed_scaled = model(all_tensor).numpy()
+        clean_all_input = _model_input(all_tensor, torch.zeros_like(all_tensor, dtype=torch.bool))
+        encoded = model.encoder(clean_all_input).numpy()
+        reconstructed_scaled = model(clean_all_input).numpy()
+        masked_eval = _masked_prediction(
+            model=model,
+            values=all_tensor,
+            mask_probability=mask_probability,
+            random_seed=random_seed + 10_000,
+        )
 
     reconstructed_values = scaler.inverse_transform(reconstructed_scaled)
+    masked_reconstructed_values = scaler.inverse_transform(masked_eval.reconstructed)
     split_labels = _split_labels(
         index=panel.index,
         validation_index=validation_panel.index,
@@ -205,11 +260,25 @@ def fit_autoencoder_panel(
         reconstructed=reconstructed_values,
         split_labels=split_labels,
     )
+    masked_reconstruction = _reconstruction_frame(
+        panel=panel,
+        reconstructed=masked_reconstructed_values,
+        split_labels=split_labels,
+        mask=masked_eval.mask,
+    )
     metrics = _metrics_frame(
-        reconstruction=reconstruction,
+        reconstruction=pd.concat(
+            [
+                reconstruction.assign(metric_scope="clean"),
+                masked_reconstruction.assign(metric_scope="masked"),
+            ],
+            ignore_index=True,
+        ),
         country=str(panel.attrs.get("country", "")),
         latent_dim=min(latent_dim, hidden_dim),
         hidden_dim=hidden_dim,
+        mask_probability=mask_probability,
+        clean_loss_weight=clean_loss_weight,
         epochs_trained=best_epoch,
         best_validation_loss=best_validation_loss,
         final_train_loss=final_train_loss,
@@ -218,6 +287,7 @@ def fit_autoencoder_panel(
     return AutoencoderResult(
         embeddings=embeddings,
         reconstruction=reconstruction,
+        masked_reconstruction=masked_reconstruction,
         metrics=metrics,
     )
 
@@ -229,6 +299,8 @@ def autoencoder_reconstruction_errors(config: ProjectConfig) -> pd.DataFrame:
 
     rows: list[pd.DataFrame] = []
     for path in sorted(config.autoencoder_dir.glob("*_reconstruction.parquet")):
+        if path.name.endswith("_masked_reconstruction.parquet"):
+            continue
         frame = pd.read_parquet(path)
         if frame.empty:
             continue
@@ -236,6 +308,17 @@ def autoencoder_reconstruction_errors(config: ProjectConfig) -> pd.DataFrame:
         if test.empty:
             continue
         test["representation"] = "autoencoder"
+        test["n_components"] = config.autoencoder.latent_dim
+        test["error"] = test["yield"] - test["fitted_yield"]
+        rows.append(test)
+    for path in sorted(config.autoencoder_dir.glob("*_masked_reconstruction.parquet")):
+        frame = pd.read_parquet(path)
+        if frame.empty:
+            continue
+        test = frame.loc[frame["split"] == "test"].copy()
+        if test.empty:
+            continue
+        test["representation"] = "masked_autoencoder"
         test["n_components"] = config.autoencoder.latent_dim
         test["error"] = test["yield"] - test["fitted_yield"]
         rows.append(test)
@@ -303,6 +386,7 @@ def _reconstruction_frame(
     panel: pd.DataFrame,
     reconstructed: NDArray[np.float64],
     split_labels: NDArray[np.str_],
+    mask: NDArray[np.bool_] | None = None,
 ) -> pd.DataFrame:
     fitted = pd.DataFrame(reconstructed, index=panel.index, columns=panel.columns)
     actual_long = panel.stack().rename("yield").reset_index()
@@ -317,10 +401,20 @@ def _reconstruction_frame(
     frame["country"] = str(panel.attrs.get("country", ""))
     split_by_date = dict(zip(pd.to_datetime(panel.index), split_labels, strict=True))
     frame["split"] = pd.to_datetime(frame["date"]).map(split_by_date)
+    if mask is not None:
+        mask_long = _mask_frame(panel, mask)
+        frame = frame.merge(mask_long, on=["date", "maturity_years"], how="inner")
+        frame = frame.loc[frame["is_masked"]].drop(columns=["is_masked"])
     return frame.loc[
         :,
         ["date", "country", "maturity_years", "yield", "fitted_yield", "split"],
     ]
+
+
+def _mask_frame(panel: pd.DataFrame, mask: NDArray[np.bool_]) -> pd.DataFrame:
+    mask_panel = pd.DataFrame(mask, index=panel.index, columns=panel.columns)
+    long = mask_panel.stack().rename("is_masked").reset_index()
+    return long.rename(columns={long.columns[0]: "date", long.columns[1]: "maturity_years"})
 
 
 def _metrics_frame(
@@ -328,6 +422,8 @@ def _metrics_frame(
     country: str,
     latent_dim: int,
     hidden_dim: int,
+    mask_probability: float,
+    clean_loss_weight: float,
     epochs_trained: int,
     best_validation_loss: float,
     final_train_loss: float,
@@ -335,14 +431,20 @@ def _metrics_frame(
 ) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     frame = reconstruction.copy()
+    if "metric_scope" not in frame.columns:
+        frame["metric_scope"] = "clean"
     frame["error"] = frame["yield"] - frame["fitted_yield"]
-    for split, group in frame.groupby("split", sort=True):
+    for group_values, group in frame.groupby(["metric_scope", "split"], sort=True):
+        metric_scope, split = group_values
         rows.append(
             {
                 "country": country,
+                "metric_scope": metric_scope,
                 "split": split,
                 "latent_dim": latent_dim,
                 "hidden_dim": hidden_dim,
+                "mask_probability": mask_probability,
+                "clean_loss_weight": clean_loss_weight,
                 "epochs_trained": epochs_trained,
                 "best_validation_loss": best_validation_loss,
                 "final_train_loss": final_train_loss,
@@ -355,3 +457,45 @@ def _metrics_frame(
             }
         )
     return pd.DataFrame(rows)
+
+
+def _random_mask(
+    shape: torch.Size,
+    mask_probability: float,
+    generator: torch.Generator,
+) -> torch.Tensor:
+    mask = torch.rand(shape, generator=generator) < mask_probability
+    row_has_mask = mask.any(dim=1)
+    if bool(row_has_mask.all()):
+        return mask
+
+    missing_rows = torch.where(~row_has_mask)[0]
+    columns = torch.randint(
+        low=0,
+        high=shape[1],
+        size=(len(missing_rows),),
+        generator=generator,
+    )
+    mask[missing_rows, columns] = True
+    return mask
+
+
+def _model_input(values: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    masked = values.clone()
+    masked[mask] = 0.0
+    return torch.cat([masked, mask.float()], dim=1)
+
+
+def _masked_prediction(
+    model: CurveAutoencoder,
+    values: torch.Tensor,
+    mask_probability: float,
+    random_seed: int,
+) -> MaskedPrediction:
+    generator = torch.Generator().manual_seed(random_seed)
+    mask = _random_mask(values.shape, mask_probability, generator)
+    reconstructed = model(_model_input(values, mask)).numpy()
+    return MaskedPrediction(
+        reconstructed=reconstructed,
+        mask=mask.numpy().astype(np.bool_),
+    )

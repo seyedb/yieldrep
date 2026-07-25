@@ -30,7 +30,9 @@ class AutoencoderConfig(BaseModel):
     epochs: int = 1200
     learning_rate: float = 0.005
     validation_fraction: float = 0.2
-    early_stopping_patience: int = 50
+    mask_probability: float = 0.15
+    clean_loss_weight: float = 1.0
+    early_stopping_patience: int = 100
     min_delta: float = 1e-5
     random_seed: int = 42
     min_train_dates: int = 252

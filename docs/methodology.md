@@ -447,10 +447,13 @@ r_t^{(m)}
 
 PCA reconstructs curves from the first \(K\) components. Nelson-Siegel
 reconstructs curves from the fitted parametric form. The first learned baseline
-is a small PyTorch MLP autoencoder trained only on the chronological train
-split, with an inner chronological validation split and early stopping on
-validation reconstruction loss. Its latent dimension is matched to the PCA
-component count.
+is a small PyTorch MLP masked autoencoder trained only on the chronological
+train split, with an inner chronological validation split and early stopping on
+validation reconstruction loss. During training, a random subset of maturities is
+masked and the model receives both the masked curve and a binary mask indicator.
+The loss combines masked-maturity reconstruction with clean-curve reconstruction,
+so the embeddings remain defined for fully observed curves. The latent dimension
+is matched to the PCA component count.
 
 The autoencoder is first evaluated on out-of-sample reconstruction:
 
@@ -458,6 +461,11 @@ The autoencoder is first evaluated on out-of-sample reconstruction:
 does a nonlinear latent curve representation reconstruct held-out curves better
 than PCA or Nelson-Siegel?
 ```
+
+A separate masked reconstruction diagnostic asks whether the model can recover
+held-out maturities from the rest of the same curve. This is closer to a
+self-supervised representation-learning task than ordinary full-curve
+reconstruction.
 
 Its learned embeddings are then passed through the same downstream protocols as
 the classical curve-level representations: outright yield-change forecasting,

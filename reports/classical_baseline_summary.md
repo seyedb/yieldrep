@@ -80,21 +80,22 @@ Policy-rate features currently improve euro-area volatility-regime
 classification for the 1-day and 20-day horizons. For US and Canada, recent
 realized curve volatility remains the stronger hurdle.
 
-The first autoencoder baseline is evaluated on out-of-sample curve
-reconstruction and then reused as a learned embedding in the downstream
-forecasting, residual RV, volatility-regime, and curve-state protocols. PCA-5
-remains the strongest reconstruction benchmark overall. The autoencoder is
-competitive with lower-dimensional classical baselines for the euro-area curve,
-but it does not beat PCA-5.
+The first learned baseline is a masked autoencoder: maturities are randomly
+hidden during training, the model receives a mask indicator, and the objective
+combines masked-maturity reconstruction with clean-curve reconstruction. It is
+then reused as a learned embedding in the downstream forecasting, residual RV,
+volatility-regime, and curve-state protocols. PCA-5 remains the strongest
+reconstruction benchmark overall.
 
 ## Interpretation
 
 PCA and Nelson-Siegel remain useful curve-level representations. They are most
 clearly validated through reconstruction and curve-state summaries.
 
-The autoencoder result is a useful first learned-representation baseline, not a
-win. It establishes the PyTorch pipeline and gives future learned models clear
-PCA reconstruction and downstream forecasting hurdles.
+The masked autoencoder is a more appropriate learned-representation baseline
+than the initial plain autoencoder, but it is still not a win. It establishes the
+PyTorch pipeline and gives future learned models clear PCA reconstruction and
+downstream forecasting hurdles.
 
 Residual relative-value ranking is a maturity-level task. In the current
 classical setup, features that directly describe maturity-specific residual

@@ -57,6 +57,8 @@ def test_fit_autoencoder_panel_returns_embeddings_and_reconstruction() -> None:
         epochs=20,
         learning_rate=0.01,
         validation_fraction=0.5,
+        mask_probability=0.4,
+        clean_loss_weight=0.2,
         early_stopping_patience=3,
         min_delta=0.0,
         random_seed=42,
@@ -75,8 +77,11 @@ def test_fit_autoencoder_panel_returns_embeddings_and_reconstruction() -> None:
         result.metrics.columns
     )
     assert set(result.reconstruction["split"]) == {"train", "validation", "test"}
+    assert set(result.masked_reconstruction["split"]) == {"train", "validation", "test"}
+    assert set(result.metrics["metric_scope"]) == {"clean", "masked"}
     assert set(result.metrics["split"]) == {"train", "validation", "test"}
     assert len(result.reconstruction) == panel.size
+    assert len(result.masked_reconstruction) < panel.size
 
 
 def _sample_curves() -> pd.DataFrame:
