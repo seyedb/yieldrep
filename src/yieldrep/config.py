@@ -212,6 +212,10 @@ class ProjectConfig(BaseModel):
         return self.evaluation_dir / "baseline_classification_metrics.parquet"
 
     @property
+    def baseline_classification_coefficients_path(self) -> Path:
+        return self.evaluation_dir / "baseline_classification_coefficients.parquet"
+
+    @property
     def baseline_residual_rv_spread_path(self) -> Path:
         return self.evaluation_dir / "residual_rv_spread.parquet"
 
@@ -334,6 +338,10 @@ class ProjectConfig(BaseModel):
     @property
     def curve_state_transition_benchmark_table_path(self) -> Path:
         return self.tables_dir / "curve_state_transition_benchmark.csv"
+
+    @property
+    def curve_state_probe_importance_table_path(self) -> Path:
+        return self.tables_dir / "curve_state_probe_importance.csv"
 
     @property
     def cross_market_summary_table_path(self) -> Path:

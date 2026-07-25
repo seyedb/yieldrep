@@ -118,6 +118,11 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.curve_state_transition_benchmark_table_path,
         index=False,
     )
+    curve_state_probe_importance = curve_state_probe_importance_summary(config)
+    curve_state_probe_importance.to_csv(
+        config.curve_state_probe_importance_table_path,
+        index=False,
+    )
 
     bucket_summary = summarize_metrics(
         pd.read_parquet(config.baseline_metrics_by_maturity_path),
@@ -156,6 +161,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.volatility_regime_benchmark_table_path,
         config.curve_state_table_path,
         config.curve_state_transition_benchmark_table_path,
+        config.curve_state_probe_importance_table_path,
         config.benchmark_conclusions_table_path,
         config.baseline_by_maturity_bucket_table_path,
         config.residual_relative_value_table_path,
@@ -663,6 +669,68 @@ def curve_state_transition_benchmark_summary(curve_state: pd.DataFrame) -> pd.Da
             }
         )
     return pd.DataFrame(rows).loc[:, columns]
+
+
+def curve_state_probe_importance_summary(config: ProjectConfig) -> pd.DataFrame:
+    """Summarize standardized logistic coefficients for curve-state probes."""
+    columns = [
+        "state",
+        "country",
+        "horizon_days",
+        "representation",
+        "feature",
+        "rows",
+        "classes",
+        "mean_coefficient",
+        "mean_abs_coefficient",
+        "max_abs_coefficient",
+        "importance_rank",
+    ]
+    if not config.baseline_classification_coefficients_path.exists():
+        return pd.DataFrame(columns=columns)
+
+    coefficients = pd.read_parquet(config.baseline_classification_coefficients_path)
+    if coefficients.empty:
+        return pd.DataFrame(columns=columns)
+
+    coefficients = coefficients.loc[
+        coefficients["target"].str.startswith("curve_state_pc")
+    ].copy()
+    if coefficients.empty:
+        return pd.DataFrame(columns=columns)
+
+    coefficients["state"] = coefficients["target"].str.removeprefix("curve_state_")
+    summary = (
+        coefficients.groupby(
+            ["state", "country", "horizon_days", "representation", "feature"],
+            sort=True,
+        )
+        .agg(
+            rows=("coefficient", "size"),
+            classes=("class_label", "nunique"),
+            mean_coefficient=("coefficient", "mean"),
+            mean_abs_coefficient=("abs_coefficient", "mean"),
+            max_abs_coefficient=("abs_coefficient", "max"),
+        )
+        .reset_index()
+    )
+    summary["importance_rank"] = summary.groupby(
+        ["state", "country", "horizon_days", "representation"]
+    )["mean_abs_coefficient"].rank(method="min", ascending=False)
+    return (
+        summary.loc[:, columns]
+        .sort_values(
+            [
+                "state",
+                "country",
+                "horizon_days",
+                "representation",
+                "importance_rank",
+                "feature",
+            ]
+        )
+        .reset_index(drop=True)
+    )
 
 
 def benchmark_conclusion_summary(

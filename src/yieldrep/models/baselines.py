@@ -93,6 +93,7 @@ class BaselineEvaluationFrames:
     metrics_by_maturity_point: pd.DataFrame
     residual_rv_spread_metrics: pd.DataFrame
     classification_metrics: pd.DataFrame
+    classification_coefficients: pd.DataFrame
 
 
 def evaluate_baselines(config: ProjectConfig) -> Path:
@@ -112,6 +113,10 @@ def evaluate_baselines(config: ProjectConfig) -> Path:
     )
     frames.classification_metrics.to_parquet(
         config.baseline_classification_metrics_path,
+        index=False,
+    )
+    frames.classification_coefficients.to_parquet(
+        config.baseline_classification_coefficients_path,
         index=False,
     )
     return config.baseline_metrics_path
@@ -139,17 +144,25 @@ def evaluate_baseline_frames(config: ProjectConfig) -> BaselineEvaluationFrames:
         residual_rv_spread_rows.extend(spec_residual_rv_spread_rows)
 
     classification_rows: list[dict[str, object]] = []
+    classification_coefficient_rows: list[dict[str, object]] = []
     for spec in _classification_specs(config):
         prepared = _prepare_evaluation_data(spec)
         if prepared is None:
             continue
-        classification_rows.extend(_evaluate_classification_representation(config, spec, prepared))
+        spec_classification_rows, spec_coefficient_rows = _evaluate_classification_representation(
+            config,
+            spec,
+            prepared,
+        )
+        classification_rows.extend(spec_classification_rows)
+        classification_coefficient_rows.extend(spec_coefficient_rows)
     return BaselineEvaluationFrames(
         metrics=pd.DataFrame(rows),
         metrics_by_maturity=pd.DataFrame(maturity_rows),
         metrics_by_maturity_point=pd.DataFrame(maturity_point_rows),
         residual_rv_spread_metrics=pd.DataFrame(residual_rv_spread_rows),
         classification_metrics=pd.DataFrame(classification_rows),
+        classification_coefficients=pd.DataFrame(classification_coefficient_rows),
     )
 
 
@@ -273,9 +286,10 @@ def _evaluate_classification_representation(
     config: ProjectConfig,
     spec: EvaluationSpec,
     prepared: PreparedEvaluationData,
-) -> list[dict[str, object]]:
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     data = prepared.data
     rows: list[dict[str, object]] = []
+    coefficient_rows: list[dict[str, object]] = []
     for group_values, group in data.groupby(GROUP_COLUMNS, sort=True):
         group_key = dict(zip(GROUP_COLUMNS, _as_tuple(group_values), strict=True))
         group = group.sort_values("date").dropna(
@@ -309,21 +323,22 @@ def _evaluate_classification_representation(
                 y_test = test_target.astype(str).to_numpy()
             x_test = split.test[prepared.feature_columns].to_numpy(dtype=float)
 
-            rows.extend(
-                _evaluate_classification_split(
-                    config=config,
-                    spec=spec,
-                    split=split,
-                    country=country,
-                    horizon_days=horizon_days,
-                    x_train=x_train,
-                    y_train=y_train,
-                    x_test=x_test,
-                    y_test=y_test,
-                    train_dates=train["date"].nunique(),
-                )
+            split_rows, split_coefficient_rows = _evaluate_classification_split(
+                config=config,
+                spec=spec,
+                split=split,
+                country=country,
+                horizon_days=horizon_days,
+                feature_columns=prepared.feature_columns,
+                x_train=x_train,
+                y_train=y_train,
+                x_test=x_test,
+                y_test=y_test,
+                train_dates=train["date"].nunique(),
             )
-    return rows
+            rows.extend(split_rows)
+            coefficient_rows.extend(split_coefficient_rows)
+    return rows, coefficient_rows
 
 
 def _evaluate_classification_split(
@@ -332,12 +347,13 @@ def _evaluate_classification_split(
     split: SplitWindow,
     country: str,
     horizon_days: int,
+    feature_columns: list[str],
     x_train: NDArray[np.float64],
     y_train: NDArray[np.str_],
     x_test: NDArray[np.float64],
     y_test: NDArray[np.str_],
     train_dates: int,
-) -> list[dict[str, object]]:
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     common = {
         "target": spec.target,
         "representation": spec.representation,
@@ -361,7 +377,7 @@ def _evaluate_classification_split(
     ]
 
     if len(np.unique(y_train)) < 2:
-        return rows
+        return rows, []
 
     model = make_pipeline(
         StandardScaler(),
@@ -381,7 +397,12 @@ def _evaluate_classification_split(
         )
     )
 
-    return rows
+    coefficient_rows = _classification_coefficient_rows(
+        common=common,
+        model=model,
+        feature_columns=feature_columns,
+    )
+    return rows, coefficient_rows
 
 
 def _limit_classification_training_rows(
@@ -917,6 +938,33 @@ def _classification_metric_row(
         "train_dates": train_dates,
         "test_dates": test_dates,
     }
+
+
+def _classification_coefficient_rows(
+    common: dict[str, object],
+    model: object,
+    feature_columns: list[str],
+) -> list[dict[str, object]]:
+    logistic = model.named_steps["logisticregression"]  # type: ignore[attr-defined]
+    coefficients = np.asarray(logistic.coef_, dtype=float)
+    classes = [str(label) for label in logistic.classes_]
+    if coefficients.ndim == 1:
+        coefficients = coefficients.reshape(1, -1)
+
+    rows: list[dict[str, object]] = []
+    for class_label, class_coefficients in zip(classes, coefficients, strict=True):
+        for feature, coefficient in zip(feature_columns, class_coefficients, strict=True):
+            rows.append(
+                {
+                    **common,
+                    "model": "logistic_l2",
+                    "class_label": class_label,
+                    "feature": feature,
+                    "coefficient": float(coefficient),
+                    "abs_coefficient": abs(float(coefficient)),
+                }
+            )
+    return rows
 
 
 def _classification_metrics(

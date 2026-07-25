@@ -167,6 +167,9 @@ def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
     output_path = evaluate_baselines(config)
     metrics = pd.read_parquet(output_path)
     classification_metrics = pd.read_parquet(config.baseline_classification_metrics_path)
+    classification_coefficients = pd.read_parquet(
+        config.baseline_classification_coefficients_path
+    )
 
     assert set(metrics["target"]) == {"vol_change"}
     assert set(metrics["representation"]) == {"pca"}
@@ -174,6 +177,9 @@ def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
     assert set(classification_metrics["representation"]) == {"pca"}
     assert set(classification_metrics["model"]) == {"train_mode", "logistic_l2"}
     assert {"accuracy", "balanced_accuracy", "macro_f1"}.issubset(classification_metrics.columns)
+    assert {"feature", "class_label", "coefficient", "abs_coefficient"}.issubset(
+        classification_coefficients.columns
+    )
 
 
 def test_evaluate_supervised_forecasts_writes_metrics_and_tables(tmp_path: Path) -> None:
