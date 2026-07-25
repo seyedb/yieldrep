@@ -47,6 +47,7 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
         tmp_path / "reports" / "tables" / "curve_state.csv",
         tmp_path / "reports" / "tables" / "curve_state_transition_benchmark.csv",
         tmp_path / "reports" / "tables" / "curve_state_probe_importance.csv",
+        tmp_path / "reports" / "tables" / "ae_classical_factor_correlations.csv",
         tmp_path / "reports" / "tables" / "benchmark_conclusions.csv",
         tmp_path / "reports" / "tables" / "baseline_by_maturity_bucket.csv",
         tmp_path / "reports" / "tables" / "residual_relative_value.csv",
@@ -65,10 +66,11 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     curve_state = pd.read_csv(output_paths[10])
     curve_state_transition = pd.read_csv(output_paths[11])
     curve_state_probe_importance = pd.read_csv(output_paths[12])
-    benchmark_conclusions = pd.read_csv(output_paths[13])
-    bucket_summary = pd.read_csv(output_paths[14])
-    residual_rv = pd.read_csv(output_paths[15])
-    point_top = pd.read_csv(output_paths[16])
+    ae_classical_correlations = pd.read_csv(output_paths[13])
+    benchmark_conclusions = pd.read_csv(output_paths[14])
+    bucket_summary = pd.read_csv(output_paths[15])
+    residual_rv = pd.read_csv(output_paths[16])
+    point_top = pd.read_csv(output_paths[17])
     assert {"target", "representation", "model", "mean_rmse"}.issubset(summary.columns)
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best", "mean_rank_ic"}.issubset(
         rank_table.columns
@@ -103,6 +105,9 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     )
     assert {"feature", "mean_abs_coefficient", "importance_rank"}.issubset(
         curve_state_probe_importance.columns
+    )
+    assert {"ae_feature", "classical_feature", "abs_correlation", "match_rank"}.issubset(
+        ae_classical_correlations.columns
     )
     assert {"research_question", "current_best_baseline", "conclusion"}.issubset(
         benchmark_conclusions.columns

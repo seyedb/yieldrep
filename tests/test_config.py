@@ -58,6 +58,9 @@ def test_load_config_reads_project_paths() -> None:
     assert config.curve_state_probe_importance_table_path == Path(
         "reports/tables/curve_state_probe_importance.csv"
     )
+    assert config.ae_classical_factor_correlations_table_path == Path(
+        "reports/tables/ae_classical_factor_correlations.csv"
+    )
     assert config.cross_market_summary_table_path == Path("reports/tables/cross_market_summary.csv")
     assert config.baseline_residual_rv_spread_path == Path(
         "data/processed/evaluation/residual_rv_spread.parquet"

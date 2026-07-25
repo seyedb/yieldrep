@@ -123,6 +123,11 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.curve_state_probe_importance_table_path,
         index=False,
     )
+    ae_classical_factor_correlations = ae_classical_factor_correlation_summary(config)
+    ae_classical_factor_correlations.to_csv(
+        config.ae_classical_factor_correlations_table_path,
+        index=False,
+    )
 
     bucket_summary = summarize_metrics(
         pd.read_parquet(config.baseline_metrics_by_maturity_path),
@@ -162,6 +167,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.curve_state_table_path,
         config.curve_state_transition_benchmark_table_path,
         config.curve_state_probe_importance_table_path,
+        config.ae_classical_factor_correlations_table_path,
         config.benchmark_conclusions_table_path,
         config.baseline_by_maturity_bucket_table_path,
         config.residual_relative_value_table_path,
@@ -729,6 +735,53 @@ def curve_state_probe_importance_summary(config: ProjectConfig) -> pd.DataFrame:
                 "feature",
             ]
         )
+        .reset_index(drop=True)
+    )
+
+
+def ae_classical_factor_correlation_summary(config: ProjectConfig) -> pd.DataFrame:
+    """Correlate autoencoder latent dimensions with PCA and Nelson-Siegel factors."""
+    columns = [
+        "country",
+        "ae_feature",
+        "classical_family",
+        "classical_feature",
+        "observations",
+        "correlation",
+        "abs_correlation",
+        "match_rank",
+    ]
+    ae_frames = _read_autoencoder_embedding_frames(config)
+    if not ae_frames:
+        return pd.DataFrame(columns=columns)
+
+    rows: list[dict[str, object]] = []
+    for country, ae_frame in ae_frames.items():
+        classical_frames = [
+            ("pca", _read_country_factor_frame(config.pca_dir / f"{country.lower()}_scores.parquet")),
+            (
+                "nelson_siegel",
+                _read_country_factor_frame(
+                    config.nelson_siegel_dir / f"{country.lower()}_factors.parquet"
+                ),
+            ),
+        ]
+        for family, classical_frame in classical_frames:
+            if classical_frame.empty:
+                continue
+            rows.extend(_ae_factor_correlation_rows(country, ae_frame, family, classical_frame))
+
+    if not rows:
+        return pd.DataFrame(columns=columns)
+
+    summary = pd.DataFrame(rows)
+    summary["match_rank"] = summary.groupby(["country", "ae_feature"])["abs_correlation"].rank(
+        method="min",
+        ascending=False,
+    )
+    return (
+        summary.loc[:, columns]
+        .sort_values(["country", "ae_feature", "match_rank", "classical_family"])
         .reset_index(drop=True)
     )
 
@@ -1407,6 +1460,76 @@ def _curve_state_learned_status(group: pd.DataFrame) -> str:
     if gap <= 0.05:
         return "competitive_with_best"
     return "behind_best"
+
+
+def _read_autoencoder_embedding_frames(config: ProjectConfig) -> dict[str, pd.DataFrame]:
+    frames: dict[str, pd.DataFrame] = {}
+    if not config.autoencoder_dir.exists():
+        return frames
+
+    for path in sorted(config.autoencoder_dir.glob("*_embeddings.parquet")):
+        country = path.name.removesuffix("_embeddings.parquet").upper()
+        frame = pd.read_parquet(path)
+        if frame.empty:
+            continue
+        frame["date"] = pd.to_datetime(frame["date"])
+        frames[country] = frame
+    return frames
+
+
+def _read_country_factor_frame(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    frame = pd.read_parquet(path)
+    if frame.empty:
+        return frame
+    frame["date"] = pd.to_datetime(frame["date"])
+    return frame
+
+
+def _ae_factor_correlation_rows(
+    country: str,
+    ae_frame: pd.DataFrame,
+    classical_family: str,
+    classical_frame: pd.DataFrame,
+) -> list[dict[str, object]]:
+    ae_features = [column for column in ae_frame.columns if column.startswith("AE")]
+    classical_features = [
+        column
+        for column in classical_frame.columns
+        if column not in {"date", "country", "split", "tau", "rmse"}
+    ]
+    if not ae_features or not classical_features:
+        return []
+
+    merged = ae_frame.loc[:, ["date", *ae_features]].merge(
+        classical_frame.loc[:, ["date", *classical_features]],
+        on="date",
+        how="inner",
+    )
+    if merged.empty:
+        return []
+
+    rows: list[dict[str, object]] = []
+    for ae_feature in ae_features:
+        for classical_feature in classical_features:
+            valid = merged[[ae_feature, classical_feature]].dropna()
+            if len(valid) < 2:
+                continue
+            correlation = valid[ae_feature].corr(valid[classical_feature])
+            rows.append(
+                {
+                    "country": country,
+                    "ae_feature": ae_feature,
+                    "classical_family": classical_family,
+                    "classical_feature": classical_feature,
+                    "observations": len(valid),
+                    "correlation": float(correlation),
+                    "abs_correlation": float(abs(correlation)),
+                    "match_rank": None,
+                }
+            )
+    return rows
 
 
 def _conclusion_row(

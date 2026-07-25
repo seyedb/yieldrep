@@ -344,6 +344,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "curve_state_probe_importance.csv"
 
     @property
+    def ae_classical_factor_correlations_table_path(self) -> Path:
+        return self.tables_dir / "ae_classical_factor_correlations.csv"
+
+    @property
     def cross_market_summary_table_path(self) -> Path:
         return self.tables_dir / "cross_market_summary.csv"
 
