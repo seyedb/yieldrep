@@ -433,6 +433,13 @@ autoencoder representations that append recent lagged factor values from the
 same information set. This asks whether recent curve-representation dynamics add
 state-transition information beyond the current curve snapshot.
 
+The sequence-readiness summary compares static and temporal representation
+baselines before introducing sequence models:
+
+```text
+reports/tables/sequence_readiness_summary.csv
+```
+
 This is a representation benchmark, not a claim that PCA states are the final
 economic regime definition.
 

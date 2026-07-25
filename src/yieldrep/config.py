@@ -340,6 +340,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "curve_state_transition_benchmark.csv"
 
     @property
+    def sequence_readiness_summary_table_path(self) -> Path:
+        return self.tables_dir / "sequence_readiness_summary.csv"
+
+    @property
     def curve_state_probe_importance_table_path(self) -> Path:
         return self.tables_dir / "curve_state_probe_importance.csv"
 

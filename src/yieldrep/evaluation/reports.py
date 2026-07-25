@@ -118,6 +118,8 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.curve_state_transition_benchmark_table_path,
         index=False,
     )
+    sequence_readiness = sequence_readiness_summary(curve_state_transition_benchmark)
+    sequence_readiness.to_csv(config.sequence_readiness_summary_table_path, index=False)
     curve_state_probe_importance = curve_state_probe_importance_summary(config)
     curve_state_probe_importance.to_csv(
         config.curve_state_probe_importance_table_path,
@@ -166,6 +168,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.volatility_regime_benchmark_table_path,
         config.curve_state_table_path,
         config.curve_state_transition_benchmark_table_path,
+        config.sequence_readiness_summary_table_path,
         config.curve_state_probe_importance_table_path,
         config.ae_classical_factor_correlations_table_path,
         config.benchmark_conclusions_table_path,
@@ -684,6 +687,32 @@ def curve_state_transition_benchmark_summary(curve_state: pd.DataFrame) -> pd.Da
                 "learned_representation_status": _curve_state_learned_status(group),
             }
         )
+    return pd.DataFrame(rows).loc[:, columns]
+
+
+def sequence_readiness_summary(transition_benchmark: pd.DataFrame) -> pd.DataFrame:
+    """Summarize whether temporal representation history improves state classification."""
+    columns = [
+        "state",
+        "country",
+        "horizon_days",
+        "best_static_family",
+        "best_static_balanced_accuracy",
+        "best_temporal_family",
+        "best_temporal_balanced_accuracy",
+        "temporal_minus_static_best",
+        "temporal_wins",
+        "autoencoder_temporal_improvement",
+        "pca_temporal_improvement",
+        "nelson_siegel_temporal_improvement",
+        "strongest_temporal_improvement_family",
+        "strongest_temporal_improvement",
+        "sequence_readiness_label",
+    ]
+    if transition_benchmark.empty:
+        return pd.DataFrame(columns=columns)
+
+    rows = [_sequence_readiness_row(row) for row in transition_benchmark.to_dict("records")]
     return pd.DataFrame(rows).loc[:, columns]
 
 
@@ -1470,6 +1499,86 @@ def _curve_state_learned_status(group: pd.DataFrame) -> str:
     if gap <= 0.05:
         return "competitive_with_best"
     return "behind_best"
+
+
+def _sequence_readiness_row(row: dict[str, object]) -> dict[str, object]:
+    static_scores = {
+        "autoencoder": _as_float(row.get("autoencoder_balanced_accuracy")),
+        "pca": _as_float(row.get("pca_balanced_accuracy")),
+        "nelson_siegel": _as_float(row.get("nelson_siegel_balanced_accuracy")),
+    }
+    temporal_scores = {
+        "autoencoder": _as_float(row.get("autoencoder_temporal_balanced_accuracy")),
+        "pca": _as_float(row.get("pca_temporal_balanced_accuracy")),
+        "nelson_siegel": _as_float(row.get("nelson_siegel_temporal_balanced_accuracy")),
+    }
+    improvements = {
+        family: _difference_or_nan(temporal_scores[family], static_scores[family])
+        for family in static_scores
+    }
+    best_static_family, best_static_score = _best_score(static_scores)
+    best_temporal_family, best_temporal_score = _best_score(temporal_scores)
+    strongest_family, strongest_improvement = _best_score(improvements)
+    temporal_minus_static = _difference_or_nan(best_temporal_score, best_static_score)
+    return {
+        "state": row["state"],
+        "country": row["country"],
+        "horizon_days": row["horizon_days"],
+        "best_static_family": best_static_family,
+        "best_static_balanced_accuracy": best_static_score,
+        "best_temporal_family": best_temporal_family,
+        "best_temporal_balanced_accuracy": best_temporal_score,
+        "temporal_minus_static_best": temporal_minus_static,
+        "temporal_wins": _positive_or_false(temporal_minus_static),
+        "autoencoder_temporal_improvement": improvements["autoencoder"],
+        "pca_temporal_improvement": improvements["pca"],
+        "nelson_siegel_temporal_improvement": improvements["nelson_siegel"],
+        "strongest_temporal_improvement_family": strongest_family,
+        "strongest_temporal_improvement": strongest_improvement,
+        "sequence_readiness_label": _sequence_readiness_label(
+            temporal_minus_static,
+            strongest_improvement,
+        ),
+    }
+
+
+def _as_float(value: object) -> float:
+    if value is None or pd.isna(value):
+        return float("nan")
+    if isinstance(value, int | float | str | np.integer | np.floating):
+        return float(value)
+    return float("nan")
+
+
+def _difference_or_nan(left: float, right: float) -> float:
+    if pd.isna(left) or pd.isna(right):
+        return float("nan")
+    return left - right
+
+
+def _best_score(scores: dict[str, float]) -> tuple[str | None, float]:
+    valid = {key: value for key, value in scores.items() if not pd.isna(value)}
+    if not valid:
+        return None, float("nan")
+    best_key = max(valid, key=valid.__getitem__)
+    return best_key, valid[best_key]
+
+
+def _positive_or_false(value: float) -> bool:
+    return bool(not pd.isna(value) and value > 0.0)
+
+
+def _sequence_readiness_label(
+    temporal_minus_static: float,
+    strongest_improvement: float,
+) -> str:
+    if pd.isna(temporal_minus_static):
+        return "insufficient_data"
+    if temporal_minus_static >= 0.05 or strongest_improvement >= 0.05:
+        return "strong_temporal_signal"
+    if temporal_minus_static > 0.0 or strongest_improvement > 0.0:
+        return "modest_temporal_signal"
+    return "no_temporal_gain"
 
 
 def _read_autoencoder_embedding_frames(config: ProjectConfig) -> dict[str, pd.DataFrame]:

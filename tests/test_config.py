@@ -55,6 +55,9 @@ def test_load_config_reads_project_paths() -> None:
     assert config.curve_state_transition_benchmark_table_path == Path(
         "reports/tables/curve_state_transition_benchmark.csv"
     )
+    assert config.sequence_readiness_summary_table_path == Path(
+        "reports/tables/sequence_readiness_summary.csv"
+    )
     assert config.curve_state_probe_importance_table_path == Path(
         "reports/tables/curve_state_probe_importance.csv"
     )
