@@ -113,6 +113,11 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
     )
     curve_state = curve_state_summary(config)
     curve_state.to_csv(config.curve_state_table_path, index=False)
+    curve_state_transition_benchmark = curve_state_transition_benchmark_summary(curve_state)
+    curve_state_transition_benchmark.to_csv(
+        config.curve_state_transition_benchmark_table_path,
+        index=False,
+    )
 
     bucket_summary = summarize_metrics(
         pd.read_parquet(config.baseline_metrics_by_maturity_path),
@@ -134,7 +139,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         rank_table=rank_table,
         residual_rv_benchmark=residual_rv_benchmark,
         volatility_regime_benchmark=volatility_regime_benchmark,
-        curve_state=curve_state,
+        curve_state_transition_benchmark=curve_state_transition_benchmark,
     )
     benchmark_conclusions.to_csv(config.benchmark_conclusions_table_path, index=False)
 
@@ -150,6 +155,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.volatility_regime_table_path,
         config.volatility_regime_benchmark_table_path,
         config.curve_state_table_path,
+        config.curve_state_transition_benchmark_table_path,
         config.benchmark_conclusions_table_path,
         config.baseline_by_maturity_bucket_table_path,
         config.residual_relative_value_table_path,
@@ -593,12 +599,78 @@ def curve_state_summary(config: ProjectConfig) -> pd.DataFrame:
     )
 
 
+def curve_state_transition_benchmark_summary(curve_state: pd.DataFrame) -> pd.DataFrame:
+    """Build a compact benchmark table for future PCA-state classification."""
+    columns = [
+        "state",
+        "country",
+        "horizon_days",
+        "best_model",
+        "best_balanced_accuracy",
+        "autoencoder_rank",
+        "autoencoder_balanced_accuracy",
+        "autoencoder_gap_to_best",
+        "pca_rank",
+        "pca_balanced_accuracy",
+        "nelson_siegel_rank",
+        "nelson_siegel_balanced_accuracy",
+        "curve_rank",
+        "curve_balanced_accuracy",
+        "policy_rank",
+        "policy_balanced_accuracy",
+        "learned_representation_status",
+    ]
+    if curve_state.empty:
+        return pd.DataFrame(columns=columns)
+
+    logistic = curve_state.loc[
+        (curve_state["model"] == "logistic_l2")
+        & (curve_state["mean_true_classes"] >= 2)
+    ].copy()
+    if logistic.empty:
+        return pd.DataFrame(columns=columns)
+
+    rank_groups = ["state", "country", "horizon_days"]
+    logistic["rank"] = logistic.groupby(rank_groups)["mean_balanced_accuracy"].rank(
+        method="min",
+        ascending=False,
+    )
+    best_score = logistic.groupby(rank_groups)["mean_balanced_accuracy"].transform("max")
+    logistic["balanced_accuracy_gap_to_best"] = (
+        best_score - logistic["mean_balanced_accuracy"]
+    )
+
+    rows: list[dict[str, object]] = []
+    for group_values, group in logistic.groupby(["state", "country", "horizon_days"], sort=True):
+        state, country, horizon_days = group_values
+        best = group.sort_values(
+            ["rank", "mean_macro_f1", "representation"],
+            ascending=[True, False, True],
+        ).iloc[0]
+        rows.append(
+            {
+                "state": state,
+                "country": country,
+                "horizon_days": horizon_days,
+                "best_model": f"{best['representation']}/{best['model']}",
+                "best_balanced_accuracy": float(best["mean_balanced_accuracy"]),
+                **_curve_state_representation_values(group, "autoencoder"),
+                **_curve_state_representation_values(group, "pca"),
+                **_curve_state_representation_values(group, "nelson_siegel"),
+                **_curve_state_representation_values(group, "curve"),
+                **_curve_state_representation_values(group, "policy"),
+                "learned_representation_status": _curve_state_learned_status(group),
+            }
+        )
+    return pd.DataFrame(rows).loc[:, columns]
+
+
 def benchmark_conclusion_summary(
     config: ProjectConfig,
     rank_table: pd.DataFrame,
     residual_rv_benchmark: pd.DataFrame,
     volatility_regime_benchmark: pd.DataFrame,
-    curve_state: pd.DataFrame,
+    curve_state_transition_benchmark: pd.DataFrame,
 ) -> pd.DataFrame:
     """Summarize current strongest baselines by research question."""
     rows = [
@@ -606,7 +678,7 @@ def benchmark_conclusion_summary(
         _yield_forecasting_conclusion(rank_table),
         _residual_rv_conclusion(residual_rv_benchmark),
         _volatility_regime_conclusion(volatility_regime_benchmark),
-        _curve_state_conclusion(curve_state),
+        _curve_state_conclusion(curve_state_transition_benchmark),
     ]
     return pd.DataFrame(rows)
 
@@ -732,28 +804,31 @@ def _volatility_regime_conclusion(benchmark: pd.DataFrame) -> dict[str, object]:
     )
 
 
-def _curve_state_conclusion(curve_state: pd.DataFrame) -> dict[str, object]:
-    if curve_state.empty:
+def _curve_state_conclusion(transition_benchmark: pd.DataFrame) -> dict[str, object]:
+    if transition_benchmark.empty:
         return _conclusion_row(
             research_question="curve_state_classification",
             current_best_baseline="not_evaluated",
             learned_representation_status="not_evaluated",
-            evidence_table="curve_state.csv",
+            evidence_table="curve_state_transition_benchmark.csv",
             conclusion="No curve-state classification rows are available.",
         )
 
-    best = curve_state.loc[curve_state["rank"] == 1].sort_values(
-        ["state", "country", "horizon_days", "representation", "model"]
-    )
-    learned_best = best["representation"].eq("autoencoder").any()
+    learned_status = transition_benchmark["learned_representation_status"].astype(str)
+    learned_best = learned_status.eq("best").any()
+    learned_competitive = learned_status.eq("competitive_with_best").any()
     return _conclusion_row(
         research_question="curve_state_classification",
-        current_best_baseline=_winner_frequency_label(best),
+        current_best_baseline=_mode_label(transition_benchmark["best_model"]),
         learned_representation_status=(
-            "mixed_some_best_ranks" if learned_best else "evaluated_but_not_best"
+            "mixed_some_best_ranks"
+            if learned_best
+            else "competitive_in_some_markets"
+            if learned_competitive
+            else "evaluated_but_not_best"
         ),
-        evidence_table="curve_state.csv",
-        conclusion="Autoencoder embeddings are most promising here, but results are mixed by state and market.",
+        evidence_table="curve_state_transition_benchmark.csv",
+        conclusion="Autoencoder embeddings are most promising for PC1/PC2 state classification; PC3 remains weak.",
     )
 
 
@@ -1226,6 +1301,44 @@ def _rank_for_representation(
     if rows.empty:
         return None
     return float(rows.sort_values([rank_column, "model"]).iloc[0][rank_column])
+
+
+def _curve_state_representation_values(
+    group: pd.DataFrame,
+    representation: str,
+) -> dict[str, object]:
+    prefix = representation
+    rows = group.loc[group["representation"] == representation]
+    if rows.empty:
+        return {
+            f"{prefix}_rank": None,
+            f"{prefix}_balanced_accuracy": None,
+            f"{prefix}_gap_to_best": None,
+        }
+    row = rows.sort_values(["rank", "mean_macro_f1", "model"], ascending=[True, False, True]).iloc[
+        0
+    ]
+    return {
+        f"{prefix}_rank": float(row["rank"]),
+        f"{prefix}_balanced_accuracy": float(row["mean_balanced_accuracy"]),
+        f"{prefix}_gap_to_best": float(row["balanced_accuracy_gap_to_best"]),
+    }
+
+
+def _curve_state_learned_status(group: pd.DataFrame) -> str:
+    rows = group.loc[group["representation"] == "autoencoder"]
+    if rows.empty:
+        return "not_evaluated"
+    row = rows.sort_values(["rank", "mean_macro_f1", "model"], ascending=[True, False, True]).iloc[
+        0
+    ]
+    rank = float(row["rank"])
+    gap = float(row["balanced_accuracy_gap_to_best"])
+    if rank == 1.0:
+        return "best"
+    if gap <= 0.05:
+        return "competitive_with_best"
+    return "behind_best"
 
 
 def _conclusion_row(

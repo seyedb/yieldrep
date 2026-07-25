@@ -332,6 +332,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "curve_state.csv"
 
     @property
+    def curve_state_transition_benchmark_table_path(self) -> Path:
+        return self.tables_dir / "curve_state_transition_benchmark.csv"
+
+    @property
     def cross_market_summary_table_path(self) -> Path:
         return self.tables_dir / "cross_market_summary.csv"
 
