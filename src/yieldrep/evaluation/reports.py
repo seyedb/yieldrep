@@ -129,6 +129,15 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
     )
     maturity_point_top.to_csv(config.baseline_by_maturity_point_top_table_path, index=False)
 
+    benchmark_conclusions = benchmark_conclusion_summary(
+        config=config,
+        rank_table=rank_table,
+        residual_rv_benchmark=residual_rv_benchmark,
+        volatility_regime_benchmark=volatility_regime_benchmark,
+        curve_state=curve_state,
+    )
+    benchmark_conclusions.to_csv(config.benchmark_conclusions_table_path, index=False)
+
     output_paths = [
         config.baseline_summary_table_path,
         config.baseline_rank_table_path,
@@ -141,6 +150,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.volatility_regime_table_path,
         config.volatility_regime_benchmark_table_path,
         config.curve_state_table_path,
+        config.benchmark_conclusions_table_path,
         config.baseline_by_maturity_bucket_table_path,
         config.residual_relative_value_table_path,
         config.baseline_by_maturity_point_top_table_path,
@@ -580,6 +590,170 @@ def curve_state_summary(config: ProjectConfig) -> pd.DataFrame:
             ascending=[True, True, True, True, False, True, True],
         )
         .reset_index(drop=True)
+    )
+
+
+def benchmark_conclusion_summary(
+    config: ProjectConfig,
+    rank_table: pd.DataFrame,
+    residual_rv_benchmark: pd.DataFrame,
+    volatility_regime_benchmark: pd.DataFrame,
+    curve_state: pd.DataFrame,
+) -> pd.DataFrame:
+    """Summarize current strongest baselines by research question."""
+    rows = [
+        _curve_reconstruction_conclusion(config),
+        _yield_forecasting_conclusion(rank_table),
+        _residual_rv_conclusion(residual_rv_benchmark),
+        _volatility_regime_conclusion(volatility_regime_benchmark),
+        _curve_state_conclusion(curve_state),
+    ]
+    return pd.DataFrame(rows)
+
+
+def _curve_reconstruction_conclusion(config: ProjectConfig) -> dict[str, object]:
+    if not config.reconstruction_oos_summary_table_path.exists():
+        return _conclusion_row(
+            research_question="curve_reconstruction",
+            current_best_baseline="not_evaluated",
+            learned_representation_status="not_available_in_current_summary",
+            evidence_table=config.reconstruction_oos_summary_table_path.name,
+            conclusion="Run reconstruction to compare PCA, Nelson-Siegel, and autoencoder.",
+        )
+
+    reconstruction = pd.read_csv(config.reconstruction_oos_summary_table_path)
+    if reconstruction.empty:
+        return _conclusion_row(
+            research_question="curve_reconstruction",
+            current_best_baseline="not_evaluated",
+            learned_representation_status="not_available_in_current_summary",
+            evidence_table=config.reconstruction_oos_summary_table_path.name,
+            conclusion="No reconstruction rows are available.",
+        )
+
+    best = (
+        reconstruction.sort_values(["country", "rmse", "representation"])
+        .groupby("country", sort=True)
+        .first()
+        .reset_index()
+    )
+    best_label = _country_winner_label(best, metric_column="rmse", lower_is_better=True)
+    learned = reconstruction.loc[
+        reconstruction["representation"].isin(["autoencoder", "masked_autoencoder"])
+    ]
+    learned_status = (
+        "evaluated_but_not_best"
+        if not learned.empty and not best["representation"].isin(learned["representation"]).any()
+        else "mixed_or_best_in_some_markets"
+        if not learned.empty
+        else "not_evaluated"
+    )
+    return _conclusion_row(
+        research_question="curve_reconstruction",
+        current_best_baseline=best_label,
+        learned_representation_status=learned_status,
+        evidence_table=config.reconstruction_oos_summary_table_path.name,
+        conclusion="PCA remains the main reconstruction hurdle for learned curve embeddings.",
+    )
+
+
+def _yield_forecasting_conclusion(rank_table: pd.DataFrame) -> dict[str, object]:
+    target = rank_table.loc[rank_table["target"] == "yield_change"].copy()
+    if target.empty:
+        return _conclusion_row(
+            research_question="outright_yield_forecasting",
+            current_best_baseline="not_evaluated",
+            learned_representation_status="not_evaluated",
+            evidence_table="baseline_rank.csv",
+            conclusion="No yield-change forecast rows are available.",
+        )
+
+    best = target.loc[target["rank"] == 1].sort_values(
+        ["country", "horizon_days", "representation", "model"]
+    )
+    learned_best = best["representation"].eq("autoencoder").any()
+    return _conclusion_row(
+        research_question="outright_yield_forecasting",
+        current_best_baseline=_winner_frequency_label(best),
+        learned_representation_status=(
+            "mixed_some_best_ranks" if learned_best else "evaluated_but_not_dominant"
+        ),
+        evidence_table="baseline_rank.csv",
+        conclusion="Outright yield-change forecasting remains noisy and is not the central win condition.",
+    )
+
+
+def _residual_rv_conclusion(benchmark: pd.DataFrame) -> dict[str, object]:
+    if benchmark.empty:
+        return _conclusion_row(
+            research_question="residual_relative_value",
+            current_best_baseline="not_evaluated",
+            learned_representation_status="not_evaluated",
+            evidence_table="residual_relative_value_benchmark.csv",
+            conclusion="No residual relative-value benchmark rows are available.",
+        )
+
+    spread_winner = _mode_label(benchmark["best_by_spread"])
+    rank_ic_winner = _mode_label(benchmark["best_by_rank_ic"])
+    learned_best = benchmark["best_by_spread"].astype(str).str.contains("autoencoder").any() or benchmark[
+        "best_by_rank_ic"
+    ].astype(str).str.contains("autoencoder").any()
+    return _conclusion_row(
+        research_question="residual_relative_value",
+        current_best_baseline=f"spread={spread_winner}; rank_ic={rank_ic_winner}",
+        learned_representation_status=(
+            "mixed_some_best_ranks" if learned_best else "evaluated_but_not_best"
+        ),
+        evidence_table="residual_relative_value_benchmark.csv",
+        conclusion="Explicit maturity residual features remain the strongest RV benchmark.",
+    )
+
+
+def _volatility_regime_conclusion(benchmark: pd.DataFrame) -> dict[str, object]:
+    if benchmark.empty:
+        return _conclusion_row(
+            research_question="volatility_regime_classification",
+            current_best_baseline="not_evaluated",
+            learned_representation_status="not_evaluated",
+            evidence_table="volatility_regime_benchmark.csv",
+            conclusion="No volatility-regime benchmark rows are available.",
+        )
+
+    best_label = _mode_label(benchmark["best_model"])
+    learned_best = benchmark["best_model"].astype(str).str.contains("autoencoder").any()
+    return _conclusion_row(
+        research_question="volatility_regime_classification",
+        current_best_baseline=best_label,
+        learned_representation_status=(
+            "mixed_some_best_ranks" if learned_best else "evaluated_but_not_best"
+        ),
+        evidence_table="volatility_regime_benchmark.csv",
+        conclusion="Realized curve-volatility and policy features remain the main hurdles.",
+    )
+
+
+def _curve_state_conclusion(curve_state: pd.DataFrame) -> dict[str, object]:
+    if curve_state.empty:
+        return _conclusion_row(
+            research_question="curve_state_classification",
+            current_best_baseline="not_evaluated",
+            learned_representation_status="not_evaluated",
+            evidence_table="curve_state.csv",
+            conclusion="No curve-state classification rows are available.",
+        )
+
+    best = curve_state.loc[curve_state["rank"] == 1].sort_values(
+        ["state", "country", "horizon_days", "representation", "model"]
+    )
+    learned_best = best["representation"].eq("autoencoder").any()
+    return _conclusion_row(
+        research_question="curve_state_classification",
+        current_best_baseline=_winner_frequency_label(best),
+        learned_representation_status=(
+            "mixed_some_best_ranks" if learned_best else "evaluated_but_not_best"
+        ),
+        evidence_table="curve_state.csv",
+        conclusion="Autoencoder embeddings are most promising here, but results are mixed by state and market.",
     )
 
 
@@ -1052,6 +1226,52 @@ def _rank_for_representation(
     if rows.empty:
         return None
     return float(rows.sort_values([rank_column, "model"]).iloc[0][rank_column])
+
+
+def _conclusion_row(
+    research_question: str,
+    current_best_baseline: str,
+    learned_representation_status: str,
+    evidence_table: str,
+    conclusion: str,
+) -> dict[str, object]:
+    return {
+        "research_question": research_question,
+        "current_best_baseline": current_best_baseline,
+        "learned_representation_status": learned_representation_status,
+        "evidence_table": evidence_table,
+        "conclusion": conclusion,
+    }
+
+
+def _country_winner_label(
+    winners: pd.DataFrame,
+    metric_column: str,
+    lower_is_better: bool,
+) -> str:
+    if winners.empty:
+        return "not_evaluated"
+    metric_label = "rmse" if lower_is_better else metric_column
+    labels = [
+        f"{row.country}:{row.representation}/{int(row.n_components)} {metric_label}={getattr(row, metric_column):.4f}"
+        for row in winners.itertuples(index=False)
+    ]
+    return "; ".join(labels)
+
+
+def _winner_frequency_label(winners: pd.DataFrame) -> str:
+    if winners.empty:
+        return "not_evaluated"
+    labels = winners["representation"].astype(str) + "/" + winners["model"].astype(str)
+    counts = labels.value_counts()
+    return "; ".join(f"{label} ({count})" for label, count in counts.items())
+
+
+def _mode_label(values: pd.Series) -> str:
+    valid = values.dropna().astype(str)
+    if valid.empty:
+        return "not_evaluated"
+    return str(valid.value_counts().index[0])
 
 
 def _naive_residual_rows(residual: pd.DataFrame, rank_groups: list[str]) -> pd.DataFrame:

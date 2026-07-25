@@ -316,6 +316,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "baseline_winners.csv"
 
     @property
+    def benchmark_conclusions_table_path(self) -> Path:
+        return self.tables_dir / "benchmark_conclusions.csv"
+
+    @property
     def volatility_regime_table_path(self) -> Path:
         return self.tables_dir / "volatility_regime.csv"
 
