@@ -8,6 +8,8 @@ import pandas as pd
 from yieldrep.config import ProjectConfig
 from yieldrep.evaluation.splits import evaluation_splits
 
+NELSON_SIEGEL_FEATURES = ["beta_level", "beta_slope", "beta_curvature", "rmse"]
+
 
 def build_modeling_datasets(config: ProjectConfig) -> list[Path]:
     """Join baseline representations to forward target datasets."""
@@ -338,12 +340,73 @@ def _build_curve_level_target_family(
         merged.to_parquet(output_path, index=False)
         output_paths.append(output_path)
 
+    if suffix == "_curve_state":
+        output_paths.extend(_build_temporal_curve_state_target_family(config, targets))
+
     if "realized_curve_vol" in targets.columns:
         curve_vol = targets.copy()
         curve_vol_path = config.modeling_dir / f"curve_vol{suffix}_targets.parquet"
         curve_vol.to_parquet(curve_vol_path, index=False)
         output_paths.append(curve_vol_path)
     return output_paths
+
+
+def _build_temporal_curve_state_target_family(
+    config: ProjectConfig,
+    targets: pd.DataFrame,
+) -> list[Path]:
+    output_paths: list[Path] = []
+    for representation, features, feature_columns in [
+        (
+            "pca_temporal",
+            _read_pca_features(config),
+            [f"PC{i}" for i in range(1, config.pca.n_components + 1)],
+        ),
+        (
+            "autoencoder_temporal",
+            _read_autoencoder_features(config),
+            [f"AE{i}" for i in range(1, config.autoencoder.latent_dim + 1)],
+        ),
+        ("nelson_siegel_temporal", _read_nelson_siegel_features(config), NELSON_SIEGEL_FEATURES),
+    ]:
+        if features.empty:
+            continue
+        temporal_features = _add_temporal_lag_features(
+            features=features,
+            feature_columns=feature_columns,
+            lag_days=config.evaluation.lag_days,
+        )
+        if temporal_features.empty:
+            continue
+        merged = targets.merge(temporal_features, on=["date", "country"], how="inner")
+        if merged.empty:
+            continue
+        output_path = config.modeling_dir / f"{representation}_curve_state_targets.parquet"
+        merged.to_parquet(output_path, index=False)
+        output_paths.append(output_path)
+    return output_paths
+
+
+def _add_temporal_lag_features(
+    features: pd.DataFrame,
+    feature_columns: list[str],
+    lag_days: list[int],
+) -> pd.DataFrame:
+    available_columns = [column for column in feature_columns if column in features.columns]
+    if not available_columns:
+        return pd.DataFrame()
+
+    frame = features.loc[:, ["date", "country", *available_columns]].copy()
+    frame["date"] = pd.to_datetime(frame["date"])
+    frame = frame.sort_values(["country", "date"]).reset_index(drop=True)
+    grouped = frame.groupby("country", sort=False)
+    for lag_day in lag_days:
+        if lag_day <= 0:
+            continue
+        lagged = grouped[available_columns].shift(lag_day)
+        lagged.columns = [f"{column}_lag_{lag_day}" for column in available_columns]
+        frame = pd.concat([frame, lagged], axis=1)
+    return frame.dropna().reset_index(drop=True)
 
 
 def _join_pca_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFrame:

@@ -182,6 +182,9 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
             processed_dir / "modeling" / "pca_curve_state_targets.parquet",
             processed_dir / "modeling" / "autoencoder_curve_state_targets.parquet",
             processed_dir / "modeling" / "nelson_siegel_curve_state_targets.parquet",
+            processed_dir / "modeling" / "pca_temporal_curve_state_targets.parquet",
+            processed_dir / "modeling" / "autoencoder_temporal_curve_state_targets.parquet",
+            processed_dir / "modeling" / "nelson_siegel_temporal_curve_state_targets.parquet",
             processed_dir / "modeling" / "curve_curve_state_targets.parquet",
         }
     )
@@ -213,6 +216,9 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     )
     pca_curve_state_targets = pd.read_parquet(
         processed_dir / "modeling" / "pca_curve_state_targets.parquet"
+    )
+    pca_temporal_curve_state_targets = pd.read_parquet(
+        processed_dir / "modeling" / "pca_temporal_curve_state_targets.parquet"
     )
     residual_feature_targets = pd.read_parquet(
         processed_dir / "modeling" / "residual_feature_targets.parquet"
@@ -269,6 +275,9 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         curve_vol_regime_targets.columns
     )
     assert {"PC1", "future_PC1", "future_PC3"}.issubset(pca_curve_state_targets.columns)
+    assert {"PC1", "PC1_lag_1", "future_PC1"}.issubset(
+        pca_temporal_curve_state_targets.columns
+    )
     assert {"residual_z_60", "residual_change_5", "target_yield_change"}.issubset(
         residual_feature_targets.columns
     )

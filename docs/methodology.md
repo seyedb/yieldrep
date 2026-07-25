@@ -428,6 +428,11 @@ creates a simple transition question:
 given today's curve representation, predict the future PCA state bucket
 ```
 
+The benchmark also includes temporal versions of PCA, Nelson-Siegel, and
+autoencoder representations that append recent lagged factor values from the
+same information set. This asks whether recent curve-representation dynamics add
+state-transition information beyond the current curve snapshot.
+
 This is a representation benchmark, not a claim that PCA states are the final
 economic regime definition.
 
@@ -769,7 +774,7 @@ Included now:
 - classical supervised forecasting baselines
 - residual RV ranking metrics for maturity-level feature sets
 - curve-level volatility-regime classification
-- PCA-defined curve-state classification
+- PCA-defined curve-state classification with static and temporal representation baselines
 - cross-market PCA, Nelson-Siegel, and state diagnostics
 - chronological, non-overlapping, and walk-forward evaluation checks
 - Plotly figures and CSV report tables

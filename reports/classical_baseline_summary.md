@@ -92,6 +92,11 @@ reconstruction benchmark overall.
 PCA and Nelson-Siegel remain useful curve-level representations. They are most
 clearly validated through reconstruction and curve-state summaries.
 
+Temporal curve-state baselines are stronger than static snapshots in many
+state-classification settings. The improvement is most visible for temporal
+PCA and Nelson-Siegel features, which reinforces the value of curve dynamics
+before moving to larger sequence models.
+
 The masked autoencoder is a more appropriate learned-representation baseline
 than the initial plain autoencoder, but it is still not a win. It establishes the
 PyTorch pipeline and gives future learned models clear PCA reconstruction and

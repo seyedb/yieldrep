@@ -618,6 +618,14 @@ def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                 EvaluationSpec(
                     target=target,
                     target_column=target_column,
+                    representation="pca_temporal",
+                    path=config.modeling_dir / f"pca_temporal{suffix}_targets.parquet",
+                    features=_temporal_features(_pca_features(config), config.evaluation.lag_days),
+                    base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
+                ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
                     representation="autoencoder",
                     path=config.modeling_dir / f"autoencoder{suffix}_targets.parquet",
                     features=_autoencoder_features(config),
@@ -626,9 +634,28 @@ def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                 EvaluationSpec(
                     target=target,
                     target_column=target_column,
+                    representation="autoencoder_temporal",
+                    path=config.modeling_dir / f"autoencoder_temporal{suffix}_targets.parquet",
+                    features=_temporal_features(
+                        _autoencoder_features(config),
+                        config.evaluation.lag_days,
+                    ),
+                    base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
+                ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
                     representation="nelson_siegel",
                     path=config.modeling_dir / f"nelson_siegel{suffix}_targets.parquet",
                     features=NELSON_SIEGEL_FEATURES,
+                    base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
+                ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
+                    representation="nelson_siegel_temporal",
+                    path=config.modeling_dir / f"nelson_siegel_temporal{suffix}_targets.parquet",
+                    features=_temporal_features(NELSON_SIEGEL_FEATURES, config.evaluation.lag_days),
                     base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
                 ),
                 EvaluationSpec(
@@ -1031,6 +1058,16 @@ def _pca_features(config: ProjectConfig) -> list[str]:
 
 def _autoencoder_features(config: ProjectConfig) -> list[str]:
     return [f"{AUTOENCODER_FEATURES_PREFIX}{i}" for i in range(1, config.autoencoder.latent_dim + 1)]
+
+
+def _temporal_features(features: list[str], lag_days: list[int]) -> list[str]:
+    lagged = [
+        f"{feature}_lag_{lag_day}"
+        for lag_day in lag_days
+        if lag_day > 0
+        for feature in features
+    ]
+    return [*features, *lagged]
 
 
 def _state_maturity_features(state_features: list[str]) -> list[str]:

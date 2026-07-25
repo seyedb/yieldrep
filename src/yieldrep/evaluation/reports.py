@@ -622,10 +622,17 @@ def curve_state_transition_benchmark_summary(curve_state: pd.DataFrame) -> pd.Da
         "autoencoder_rank",
         "autoencoder_balanced_accuracy",
         "autoencoder_gap_to_best",
+        "autoencoder_temporal_rank",
+        "autoencoder_temporal_balanced_accuracy",
+        "autoencoder_temporal_gap_to_best",
         "pca_rank",
         "pca_balanced_accuracy",
+        "pca_temporal_rank",
+        "pca_temporal_balanced_accuracy",
         "nelson_siegel_rank",
         "nelson_siegel_balanced_accuracy",
+        "nelson_siegel_temporal_rank",
+        "nelson_siegel_temporal_balanced_accuracy",
         "curve_rank",
         "curve_balanced_accuracy",
         "policy_rank",
@@ -667,8 +674,11 @@ def curve_state_transition_benchmark_summary(curve_state: pd.DataFrame) -> pd.Da
                 "best_model": f"{best['representation']}/{best['model']}",
                 "best_balanced_accuracy": float(best["mean_balanced_accuracy"]),
                 **_curve_state_representation_values(group, "autoencoder"),
+                **_curve_state_representation_values(group, "autoencoder_temporal"),
                 **_curve_state_representation_values(group, "pca"),
+                **_curve_state_representation_values(group, "pca_temporal"),
                 **_curve_state_representation_values(group, "nelson_siegel"),
+                **_curve_state_representation_values(group, "nelson_siegel_temporal"),
                 **_curve_state_representation_values(group, "curve"),
                 **_curve_state_representation_values(group, "policy"),
                 "learned_representation_status": _curve_state_learned_status(group),
@@ -949,7 +959,7 @@ def _curve_state_conclusion(transition_benchmark: pd.DataFrame) -> dict[str, obj
             else "evaluated_but_not_best"
         ),
         evidence_table="curve_state_transition_benchmark.csv",
-        conclusion="Autoencoder embeddings are most promising for PC1/PC2 state classification; PC3 remains weak.",
+        conclusion="Temporal PCA/NS baselines are strongest overall; AE remains useful in PC1/PC2 pockets, while PC3 is weak.",
     )
 
 
@@ -1447,7 +1457,7 @@ def _curve_state_representation_values(
 
 
 def _curve_state_learned_status(group: pd.DataFrame) -> str:
-    rows = group.loc[group["representation"] == "autoencoder"]
+    rows = group.loc[group["representation"].isin(["autoencoder", "autoencoder_temporal"])]
     if rows.empty:
         return "not_evaluated"
     row = rows.sort_values(["rank", "mean_macro_f1", "model"], ascending=[True, False, True]).iloc[
