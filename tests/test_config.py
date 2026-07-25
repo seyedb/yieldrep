@@ -179,6 +179,8 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.autoencoder.latent_dim == 5
     assert config.autoencoder.hidden_dim == 64
     assert config.autoencoder.epochs == 1200
+    assert config.autoencoder.validation_fraction == 0.2
+    assert config.autoencoder.early_stopping_patience == 50
     assert config.targets.horizons_days == [1, 5, 20]
     assert config.targets.realized_vol_window == 20
     assert config.evaluation.method == "date_ordered"

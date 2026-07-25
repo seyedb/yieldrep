@@ -9,6 +9,7 @@ import torch
 from numpy.typing import NDArray
 from sklearn.preprocessing import StandardScaler
 from torch import nn
+from torch import Tensor
 
 from yieldrep.config import ProjectConfig
 from yieldrep.factors.curve import curve_panel
@@ -59,22 +60,33 @@ def build_autoencoder(config: ProjectConfig) -> list[Path]:
             hidden_dim=config.autoencoder.hidden_dim,
             epochs=config.autoencoder.epochs,
             learning_rate=config.autoencoder.learning_rate,
+            validation_fraction=config.autoencoder.validation_fraction,
+            early_stopping_patience=config.autoencoder.early_stopping_patience,
+            min_delta=config.autoencoder.min_delta,
             random_seed=config.autoencoder.random_seed,
         )
         country_key = str(country).lower()
         embeddings_path = config.autoencoder_dir / f"{country_key}_embeddings.parquet"
         reconstruction_path = config.autoencoder_dir / f"{country_key}_reconstruction.parquet"
+        metrics_path = config.autoencoder_dir / f"{country_key}_metrics.parquet"
         result.embeddings.to_parquet(embeddings_path, index=False)
         result.reconstruction.to_parquet(reconstruction_path, index=False)
-        output_paths.extend([embeddings_path, reconstruction_path])
+        result.metrics.to_parquet(metrics_path, index=False)
+        output_paths.extend([embeddings_path, reconstruction_path, metrics_path])
 
     return output_paths
 
 
 class AutoencoderResult:
-    def __init__(self, embeddings: pd.DataFrame, reconstruction: pd.DataFrame) -> None:
+    def __init__(
+        self,
+        embeddings: pd.DataFrame,
+        reconstruction: pd.DataFrame,
+        metrics: pd.DataFrame,
+    ) -> None:
         self.embeddings = embeddings
         self.reconstruction = reconstruction
+        self.metrics = metrics
 
 
 def fit_autoencoder_panel(
@@ -84,6 +96,9 @@ def fit_autoencoder_panel(
     hidden_dim: int,
     epochs: int,
     learning_rate: float,
+    validation_fraction: float,
+    early_stopping_patience: int,
+    min_delta: float,
     random_seed: int,
 ) -> AutoencoderResult:
     """Fit an autoencoder on a chronological train split and reconstruct all dates."""
@@ -95,11 +110,21 @@ def fit_autoencoder_panel(
         raise ValueError("epochs must be positive")
     if learning_rate <= 0:
         raise ValueError("learning_rate must be positive")
+    if not 0 < validation_fraction < 1:
+        raise ValueError("validation_fraction must be between 0 and 1")
+    if early_stopping_patience <= 0:
+        raise ValueError("early_stopping_patience must be positive")
+    if min_delta < 0:
+        raise ValueError("min_delta must be non-negative")
 
     split = _date_ordered_panel_split(panel, test_fraction)
     if split is None:
         raise ValueError("Panel is too short for the requested test split")
-    train_panel, test_panel = split
+    train_validation_panel, test_panel = split
+    inner_split = _date_ordered_panel_split(train_validation_panel, validation_fraction)
+    if inner_split is None:
+        raise ValueError("Training panel is too short for the requested validation split")
+    train_panel, validation_panel = inner_split
 
     torch.manual_seed(random_seed)
     np.random.seed(random_seed)
@@ -107,6 +132,7 @@ def fit_autoencoder_panel(
 
     scaler = StandardScaler()
     x_train = scaler.fit_transform(train_panel).astype(np.float32)
+    x_validation = scaler.transform(validation_panel).astype(np.float32)
     x_all = scaler.transform(panel).astype(np.float32)
 
     model = CurveAutoencoder(
@@ -117,14 +143,44 @@ def fit_autoencoder_panel(
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = nn.MSELoss()
     train_tensor = torch.from_numpy(x_train)
+    validation_tensor = torch.from_numpy(x_validation)
 
-    model.train()
-    for _ in range(epochs):
+    best_state: dict[str, Tensor] | None = None
+    best_validation_loss = float("inf")
+    best_epoch = 0
+    epochs_without_improvement = 0
+    final_train_loss = float("nan")
+    final_validation_loss = float("nan")
+
+    for epoch in range(1, epochs + 1):
+        model.train()
         optimizer.zero_grad()
         reconstructed = model(train_tensor)
         loss = loss_fn(reconstructed, train_tensor)
         loss.backward()
         optimizer.step()
+
+        model.eval()
+        with torch.no_grad():
+            validation_loss = loss_fn(model(validation_tensor), validation_tensor)
+
+        final_train_loss = float(loss.detach().item())
+        final_validation_loss = float(validation_loss.detach().item())
+        if final_validation_loss < best_validation_loss - min_delta:
+            best_validation_loss = final_validation_loss
+            best_epoch = epoch
+            best_state = {
+                name: parameter.detach().clone()
+                for name, parameter in model.state_dict().items()
+            }
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement >= early_stopping_patience:
+                break
+
+    if best_state is not None:
+        model.load_state_dict(best_state)
 
     model.eval()
     with torch.no_grad():
@@ -133,7 +189,11 @@ def fit_autoencoder_panel(
         reconstructed_scaled = model(all_tensor).numpy()
 
     reconstructed_values = scaler.inverse_transform(reconstructed_scaled)
-    split_labels = _split_labels(panel.index, test_panel.index)
+    split_labels = _split_labels(
+        index=panel.index,
+        validation_index=validation_panel.index,
+        test_index=test_panel.index,
+    )
     embeddings = _embedding_frame(
         index=panel.index,
         country=str(panel.attrs.get("country", "")),
@@ -145,7 +205,21 @@ def fit_autoencoder_panel(
         reconstructed=reconstructed_values,
         split_labels=split_labels,
     )
-    return AutoencoderResult(embeddings=embeddings, reconstruction=reconstruction)
+    metrics = _metrics_frame(
+        reconstruction=reconstruction,
+        country=str(panel.attrs.get("country", "")),
+        latent_dim=min(latent_dim, hidden_dim),
+        hidden_dim=hidden_dim,
+        epochs_trained=best_epoch,
+        best_validation_loss=best_validation_loss,
+        final_train_loss=final_train_loss,
+        final_validation_loss=final_validation_loss,
+    )
+    return AutoencoderResult(
+        embeddings=embeddings,
+        reconstruction=reconstruction,
+        metrics=metrics,
+    )
 
 
 def autoencoder_reconstruction_errors(config: ProjectConfig) -> pd.DataFrame:
@@ -183,10 +257,30 @@ def _date_ordered_panel_split(
     return panel.iloc[:split_index], panel.iloc[split_index:]
 
 
-def _split_labels(index: pd.Index, test_index: pd.Index) -> NDArray[np.str_]:
+def _split_labels(
+    index: pd.Index,
+    validation_index: pd.Index,
+    test_index: pd.Index,
+) -> NDArray[np.str_]:
+    validation_dates = set(pd.to_datetime(validation_index))
     test_dates = set(pd.to_datetime(test_index))
-    labels = ["test" if date in test_dates else "train" for date in pd.to_datetime(index)]
+    labels = [
+        _split_label(date, validation_dates, test_dates)
+        for date in pd.to_datetime(index)
+    ]
     return np.asarray(labels, dtype=np.str_)
+
+
+def _split_label(
+    date: pd.Timestamp,
+    validation_dates: set[pd.Timestamp],
+    test_dates: set[pd.Timestamp],
+) -> str:
+    if date in test_dates:
+        return "test"
+    if date in validation_dates:
+        return "validation"
+    return "train"
 
 
 def _embedding_frame(
@@ -227,3 +321,37 @@ def _reconstruction_frame(
         :,
         ["date", "country", "maturity_years", "yield", "fitted_yield", "split"],
     ]
+
+
+def _metrics_frame(
+    reconstruction: pd.DataFrame,
+    country: str,
+    latent_dim: int,
+    hidden_dim: int,
+    epochs_trained: int,
+    best_validation_loss: float,
+    final_train_loss: float,
+    final_validation_loss: float,
+) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    frame = reconstruction.copy()
+    frame["error"] = frame["yield"] - frame["fitted_yield"]
+    for split, group in frame.groupby("split", sort=True):
+        rows.append(
+            {
+                "country": country,
+                "split": split,
+                "latent_dim": latent_dim,
+                "hidden_dim": hidden_dim,
+                "epochs_trained": epochs_trained,
+                "best_validation_loss": best_validation_loss,
+                "final_train_loss": final_train_loss,
+                "final_validation_loss": final_validation_loss,
+                "observations": len(group),
+                "dates": group["date"].nunique(),
+                "rmse": float(np.sqrt(np.mean(np.square(group["error"])))),
+                "mae": float(np.mean(np.abs(group["error"]))),
+                "mean_error": float(group["error"].mean()),
+            }
+        )
+    return pd.DataFrame(rows)

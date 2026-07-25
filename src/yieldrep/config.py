@@ -29,6 +29,9 @@ class AutoencoderConfig(BaseModel):
     hidden_dim: int = 64
     epochs: int = 1200
     learning_rate: float = 0.005
+    validation_fraction: float = 0.2
+    early_stopping_patience: int = 50
+    min_delta: float = 1e-5
     random_seed: int = 42
     min_train_dates: int = 252
 

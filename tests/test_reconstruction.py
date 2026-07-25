@@ -54,8 +54,11 @@ def test_fit_autoencoder_panel_returns_embeddings_and_reconstruction() -> None:
         test_fraction=0.5,
         latent_dim=2,
         hidden_dim=4,
-        epochs=3,
+        epochs=20,
         learning_rate=0.01,
+        validation_fraction=0.5,
+        early_stopping_patience=3,
+        min_delta=0.0,
         random_seed=42,
     )
 
@@ -68,7 +71,11 @@ def test_fit_autoencoder_panel_returns_embeddings_and_reconstruction() -> None:
         "fitted_yield",
         "split",
     }.issubset(result.reconstruction.columns)
-    assert set(result.reconstruction["split"]) == {"train", "test"}
+    assert {"split", "rmse", "mae", "epochs_trained", "best_validation_loss"}.issubset(
+        result.metrics.columns
+    )
+    assert set(result.reconstruction["split"]) == {"train", "validation", "test"}
+    assert set(result.metrics["split"]) == {"train", "validation", "test"}
     assert len(result.reconstruction) == panel.size
 
 

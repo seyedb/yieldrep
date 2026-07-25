@@ -14,6 +14,9 @@ autoencoder:
   hidden_dim: 64
   epochs: 1200
   learning_rate: 0.005
+  validation_fraction: 0.2
+  early_stopping_patience: 50
+  min_delta: 0.00001
   random_seed: 42
   min_train_dates: 252
 

@@ -448,7 +448,9 @@ r_t^{(m)}
 PCA reconstructs curves from the first \(K\) components. Nelson-Siegel
 reconstructs curves from the fitted parametric form. The first learned baseline
 is a small PyTorch MLP autoencoder trained only on the chronological train
-split. Its latent dimension is matched to the PCA component count.
+split, with an inner chronological validation split and early stopping on
+validation reconstruction loss. Its latent dimension is matched to the PCA
+component count.
 
 The autoencoder is first evaluated on out-of-sample reconstruction:
 
