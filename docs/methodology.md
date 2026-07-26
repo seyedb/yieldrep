@@ -573,6 +573,22 @@ The same evidence is visualized in
 Metrics are interpreted by task. A single pooled error number is not treated as
 the universal objective.
 
+The evaluation protocol separates core research tasks from supporting
+diagnostics:
+
+| Role | Tasks | Purpose |
+| --- | --- | --- |
+| Core baseline tasks | clean reconstruction, masked maturity reconstruction, residual relative value, volatility-regime classification | define the main classical and learned representation hurdles |
+| Supporting diagnostics | outright yield-change forecasting, cross-market factor comparison, latent-factor correlations | explain model behavior and failure modes |
+| Exploratory extensions | learned state/regime separation, graph learning | only added after the relevant baseline task is stable |
+
+This distinction is important because not every result should be interpreted as
+a trading signal or a final model comparison. Reconstruction tests whether a
+representation captures curve geometry. Residual relative value tests whether
+rich/cheap maturity structure mean-reverts. Volatility-regime classification
+tests whether observable curve and macro state variables identify future curve
+stress.
+
 The current metric hierarchy is:
 
 | Task | Primary metric | Secondary metric | Context metrics |
@@ -585,6 +601,19 @@ The current metric hierarchy is:
 
 This hierarchy is intentionally narrow. New metrics should only be added if they
 answer a distinct research question that the current set does not cover.
+
+The current evidence gates are:
+
+| Scenario | Evidence considered meaningful |
+| --- | --- |
+| Clean reconstruction | a learned representation narrows the gap to PCA without look-ahead |
+| Masked maturity reconstruction | a learned model improves masked RMSE / MAE versus the masked autoencoder hurdle |
+| Residual relative value | positive spread score, hit rate above chance, and positive rank IC by country/horizon |
+| Macro or market RV regimes | materially different high-minus-low hit rates or rank IC across regimes |
+| Volatility regimes | balanced accuracy and macro F1 above direct persistence / curve-volatility hurdles |
+
+Results that do not pass these gates are still useful diagnostics, but they are
+not treated as evidence that a representation improves the research task.
 
 Reconstruction uses RMSE and MAE as primary metrics because the task is curve
 compression: the question is whether the representation reproduces observed

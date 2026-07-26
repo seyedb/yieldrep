@@ -138,6 +138,7 @@ The companion heatmap is written to
 
 ## Next Step
 
-The next research step should improve the learned representation protocol itself,
-especially the masked autoencoder and sequence-model training setup, before using
-learned embeddings in downstream forecasting or relative-value tasks.
+The next phase is learned curve-state diagnostics. The immediate question is not
+whether learned embeddings improve a supervised forecast, but whether AE or
+Transformer curve states separate macro/RV environments already identified by
+the classical regime scorecards.
