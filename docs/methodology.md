@@ -444,6 +444,12 @@ held-out maturities from the rest of the same curve. This is closer to a
 self-supervised representation-learning task than ordinary full-curve
 reconstruction.
 
+Clean reconstruction and masked-maturity reconstruction are reported as separate
+tasks. PCA, Nelson-Siegel, and the autoencoder are compared on clean held-out
+curve reconstruction. Masked autoencoder results are reported as a standalone
+self-supervised diagnostic because PCA and Nelson-Siegel are not trained with the
+same missing-maturity objective.
+
 PCA, Nelson-Siegel, and autoencoder outputs are evaluated as standalone
 representations through reconstruction and diagnostics. They are not fed as
 inputs into downstream ridge, logistic, or elastic-net models.
@@ -516,7 +522,8 @@ where the task is well-defined:
 
 | Scenario | Valid methods | Primary metrics |
 | --- | --- | --- |
-| Curve reconstruction | PCA, Nelson-Siegel, autoencoder | out-of-sample RMSE, MAE |
+| Curve reconstruction | PCA, Nelson-Siegel, autoencoder | clean out-of-sample RMSE, MAE |
+| Masked maturity reconstruction | masked autoencoder | masked-maturity RMSE, MAE |
 | Outright yield forecasting | lagged moves, curve-shape features, carry/roll-down proxies | RMSE, MAE, directional accuracy |
 | Residual relative value | Nelson-Siegel residual diagnostics, curve-shape by maturity baseline | spread convergence, hit rate, rank IC |
 | Volatility-regime classification | curve-shape, policy-rate, realized curve-volatility features | balanced accuracy, macro F1 |

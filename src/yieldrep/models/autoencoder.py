@@ -307,6 +307,7 @@ def autoencoder_reconstruction_errors(config: ProjectConfig) -> pd.DataFrame:
         test = frame.loc[frame["split"] == "test"].copy()
         if test.empty:
             continue
+        test["reconstruction_task"] = "clean_reconstruction"
         test["representation"] = "autoencoder"
         test["n_components"] = config.autoencoder.latent_dim
         test["error"] = test["yield"] - test["fitted_yield"]
@@ -318,6 +319,7 @@ def autoencoder_reconstruction_errors(config: ProjectConfig) -> pd.DataFrame:
         test = frame.loc[frame["split"] == "test"].copy()
         if test.empty:
             continue
+        test["reconstruction_task"] = "masked_maturity_reconstruction"
         test["representation"] = "masked_autoencoder"
         test["n_components"] = config.autoencoder.latent_dim
         test["error"] = test["yield"] - test["fitted_yield"]

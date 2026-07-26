@@ -26,7 +26,8 @@ The current primary metrics are:
 
 | Task | Primary metric | Secondary/context metrics |
 | --- | --- | --- |
-| Curve reconstruction | RMSE / MAE | PCA explained variance |
+| Clean curve reconstruction | out-of-sample RMSE / MAE | PCA explained variance |
+| Masked maturity reconstruction | masked-maturity RMSE / MAE | autoencoder train/validation diagnostics |
 | Residual relative value | residual RV spread score | rank IC, convergence hit rate |
 | Outright yield-change forecasting | RMSE / MAE | directional accuracy |
 | Volatility regime classification | balanced accuracy / macro F1 | accuracy |
@@ -70,8 +71,10 @@ realized curve volatility remains the stronger hurdle.
 The first learned baseline is a masked autoencoder: maturities are randomly
 hidden during training, the model receives a mask indicator, and the objective
 combines masked-maturity reconstruction with clean-curve reconstruction. Its
-embeddings are not fed into downstream benchmark models. PCA-5 remains the
-strongest reconstruction benchmark overall.
+embeddings are not fed into downstream benchmark models. Clean out-of-sample
+reconstruction is now evaluated separately from masked-maturity reconstruction.
+PCA-5 remains the strongest clean reconstruction benchmark in US, Canada, and
+the euro-area aggregate curve.
 
 ## Interpretation
 
@@ -79,9 +82,9 @@ PCA and Nelson-Siegel remain useful curve-level representations. They are most
 clearly validated through reconstruction and cross-market factor diagnostics.
 
 The masked autoencoder is a more appropriate learned-representation baseline
-than the initial plain autoencoder, but it is still not a win. It establishes the
-PyTorch pipeline and gives future learned models a clear PCA reconstruction
-hurdle.
+than the initial plain autoencoder, but it is still not a win on clean held-out
+curve reconstruction. It establishes the PyTorch pipeline and gives future
+learned models a clear PCA reconstruction hurdle.
 
 Residual relative-value ranking is a maturity-level task. In the current
 classical setup, direct curve-shape, lagged, and carry/roll-down features are
@@ -101,5 +104,5 @@ sample.
 ## Next Step
 
 The next research step should improve the learned representation protocol
-itself, for example with better regularization, validation-based early stopping,
-or a masked-reconstruction objective, before moving to larger architectures.
+itself, for example with better regularization, architecture constraints, or a
+more stable masked-reconstruction setup, before moving to larger architectures.

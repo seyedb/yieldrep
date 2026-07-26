@@ -597,6 +597,14 @@ def scenario_method_comparison_table() -> pd.DataFrame:
             "methodological_boundary": "Representation outputs are evaluated directly, not fed into another supervised model.",
         },
         {
+            "scenario": "masked_maturity_reconstruction",
+            "question": "Can a self-supervised model infer hidden maturities from the rest of the curve?",
+            "valid_methods": "masked autoencoder",
+            "primary_metrics": "masked-maturity RMSE; MAE by country and maturity",
+            "evidence_tables": "reconstruction_oos_comparison.csv; reconstruction_oos_by_maturity.csv",
+            "methodological_boundary": "Masked reconstruction is reported separately from clean curve reconstruction.",
+        },
+        {
             "scenario": "outright_yield_forecasting",
             "question": "Which direct feature family predicts future yield changes?",
             "valid_methods": "lagged yield changes; curve-shape features; carry/roll-down proxies",

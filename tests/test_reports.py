@@ -113,6 +113,7 @@ def test_scenario_method_comparison_table_documents_clean_boundaries() -> None:
 
     assert set(table["scenario"]) == {
         "curve_reconstruction",
+        "masked_maturity_reconstruction",
         "outright_yield_forecasting",
         "residual_relative_value",
         "volatility_regime_classification",

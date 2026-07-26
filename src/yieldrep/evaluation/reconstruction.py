@@ -12,7 +12,8 @@ from yieldrep.factors.curve import curve_panel
 from yieldrep.models.autoencoder import autoencoder_reconstruction_errors
 
 
-GROUP_COLUMNS = ["country", "representation", "n_components"]
+GROUP_COLUMNS = ["reconstruction_task", "country", "representation", "n_components"]
+MATURITY_BUCKET_GROUP_COLUMNS = [*GROUP_COLUMNS, "maturity_bucket"]
 MATURITY_GROUP_COLUMNS = [*GROUP_COLUMNS, "maturity_years", "maturity_bucket"]
 WORST_MATURITIES_PER_GROUP = 10
 
@@ -30,18 +31,27 @@ def evaluate_reconstruction(config: ProjectConfig) -> list[Path]:
     by_maturity = _summarize_reconstruction(errors, MATURITY_GROUP_COLUMNS)
     worst_maturities = _worst_maturity_diagnostics(by_maturity)
     oos_summary = _summarize_reconstruction(oos_errors, GROUP_COLUMNS)
+    oos_by_maturity_bucket = _summarize_reconstruction(oos_errors, MATURITY_BUCKET_GROUP_COLUMNS)
     oos_by_maturity = _summarize_reconstruction(oos_errors, MATURITY_GROUP_COLUMNS)
+    oos_comparison = _oos_comparison_table(oos_summary)
     summary.to_csv(config.reconstruction_summary_table_path, index=False)
     by_maturity.to_csv(config.reconstruction_by_maturity_table_path, index=False)
     worst_maturities.to_csv(config.reconstruction_worst_maturities_table_path, index=False)
     oos_summary.to_csv(config.reconstruction_oos_summary_table_path, index=False)
     oos_by_maturity.to_csv(config.reconstruction_oos_by_maturity_table_path, index=False)
+    oos_by_maturity_bucket.to_csv(
+        config.reconstruction_oos_by_maturity_bucket_table_path,
+        index=False,
+    )
+    oos_comparison.to_csv(config.reconstruction_oos_comparison_table_path, index=False)
     return [
         config.reconstruction_summary_table_path,
         config.reconstruction_by_maturity_table_path,
         config.reconstruction_worst_maturities_table_path,
         config.reconstruction_oos_summary_table_path,
         config.reconstruction_oos_by_maturity_table_path,
+        config.reconstruction_oos_by_maturity_bucket_table_path,
+        config.reconstruction_oos_comparison_table_path,
     ]
 
 
@@ -186,9 +196,13 @@ def _nelson_siegel_reconstruction_errors(config: ProjectConfig) -> pd.DataFrame:
         if merged.empty:
             continue
 
-        frame = merged.loc[:, ["date", "country", "maturity_years", "yield", "fitted_yield"]].copy()
+        frame = merged.loc[
+            :,
+            ["date", "country", "maturity_years", "yield", "fitted_yield"],
+        ].copy()
         frame["representation"] = "nelson_siegel"
         frame["n_components"] = 3
+        frame["reconstruction_task"] = "clean_reconstruction"
         frame["error"] = frame["yield"] - frame["fitted_yield"]
         rows.append(_format_errors(frame))
 
@@ -208,6 +222,7 @@ def _panel_errors(
     frame["country"] = country
     frame["representation"] = representation
     frame["n_components"] = n_components
+    frame["reconstruction_task"] = "clean_reconstruction"
     frame["error"] = frame["yield"] - frame["fitted_yield"]
     return _format_errors(frame)
 
@@ -221,12 +236,15 @@ def _format_errors(errors: pd.DataFrame) -> pd.DataFrame:
     frame = errors.copy()
     frame["maturity_years"] = frame["maturity_years"].astype(float)
     frame["maturity_bucket"] = _maturity_bucket(frame["maturity_years"])
+    if "reconstruction_task" not in frame.columns:
+        frame["reconstruction_task"] = "clean_reconstruction"
     frame["squared_error"] = np.square(frame["error"])
     frame["absolute_error"] = np.abs(frame["error"])
     return frame.loc[
         :,
         [
             "date",
+            "reconstruction_task",
             "country",
             "representation",
             "n_components",
@@ -267,6 +285,38 @@ def _summarize_reconstruction(errors: pd.DataFrame, group_columns: list[str]) ->
     return summary.drop(columns=["mse"]).sort_values([*group_columns, "rmse"]).reset_index(drop=True)
 
 
+def _oos_comparison_table(oos_summary: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        *GROUP_COLUMNS,
+        "observations",
+        "dates",
+        "rmse",
+        "mae",
+        "mean_error",
+        "rmse_rank",
+        "rmse_gap_to_best",
+        "pct_rmse_gap_to_best",
+    ]
+    if oos_summary.empty:
+        return pd.DataFrame(columns=columns)
+
+    comparison = oos_summary.copy()
+    comparison["rmse_rank"] = comparison.groupby(
+        ["reconstruction_task", "country"],
+        sort=False,
+    )["rmse"].rank(method="min")
+    best = comparison.groupby(["reconstruction_task", "country"], sort=False)["rmse"].transform("min")
+    comparison["rmse_gap_to_best"] = comparison["rmse"] - best
+    comparison["pct_rmse_gap_to_best"] = np.where(
+        best > 0.0,
+        comparison["rmse_gap_to_best"] / best,
+        np.nan,
+    )
+    return comparison.loc[:, columns].sort_values(
+        ["reconstruction_task", "country", "rmse_rank", "representation", "n_components"]
+    ).reset_index(drop=True)
+
+
 def _worst_maturity_diagnostics(by_maturity: pd.DataFrame) -> pd.DataFrame:
     if by_maturity.empty:
         return pd.DataFrame(
@@ -286,7 +336,7 @@ def _worst_maturity_diagnostics(by_maturity: pd.DataFrame) -> pd.DataFrame:
     ranked["abs_mean_error"] = ranked["mean_error"].abs()
     ranked = ranked.sort_values(
         [*GROUP_COLUMNS, "rmse", "abs_mean_error"],
-        ascending=[True, True, True, False, False],
+        ascending=[*[True] * len(GROUP_COLUMNS), False, False],
     )
     ranked["rmse_rank"] = ranked.groupby(GROUP_COLUMNS, sort=False).cumcount() + 1
     return (

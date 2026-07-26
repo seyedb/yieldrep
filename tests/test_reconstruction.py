@@ -34,15 +34,31 @@ def test_evaluate_reconstruction_writes_summary_tables(tmp_path: Path) -> None:
         tmp_path / "reports" / "tables" / "reconstruction_worst_maturities.csv",
         tmp_path / "reports" / "tables" / "reconstruction_oos_summary.csv",
         tmp_path / "reports" / "tables" / "reconstruction_oos_by_maturity.csv",
+        tmp_path / "reports" / "tables" / "reconstruction_oos_by_maturity_bucket.csv",
+        tmp_path / "reports" / "tables" / "reconstruction_oos_comparison.csv",
     ]
     assert set(summary["representation"]) == {"pca", "nelson_siegel"}
     assert set(summary.loc[summary["representation"].eq("pca"), "n_components"]) == {1, 2}
-    assert {"observations", "dates", "rmse", "mae", "mean_error"}.issubset(summary.columns)
+    assert {
+        "reconstruction_task",
+        "observations",
+        "dates",
+        "rmse",
+        "mae",
+        "mean_error",
+    }.issubset(summary.columns)
     assert {"maturity_years", "maturity_bucket"}.issubset(by_maturity.columns)
     assert {"abs_mean_error", "rmse_rank"}.issubset(worst_maturities.columns)
     assert worst_maturities["rmse_rank"].min() == 1
     assert set(oos_summary["representation"]) == {"pca", "nelson_siegel"}
+    assert set(oos_summary["reconstruction_task"]) == {"clean_reconstruction"}
     assert {"maturity_years", "maturity_bucket"}.issubset(oos_by_maturity.columns)
+    oos_by_bucket = pd.read_csv(output_paths[5])
+    oos_comparison = pd.read_csv(output_paths[6])
+    assert {"maturity_bucket", "rmse"}.issubset(oos_by_bucket.columns)
+    assert {"rmse_rank", "rmse_gap_to_best", "pct_rmse_gap_to_best"}.issubset(
+        oos_comparison.columns
+    )
 
 
 def test_fit_autoencoder_panel_returns_embeddings_and_reconstruction() -> None:
