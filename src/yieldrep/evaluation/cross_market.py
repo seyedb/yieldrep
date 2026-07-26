@@ -9,7 +9,6 @@ from yieldrep.config import ProjectConfig
 
 COMPONENTS = ["PC1", "PC2", "PC3"]
 NS_FACTORS = ["beta_level", "beta_slope", "beta_curvature"]
-STATE_LABELS = ["low", "medium", "high"]
 
 
 def build_cross_market_report(config: ProjectConfig) -> Path:
@@ -24,7 +23,6 @@ def build_cross_market_report(config: ProjectConfig) -> Path:
     rows.extend(_pca_variance_rows(pca_variance))
     rows.extend(_pca_score_correlation_rows(pca_scores))
     rows.extend(_nelson_siegel_correlation_rows(ns_factors))
-    rows.extend(_curve_state_overlap_rows(pca_scores))
 
     report = pd.DataFrame(rows).sort_values(
         ["metric_group", "metric", "country", "country_a", "country_b"],
@@ -119,45 +117,6 @@ def _nelson_siegel_correlation_rows(frames: dict[str, pd.DataFrame]) -> list[dic
                     )
                 )
     return rows
-
-
-def _curve_state_overlap_rows(frames: dict[str, pd.DataFrame]) -> list[dict[str, object]]:
-    states = {country: _add_state_labels(frame) for country, frame in frames.items()}
-    rows: list[dict[str, object]] = []
-    for country_a, country_b in combinations(sorted(states), 2):
-        columns = [f"{component}_state" for component in COMPONENTS]
-        merged = _merge_by_date(states[country_a], states[country_b], columns)
-        if merged.empty:
-            continue
-        for component in COMPONENTS:
-            left = f"{component}_state_a"
-            right = f"{component}_state_b"
-            if left in merged.columns and right in merged.columns:
-                overlap = (merged[left] == merged[right]).mean()
-                rows.append(
-                    _pair_row(
-                        metric_group="curve_state_overlap",
-                        metric=f"{component.lower()}_same_state_share",
-                        country_a=country_a,
-                        country_b=country_b,
-                        value=float(overlap),
-                        observations=len(merged),
-                    )
-                )
-    return rows
-
-
-def _add_state_labels(frame: pd.DataFrame) -> pd.DataFrame:
-    state_frame = frame.copy()
-    for component in COMPONENTS:
-        if component in state_frame.columns:
-            state_frame[f"{component}_state"] = _tercile_labels(state_frame[component])
-    return state_frame
-
-
-def _tercile_labels(values: pd.Series) -> pd.Series:
-    ranked = values.rank(method="first")
-    return pd.qcut(ranked, q=3, labels=STATE_LABELS, duplicates="drop").astype("string")
 
 
 def _merge_by_date(

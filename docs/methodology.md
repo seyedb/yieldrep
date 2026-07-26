@@ -408,41 +408,6 @@ This avoids using full-sample regime thresholds and makes PCA, Nelson-Siegel,
 engineered curve features, and recent realized curve volatility comparable on a
 natural curve-level classification task.
 
-### Curve-State Classification
-
-Curve-state classification uses PCA scores as empirical state coordinates. The
-first three components are treated as level, slope, and curvature-like state
-axes:
-
-```math
-s_{k,t+h}^{(c)}
-=
-PC_{k,t+h}^{(c)}
-```
-
-For each component \(k \in \{1,2,3\}\), the future score is bucketed into low,
-medium, or high regimes using training-sample terciles inside each split. This
-creates a simple transition question:
-
-```text
-given today's curve representation, predict the future PCA state bucket
-```
-
-The benchmark also includes temporal versions of PCA, Nelson-Siegel, and
-autoencoder representations that append recent lagged factor values from the
-same information set. This asks whether recent curve-representation dynamics add
-state-transition information beyond the current curve snapshot.
-
-The sequence-readiness summary compares static and temporal representation
-baselines before introducing sequence models:
-
-```text
-reports/tables/sequence_readiness_summary.csv
-```
-
-This is a representation benchmark, not a claim that PCA states are the final
-economic regime definition.
-
 ## Evaluation Protocol
 
 ### Reconstruction
@@ -482,10 +447,10 @@ reconstruction.
 Its learned embeddings are then passed through the same downstream protocols as
 the classical curve-level representations: outright yield-change forecasting,
 standardized yield-change forecasting, residual-change forecasting, volatility
-change forecasting, curve-volatility regime classification, and PCA state
-classification. For residual relative value, maturity-interacted autoencoder
-features are evaluated alongside the maturity-aware PCA and Nelson-Siegel
-variants.
+change forecasting, and curve-volatility regime classification. For residual
+relative value, maturity-interacted autoencoder features are evaluated alongside
+the maturity-aware PCA and Nelson-Siegel variants. PCA is used as a
+representation and reconstruction benchmark, not as a target-definition device.
 
 ### Supervised Forecasting
 
@@ -539,7 +504,7 @@ separates curve-level and maturity-level evaluation:
 
 | Level | Natural representations | Natural tasks |
 | --- | --- | --- |
-| Curve-level | PCA scores, Nelson-Siegel factors, curve-shape features | reconstruction, volatility regimes, curve-state classification |
+| Curve-level | PCA scores, Nelson-Siegel factors, curve-shape features | reconstruction, volatility regimes |
 | State-maturity panel | PCA/NS/curve factors with maturity basis interactions | residual RV ranking as a stronger classical comparator |
 | Maturity-level | residual features, lagged maturity moves, carry/roll-down proxies | residual relative value, cross-sectional maturity ranking |
 
@@ -644,19 +609,6 @@ recent realized curve volatility as the direct persistence hurdle:
 
 ```text
 reports/tables/volatility_regime_benchmark.csv
-```
-
-Curve-state classification is summarized here:
-
-```text
-reports/tables/curve_state.csv
-```
-
-Curve-state timelines and transition matrices are written to:
-
-```text
-reports/figures/*_curve_state_*.html
-reports/figures/*_state_transitions_*d.html
 ```
 
 Regression metrics:
@@ -781,8 +733,7 @@ Included now:
 - classical supervised forecasting baselines
 - residual RV ranking metrics for maturity-level feature sets
 - curve-level volatility-regime classification
-- PCA-defined curve-state classification with static and temporal representation baselines
-- cross-market PCA, Nelson-Siegel, and state diagnostics
+- cross-market PCA and Nelson-Siegel representation diagnostics
 - chronological, non-overlapping, and walk-forward evaluation checks
 - Plotly figures and CSV report tables
 

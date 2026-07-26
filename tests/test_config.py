@@ -26,7 +26,6 @@ def test_load_config_reads_project_paths() -> None:
     assert config.curve_vol_regime_targets_path == Path(
         "data/processed/curve_vol_regime_targets.parquet"
     )
-    assert config.curve_state_targets_path == Path("data/processed/curve_state_targets.parquet")
     assert config.residual_features_path == Path("data/processed/residual_features.parquet")
     assert config.carry_roll_features_path == Path("data/processed/carry_roll_features.parquet")
     assert config.modeling_dir == Path("data/processed/modeling")
@@ -50,16 +49,6 @@ def test_load_config_reads_project_paths() -> None:
     assert config.volatility_regime_table_path == Path("reports/tables/volatility_regime.csv")
     assert config.volatility_regime_benchmark_table_path == Path(
         "reports/tables/volatility_regime_benchmark.csv"
-    )
-    assert config.curve_state_table_path == Path("reports/tables/curve_state.csv")
-    assert config.curve_state_transition_benchmark_table_path == Path(
-        "reports/tables/curve_state_transition_benchmark.csv"
-    )
-    assert config.sequence_readiness_summary_table_path == Path(
-        "reports/tables/sequence_readiness_summary.csv"
-    )
-    assert config.curve_state_probe_importance_table_path == Path(
-        "reports/tables/curve_state_probe_importance.csv"
     )
     assert config.ae_classical_factor_correlations_table_path == Path(
         "reports/tables/ae_classical_factor_correlations.csv"

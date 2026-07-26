@@ -23,7 +23,6 @@ from yieldrep.evaluation.reports import (
 )
 from yieldrep.evaluation.reconstruction import evaluate_reconstruction
 from yieldrep.evaluation.targets import (
-    build_curve_state_targets,
     build_residual_targets,
     build_standardized_targets,
     build_targets,
@@ -40,7 +39,6 @@ from yieldrep.models.autoencoder import build_autoencoder
 from yieldrep.models.forecasting import evaluate_supervised_forecasts
 from yieldrep.visualization.plotly_baselines import plot_baseline_metrics
 from yieldrep.visualization.plotly_cross_market import plot_cross_market_pca
-from yieldrep.visualization.plotly_curve_state import plot_curve_state
 from yieldrep.visualization.plotly_curves import plot_curves
 from yieldrep.visualization.plotly_nelson_siegel import plot_nelson_siegel
 from yieldrep.visualization.plotly_pca import plot_pca
@@ -171,13 +169,6 @@ def build_vol_targets_command(config: Path = Path("configs/default.yaml")) -> No
         typer.echo(output_path)
 
 
-@app.command("build-curve-state-targets")
-def build_curve_state_targets_command(config: Path = Path("configs/default.yaml")) -> None:
-    """Build future PCA curve-state targets."""
-    project_config = load_config(config)
-    typer.echo(build_curve_state_targets(project_config))
-
-
 @app.command("build-curve-features")
 def build_curve_features_command(config: Path = Path("configs/default.yaml")) -> None:
     """Build engineered curve-shape baseline features."""
@@ -286,14 +277,6 @@ def plot_baseline_metrics_command(config: Path = Path("configs/default.yaml")) -
         typer.echo(output_path)
 
 
-@app.command("plot-curve-state")
-def plot_curve_state_command(config: Path = Path("configs/default.yaml")) -> None:
-    """Generate Plotly HTML figures for PCA curve states."""
-    project_config = load_config(config)
-    for output_path in plot_curve_state(project_config):
-        typer.echo(output_path)
-
-
 @app.command("plot-nelson-siegel")
 def plot_nelson_siegel_command(config: Path = Path("configs/default.yaml")) -> None:
     """Generate Plotly HTML figures from Nelson-Siegel outputs."""
@@ -333,13 +316,11 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_standardized_targets(project_config))
     output_paths.append(build_residual_targets(project_config))
     output_paths.extend(build_vol_targets(project_config))
-    output_paths.append(build_curve_state_targets(project_config))
     output_paths.extend(build_modeling_datasets(project_config))
     output_paths.append(evaluate_baselines(project_config))
     output_paths.extend(evaluate_supervised_forecasts(project_config))
     output_paths.extend(summarize_baselines(project_config))
     output_paths.extend(plot_baseline_metrics(project_config))
-    output_paths.extend(plot_curve_state(project_config))
     output_paths.append(build_cross_market_report(project_config))
     output_paths.extend(plot_cross_market_pca(project_config))
     return output_paths

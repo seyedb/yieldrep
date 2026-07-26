@@ -17,7 +17,6 @@ Current evaluation covers:
 - VIX and MOVE market-volatility regime conditioning for residual RV
 - inflation and unemployment macro-regime data
 - curve-level volatility-regime classification
-- PCA-defined curve-state classification
 - cross-market representation diagnostics
 - policy-rate features for curve-level classification tasks
 
@@ -68,13 +67,9 @@ future curve-move magnitude labels assigned from training-sample quantiles.
 Recent realized curve volatility is the current hurdle, and it is the strongest
 baseline for most evaluated country/horizon pairs.
 
-For curve-state classification, the project evaluates whether current PCA,
-Nelson-Siegel, and engineered curve features predict future PCA state buckets
-for the first three components.
-
 Cross-market diagnostics compare PCA variance, PCA score co-movement,
-Nelson-Siegel factor co-movement, and PCA state overlap across US, Canada, and
-the euro-area aggregate curve.
+and Nelson-Siegel factor co-movement across US, Canada, and the euro-area
+aggregate curve.
 
 Policy-rate features currently improve euro-area volatility-regime
 classification for the 1-day and 20-day horizons. For US and Canada, recent
@@ -84,18 +79,13 @@ The first learned baseline is a masked autoencoder: maturities are randomly
 hidden during training, the model receives a mask indicator, and the objective
 combines masked-maturity reconstruction with clean-curve reconstruction. It is
 then reused as a learned embedding in the downstream forecasting, residual RV,
-volatility-regime, and curve-state protocols. PCA-5 remains the strongest
-reconstruction benchmark overall.
+and volatility-regime protocols. PCA-5 remains the strongest reconstruction
+benchmark overall.
 
 ## Interpretation
 
 PCA and Nelson-Siegel remain useful curve-level representations. They are most
-clearly validated through reconstruction and curve-state summaries.
-
-Temporal curve-state baselines are stronger than static snapshots in many
-state-classification settings. The improvement is most visible for temporal
-PCA and Nelson-Siegel features, which reinforces the value of curve dynamics
-before moving to larger sequence models.
+clearly validated through reconstruction and cross-market factor diagnostics.
 
 The masked autoencoder is a more appropriate learned-representation baseline
 than the initial plain autoencoder, but it is still not a win. It establishes the
