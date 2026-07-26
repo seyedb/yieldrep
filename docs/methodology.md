@@ -565,6 +565,8 @@ and next action for each research scenario.
 Residual relative-value regime evidence is summarized in
 `reports/tables/residual_rv_regime_scorecard.csv`, combining market-volatility
 and macro-regime splits into one comparable scorecard.
+The same evidence is visualized in
+`reports/figures/residual_rv_regime_heatmap.html`.
 
 ### Metric Protocol
 

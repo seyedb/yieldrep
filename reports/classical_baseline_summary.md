@@ -133,6 +133,8 @@ The baseline audit table provides the current scenario-level map:
 The residual RV regime scorecard highlights where mean-reversion evidence is
 stronger by market-volatility and macro regime:
 `reports/tables/residual_rv_regime_scorecard.csv`.
+The companion heatmap is written to
+`reports/figures/residual_rv_regime_heatmap.html`.
 
 ## Next Step
 

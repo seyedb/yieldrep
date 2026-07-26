@@ -125,6 +125,9 @@ def test_load_config_reads_project_paths() -> None:
         "reports/tables/residual_mean_reversion.csv"
     )
     assert config.residual_zscores_figure_path == Path("reports/figures/residual_zscores.html")
+    assert config.residual_rv_regime_heatmap_figure_path == Path(
+        "reports/figures/residual_rv_regime_heatmap.html"
+    )
     assert config.overlap_sensitivity_table_path == Path("reports/tables/overlap_sensitivity.csv")
     assert config.benchmark_conclusions_table_path == Path(
         "reports/tables/benchmark_conclusions.csv"

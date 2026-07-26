@@ -342,6 +342,10 @@ class ProjectConfig(BaseModel):
         return self.figures_dir / "residual_zscores.html"
 
     @property
+    def residual_rv_regime_heatmap_figure_path(self) -> Path:
+        return self.figures_dir / "residual_rv_regime_heatmap.html"
+
+    @property
     def baseline_by_maturity_point_top_table_path(self) -> Path:
         return self.tables_dir / "baseline_by_maturity_point_top.csv"
 
