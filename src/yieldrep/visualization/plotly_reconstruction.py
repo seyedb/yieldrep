@@ -8,6 +8,7 @@ import plotly.express as px
 from plotly.graph_objects import Figure
 
 from yieldrep.config import ProjectConfig
+from yieldrep.evaluation.reports import ae_classical_factor_correlation_summary
 
 
 def plot_reconstruction(config: ProjectConfig) -> list[Path]:
@@ -24,14 +25,16 @@ def plot_reconstruction(config: ProjectConfig) -> list[Path]:
     bucket_path = config.figures_dir / "reconstruction_oos_rmse_by_maturity_bucket.html"
     maturity_path = config.figures_dir / "reconstruction_oos_rmse_by_maturity.html"
     training_path = config.figures_dir / "reconstruction_autoencoder_training_history.html"
+    latent_path = config.figures_dir / "autoencoder_latent_factor_correlations.html"
 
     _plot_pca_components(summary).write_html(component_path)
     _plot_representation_comparison(oos_summary).write_html(comparison_path)
     _plot_maturity_bucket_profile(oos_by_bucket).write_html(bucket_path)
     _plot_maturity_profile(oos_by_maturity).write_html(maturity_path)
     _plot_training_history(config).write_html(training_path)
+    _plot_latent_factor_correlations(config).write_html(latent_path)
 
-    return [component_path, comparison_path, bucket_path, maturity_path, training_path]
+    return [component_path, comparison_path, bucket_path, maturity_path, training_path, latent_path]
 
 
 def _plot_pca_components(summary: pd.DataFrame) -> Any:
@@ -136,4 +139,33 @@ def _plot_training_history(config: ProjectConfig) -> Figure:
         facet_col="country",
         title="Autoencoder training history",
         labels={"epoch": "Epoch", "loss": "Scaled reconstruction loss", "loss_type": "Loss"},
+    )
+
+
+def _plot_latent_factor_correlations(config: ProjectConfig) -> Figure:
+    if config.ae_classical_factor_correlations_table_path.exists():
+        correlations = pd.read_csv(config.ae_classical_factor_correlations_table_path)
+    else:
+        correlations = ae_classical_factor_correlation_summary(config)
+        correlations.to_csv(config.ae_classical_factor_correlations_table_path, index=False)
+    if correlations.empty:
+        return Figure()
+
+    correlations = correlations.copy()
+    correlations["factor"] = (
+        correlations["classical_family"].astype(str)
+        + ": "
+        + correlations["classical_feature"].astype(str)
+    )
+    return px.imshow(
+        correlations.pivot_table(
+            index=["country", "factor"],
+            columns="ae_feature",
+            values="abs_correlation",
+            aggfunc="max",
+        ),
+        color_continuous_scale="Viridis",
+        aspect="auto",
+        title="Autoencoder latent correlations with curve and classical factors",
+        labels={"x": "AE latent dimension", "y": "Factor", "color": "|Correlation|"},
     )

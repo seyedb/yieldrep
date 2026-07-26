@@ -523,7 +523,7 @@ def volatility_regime_benchmark_summary(summary: pd.DataFrame) -> pd.DataFrame:
 
 
 def ae_classical_factor_correlation_summary(config: ProjectConfig) -> pd.DataFrame:
-    """Correlate autoencoder latent dimensions with PCA and Nelson-Siegel factors."""
+    """Correlate autoencoder latent dimensions with curve and classical factors."""
     columns = [
         "country",
         "ae_feature",
@@ -533,6 +533,7 @@ def ae_classical_factor_correlation_summary(config: ProjectConfig) -> pd.DataFra
         "correlation",
         "abs_correlation",
         "match_rank",
+        "family_match_rank",
     ]
     ae_frames = _read_autoencoder_embedding_frames(config)
     if not ae_frames:
@@ -541,6 +542,7 @@ def ae_classical_factor_correlation_summary(config: ProjectConfig) -> pd.DataFra
     rows: list[dict[str, object]] = []
     for country, ae_frame in ae_frames.items():
         classical_frames = [
+            ("curve", _read_country_factor_frame(config.curve_features_path, country=country)),
             ("pca", _read_country_factor_frame(config.pca_dir / f"{country.lower()}_scores.parquet")),
             (
                 "nelson_siegel",
@@ -559,6 +561,12 @@ def ae_classical_factor_correlation_summary(config: ProjectConfig) -> pd.DataFra
 
     summary = pd.DataFrame(rows)
     summary["match_rank"] = summary.groupby(["country", "ae_feature"])["abs_correlation"].rank(
+        method="min",
+        ascending=False,
+    )
+    summary["family_match_rank"] = summary.groupby(
+        ["country", "ae_feature", "classical_family"]
+    )["abs_correlation"].rank(
         method="min",
         ascending=False,
     )
@@ -1217,13 +1225,15 @@ def _read_autoencoder_embedding_frames(config: ProjectConfig) -> dict[str, pd.Da
     return frames
 
 
-def _read_country_factor_frame(path: Path) -> pd.DataFrame:
+def _read_country_factor_frame(path: Path, country: str | None = None) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
     frame = pd.read_parquet(path)
     if frame.empty:
         return frame
     frame["date"] = pd.to_datetime(frame["date"])
+    if country is not None and "country" in frame.columns:
+        frame = frame.loc[frame["country"] == country].copy()
     return frame
 
 
@@ -1238,6 +1248,7 @@ def _ae_factor_correlation_rows(
         column
         for column in classical_frame.columns
         if column not in {"date", "country", "split", "tau", "rmse"}
+        and pd.api.types.is_numeric_dtype(classical_frame[column])
     ]
     if not ae_features or not classical_features:
         return []

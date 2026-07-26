@@ -458,6 +458,11 @@ PCA, Nelson-Siegel, and autoencoder outputs are evaluated as standalone
 representations through reconstruction and diagnostics. They are not fed as
 inputs into downstream ridge, logistic, or elastic-net models.
 
+Autoencoder latent dimensions are also inspected by correlation with direct
+curve-shape features, PCA scores, and Nelson-Siegel factors. These correlations
+are interpretation diagnostics only: they ask whether latent dimensions align
+with recognizable term-structure states such as level, slope, and curvature.
+
 ### Supervised Forecasting
 
 Supervised benchmarks join features available at date \(t\) to a future target:

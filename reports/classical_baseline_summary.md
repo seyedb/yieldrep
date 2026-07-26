@@ -86,6 +86,11 @@ version, but it is still not a win on clean held-out curve reconstruction. It
 establishes the PyTorch pipeline and gives future learned models a clear PCA
 reconstruction hurdle.
 
+Latent-structure diagnostics show that the current autoencoder dimensions mostly
+align with curve level, with some slope information appearing in selected latent
+dimensions. This is useful, but it also suggests the representation is not yet
+clearly disentangling level, slope, and curvature.
+
 Residual relative-value ranking is a maturity-level task. In the current
 classical setup, direct curve-shape, lagged, and carry/roll-down features are
 the allowed supervised feature families.
