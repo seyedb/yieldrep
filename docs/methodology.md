@@ -436,6 +436,12 @@ reconstruction with clean-curve reconstruction, so the embeddings remain defined
 for fully observed curves. The latent dimension is matched to the PCA component
 count.
 
+The first sequence model is a small maturity-aware Transformer encoder. It treats
+maturities as ordered tokens and gives each token its observed or masked yield,
+mask indicator, and normalized maturity coordinate. The objective is the same
+masked-maturity reconstruction task used for the autoencoder, so comparisons are
+made on the same held-out masked points.
+
 The autoencoder is first evaluated on out-of-sample reconstruction:
 
 ```text
@@ -450,14 +456,14 @@ reconstruction.
 
 Clean reconstruction and masked-maturity reconstruction are reported as separate
 tasks. PCA, Nelson-Siegel, and the autoencoder are compared on clean held-out
-curve reconstruction. Masked autoencoder results are reported as a standalone
-self-supervised diagnostic because PCA and Nelson-Siegel are not trained with the
-same missing-maturity objective.
+curve reconstruction. Masked autoencoder and maturity Transformer results are
+reported as standalone self-supervised diagnostics because PCA and
+Nelson-Siegel are not trained with the same missing-maturity objective.
 
 Masked reconstruction is summarized by maturity and by curve segment. The
-hardest-maturity table ranks where the autoencoder has the largest masked
-reconstruction error, which helps identify whether missing front-end, belly, or
-long-end points are hardest to infer from the rest of the curve.
+hardest-maturity table ranks where each self-supervised model has the largest
+masked reconstruction error, which helps identify whether missing front-end,
+belly, or long-end points are hardest to infer from the rest of the curve.
 
 PCA, Nelson-Siegel, and autoencoder outputs are evaluated as standalone
 representations through reconstruction and diagnostics. They are not fed as
@@ -539,7 +545,7 @@ where the task is well-defined:
 | Scenario | Valid methods | Primary metrics |
 | --- | --- | --- |
 | Curve reconstruction | PCA, Nelson-Siegel, autoencoder | clean out-of-sample RMSE, MAE |
-| Masked maturity reconstruction | masked autoencoder | masked-maturity RMSE, MAE |
+| Masked maturity reconstruction | masked autoencoder, maturity Transformer | masked-maturity RMSE, MAE |
 | Outright yield forecasting | lagged moves, curve-shape features, carry/roll-down proxies | RMSE, MAE, directional accuracy |
 | Residual relative value | Nelson-Siegel residual diagnostics, curve-shape by maturity baseline | spread convergence, hit rate, rank IC |
 | Volatility-regime classification | curve-shape, policy-rate, realized curve-volatility features | balanced accuracy, macro F1 |

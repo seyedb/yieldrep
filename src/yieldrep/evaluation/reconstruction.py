@@ -10,6 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from yieldrep.config import ProjectConfig
 from yieldrep.factors.curve import curve_panel
 from yieldrep.models.autoencoder import autoencoder_reconstruction_errors
+from yieldrep.models.transformer import transformer_reconstruction_errors
 
 
 GROUP_COLUMNS = ["reconstruction_task", "country", "representation", "n_components"]
@@ -123,6 +124,9 @@ def _out_of_sample_reconstruction_errors(curves: pd.DataFrame, config: ProjectCo
     autoencoder = autoencoder_reconstruction_errors(config)
     if not autoencoder.empty:
         rows.append(_format_errors(autoencoder))
+    transformer = transformer_reconstruction_errors(config)
+    if not transformer.empty:
+        rows.append(_format_errors(transformer))
 
     return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
 

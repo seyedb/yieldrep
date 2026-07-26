@@ -37,6 +37,7 @@ from yieldrep.factors.residual import build_residual_features
 from yieldrep.models.baselines import evaluate_baselines
 from yieldrep.models.autoencoder import build_autoencoder
 from yieldrep.models.forecasting import evaluate_supervised_forecasts
+from yieldrep.models.transformer import build_transformer
 from yieldrep.visualization.plotly_baselines import plot_baseline_metrics
 from yieldrep.visualization.plotly_cross_market import plot_cross_market_pca
 from yieldrep.visualization.plotly_curves import plot_curves
@@ -197,6 +198,14 @@ def build_policy_features_command(config: Path = Path("configs/default.yaml")) -
     typer.echo(build_policy_features(project_config))
 
 
+@app.command("build-transformer")
+def build_transformer_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Build maturity Transformer reconstruction outputs."""
+    project_config = load_config(config)
+    for output_path in build_transformer(project_config):
+        typer.echo(output_path)
+
+
 @app.command("run-baselines")
 def run_baselines_command(config: Path = Path("configs/default.yaml")) -> None:
     """Run the full classical baseline research pipeline."""
@@ -255,6 +264,8 @@ def reconstruction_command(config: Path = Path("configs/default.yaml")) -> None:
     project_config = load_config(config)
     for output_path in build_autoencoder(project_config):
         typer.echo(output_path)
+    for output_path in build_transformer(project_config):
+        typer.echo(output_path)
     for output_path in evaluate_reconstruction(project_config):
         typer.echo(output_path)
     for output_path in plot_reconstruction(project_config):
@@ -300,6 +311,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.extend(build_pca(project_config))
     output_paths.extend(build_nelson_siegel(project_config))
     output_paths.extend(build_autoencoder(project_config))
+    output_paths.extend(build_transformer(project_config))
     output_paths.append(build_curve_features(project_config))
     output_paths.append(build_carry_roll_features(project_config))
     output_paths.append(build_residual_features(project_config))

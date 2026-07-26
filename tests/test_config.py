@@ -19,6 +19,7 @@ def test_load_config_reads_project_paths() -> None:
     assert config.pca_dir == Path("data/processed/pca")
     assert config.nelson_siegel_dir == Path("data/processed/nelson_siegel")
     assert config.autoencoder_dir == Path("data/processed/autoencoder")
+    assert config.transformer_dir == Path("data/processed/transformer")
     assert config.targets_path == Path("data/processed/targets.parquet")
     assert config.standardized_targets_path == Path("data/processed/standardized_targets.parquet")
     assert config.residual_targets_path == Path("data/processed/residual_targets.parquet")
@@ -212,6 +213,10 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.autoencoder.mask_probability == 0.15
     assert config.autoencoder.clean_loss_weight == 1.0
     assert config.autoencoder.early_stopping_patience == 150
+    assert config.transformer.latent_dim == 5
+    assert config.transformer.model_dim == 16
+    assert config.transformer.n_heads == 4
+    assert config.transformer.n_layers == 1
     assert config.targets.horizons_days == [1, 5, 20]
     assert config.targets.realized_vol_window == 20
     assert config.evaluation.method == "date_ordered"

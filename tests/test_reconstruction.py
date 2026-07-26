@@ -5,6 +5,7 @@ import pandas as pd
 from yieldrep.config import PCAConfig, ProjectConfig, SourceConfig
 from yieldrep.evaluation.reconstruction import evaluate_reconstruction
 from yieldrep.models.autoencoder import fit_autoencoder_panel
+from yieldrep.models.transformer import fit_transformer_panel
 
 
 def test_evaluate_reconstruction_writes_summary_tables(tmp_path: Path) -> None:
@@ -120,6 +121,44 @@ def test_fit_autoencoder_panel_returns_embeddings_and_reconstruction() -> None:
     assert set(result.metrics["split"]) == {"train", "validation", "test"}
     assert len(result.reconstruction) == panel.size
     assert len(result.masked_reconstruction) < panel.size
+    assert result.training_history["is_best_epoch"].sum() == 1
+
+
+def test_fit_transformer_panel_returns_embeddings_and_reconstruction() -> None:
+    panel = _sample_curves().pivot(index="date", columns="maturity_years", values="yield")
+    panel.attrs["country"] = "US"
+
+    result = fit_transformer_panel(
+        panel=panel,
+        test_fraction=0.5,
+        latent_dim=2,
+        model_dim=8,
+        n_heads=2,
+        n_layers=1,
+        feedforward_dim=16,
+        dropout=0.0,
+        epochs=20,
+        batch_size=2,
+        learning_rate=0.01,
+        weight_decay=0.0,
+        validation_fraction=0.5,
+        mask_probability=0.4,
+        clean_loss_weight=0.2,
+        early_stopping_patience=3,
+        min_delta=0.0,
+        random_seed=42,
+    )
+
+    assert {"date", "country", "split", "TE1", "TE2"}.issubset(result.embeddings.columns)
+    assert {"date", "country", "maturity_years", "yield", "fitted_yield", "split"}.issubset(
+        result.reconstruction.columns
+    )
+    assert {"split", "rmse", "mae", "model_dim", "n_heads", "epochs_trained"}.issubset(
+        result.metrics.columns
+    )
+    assert set(result.reconstruction["split"]) == {"train", "validation", "test"}
+    assert set(result.masked_reconstruction["split"]) == {"train", "validation", "test"}
+    assert set(result.metrics["metric_scope"]) == {"clean", "masked"}
     assert result.training_history["is_best_epoch"].sum() == 1
 
 

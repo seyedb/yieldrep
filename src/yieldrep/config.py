@@ -42,6 +42,26 @@ class AutoencoderConfig(BaseModel):
     min_train_dates: int = 252
 
 
+class TransformerConfig(BaseModel):
+    latent_dim: int = 5
+    model_dim: int = 16
+    n_heads: int = 4
+    n_layers: int = 1
+    feedforward_dim: int = 32
+    dropout: float = 0.0
+    epochs: int = 30
+    batch_size: int = 1024
+    learning_rate: float = 0.001
+    weight_decay: float = 1e-5
+    validation_fraction: float = 0.2
+    mask_probability: float = 0.15
+    clean_loss_weight: float = 1.0
+    early_stopping_patience: int = 6
+    min_delta: float = 1e-5
+    random_seed: int = 42
+    min_train_dates: int = 252
+
+
 class TargetConfig(BaseModel):
     horizons_days: list[int] = Field(default_factory=lambda: [1, 5, 20])
     realized_vol_window: int = 20
@@ -79,6 +99,7 @@ class ProjectConfig(BaseModel):
     pca: PCAConfig = Field(default_factory=PCAConfig)
     nelson_siegel: NelsonSiegelConfig = Field(default_factory=NelsonSiegelConfig)
     autoencoder: AutoencoderConfig = Field(default_factory=AutoencoderConfig)
+    transformer: TransformerConfig = Field(default_factory=TransformerConfig)
     targets: TargetConfig = Field(default_factory=TargetConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     plots: PlotConfig = Field(default_factory=PlotConfig)
@@ -142,6 +163,10 @@ class ProjectConfig(BaseModel):
     @property
     def autoencoder_dir(self) -> Path:
         return self.processed_dir / "autoencoder"
+
+    @property
+    def transformer_dir(self) -> Path:
+        return self.processed_dir / "transformer"
 
     @property
     def targets_path(self) -> Path:

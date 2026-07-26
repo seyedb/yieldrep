@@ -26,6 +26,25 @@ autoencoder:
   random_seed: 42
   min_train_dates: 252
 
+transformer:
+  latent_dim: 5
+  model_dim: 16
+  n_heads: 4
+  n_layers: 1
+  feedforward_dim: 32
+  dropout: 0.0
+  epochs: 30
+  batch_size: 1024
+  learning_rate: 0.001
+  weight_decay: 0.00001
+  validation_fraction: 0.2
+  mask_probability: 0.15
+  clean_loss_weight: 1.0
+  early_stopping_patience: 6
+  min_delta: 0.00001
+  random_seed: 42
+  min_train_dates: 252
+
 targets:
   horizons_days: [1, 5, 20]
 

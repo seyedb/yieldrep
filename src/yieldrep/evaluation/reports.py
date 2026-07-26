@@ -607,7 +607,7 @@ def scenario_method_comparison_table() -> pd.DataFrame:
         {
             "scenario": "masked_maturity_reconstruction",
             "question": "Can a self-supervised model infer hidden maturities from the rest of the curve?",
-            "valid_methods": "masked autoencoder",
+            "valid_methods": "masked autoencoder; maturity Transformer",
             "primary_metrics": "masked-maturity RMSE; MAE by country and maturity",
             "evidence_tables": "reconstruction_oos_comparison.csv; reconstruction_oos_by_maturity.csv",
             "methodological_boundary": "Masked reconstruction is reported separately from clean curve reconstruction.",
