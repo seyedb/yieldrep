@@ -19,11 +19,15 @@ def plot_reconstruction(config: ProjectConfig) -> list[Path]:
     oos_summary = pd.read_csv(config.reconstruction_oos_summary_table_path)
     oos_by_maturity = pd.read_csv(config.reconstruction_oos_by_maturity_table_path)
     oos_by_bucket = pd.read_csv(config.reconstruction_oos_by_maturity_bucket_table_path)
+    masked_by_maturity = pd.read_csv(config.masked_reconstruction_by_maturity_table_path)
+    masked_by_bucket = pd.read_csv(config.masked_reconstruction_by_maturity_bucket_table_path)
 
     component_path = config.figures_dir / "reconstruction_rmse_by_component.html"
     comparison_path = config.figures_dir / "reconstruction_oos_rmse_comparison.html"
     bucket_path = config.figures_dir / "reconstruction_oos_rmse_by_maturity_bucket.html"
     maturity_path = config.figures_dir / "reconstruction_oos_rmse_by_maturity.html"
+    masked_bucket_path = config.figures_dir / "masked_reconstruction_rmse_by_maturity_bucket.html"
+    masked_maturity_path = config.figures_dir / "masked_reconstruction_rmse_by_maturity.html"
     training_path = config.figures_dir / "reconstruction_autoencoder_training_history.html"
     latent_path = config.figures_dir / "autoencoder_latent_factor_correlations.html"
     latent_time_path = config.figures_dir / "autoencoder_latent_time_series.html"
@@ -33,6 +37,8 @@ def plot_reconstruction(config: ProjectConfig) -> list[Path]:
     _plot_representation_comparison(oos_summary).write_html(comparison_path)
     _plot_maturity_bucket_profile(oos_by_bucket).write_html(bucket_path)
     _plot_maturity_profile(oos_by_maturity).write_html(maturity_path)
+    _plot_masked_maturity_bucket_profile(masked_by_bucket).write_html(masked_bucket_path)
+    _plot_masked_maturity_profile(masked_by_maturity).write_html(masked_maturity_path)
     _plot_training_history(config).write_html(training_path)
     _plot_latent_factor_correlations(config).write_html(latent_path)
     _plot_latent_time_series(config).write_html(latent_time_path)
@@ -43,6 +49,8 @@ def plot_reconstruction(config: ProjectConfig) -> list[Path]:
         comparison_path,
         bucket_path,
         maturity_path,
+        masked_bucket_path,
+        masked_maturity_path,
         training_path,
         latent_path,
         latent_time_path,
@@ -105,6 +113,30 @@ def _plot_maturity_profile(by_maturity: pd.DataFrame) -> Any:
         markers=True,
         title="Out-of-sample reconstruction RMSE by maturity",
         labels={"maturity_years": "Maturity years", "rmse": "Reconstruction RMSE"},
+    )
+
+
+def _plot_masked_maturity_bucket_profile(by_bucket: pd.DataFrame) -> Any:
+    return px.bar(
+        by_bucket,
+        x="maturity_bucket",
+        y="rmse",
+        color="country",
+        barmode="group",
+        title="Masked maturity reconstruction RMSE by curve segment",
+        labels={"maturity_bucket": "Maturity bucket", "rmse": "Masked reconstruction RMSE"},
+    )
+
+
+def _plot_masked_maturity_profile(by_maturity: pd.DataFrame) -> Any:
+    return px.line(
+        by_maturity,
+        x="maturity_years",
+        y="rmse",
+        color="country",
+        markers=True,
+        title="Masked maturity reconstruction RMSE by maturity",
+        labels={"maturity_years": "Maturity years", "rmse": "Masked reconstruction RMSE"},
     )
 
 

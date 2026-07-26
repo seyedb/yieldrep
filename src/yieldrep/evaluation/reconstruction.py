@@ -34,6 +34,9 @@ def evaluate_reconstruction(config: ProjectConfig) -> list[Path]:
     oos_by_maturity_bucket = _summarize_reconstruction(oos_errors, MATURITY_BUCKET_GROUP_COLUMNS)
     oos_by_maturity = _summarize_reconstruction(oos_errors, MATURITY_GROUP_COLUMNS)
     oos_comparison = _oos_comparison_table(oos_summary)
+    masked_by_maturity = _masked_reconstruction_summary(oos_by_maturity)
+    masked_by_maturity_bucket = _masked_reconstruction_summary(oos_by_maturity_bucket)
+    masked_hardest = _masked_reconstruction_hardest_maturities(masked_by_maturity)
     summary.to_csv(config.reconstruction_summary_table_path, index=False)
     by_maturity.to_csv(config.reconstruction_by_maturity_table_path, index=False)
     worst_maturities.to_csv(config.reconstruction_worst_maturities_table_path, index=False)
@@ -44,6 +47,15 @@ def evaluate_reconstruction(config: ProjectConfig) -> list[Path]:
         index=False,
     )
     oos_comparison.to_csv(config.reconstruction_oos_comparison_table_path, index=False)
+    masked_by_maturity.to_csv(config.masked_reconstruction_by_maturity_table_path, index=False)
+    masked_by_maturity_bucket.to_csv(
+        config.masked_reconstruction_by_maturity_bucket_table_path,
+        index=False,
+    )
+    masked_hardest.to_csv(
+        config.masked_reconstruction_hardest_maturities_table_path,
+        index=False,
+    )
     return [
         config.reconstruction_summary_table_path,
         config.reconstruction_by_maturity_table_path,
@@ -52,6 +64,9 @@ def evaluate_reconstruction(config: ProjectConfig) -> list[Path]:
         config.reconstruction_oos_by_maturity_table_path,
         config.reconstruction_oos_by_maturity_bucket_table_path,
         config.reconstruction_oos_comparison_table_path,
+        config.masked_reconstruction_by_maturity_table_path,
+        config.masked_reconstruction_by_maturity_bucket_table_path,
+        config.masked_reconstruction_hardest_maturities_table_path,
     ]
 
 
@@ -314,6 +329,39 @@ def _oos_comparison_table(oos_summary: pd.DataFrame) -> pd.DataFrame:
     )
     return comparison.loc[:, columns].sort_values(
         ["reconstruction_task", "country", "rmse_rank", "representation", "n_components"]
+    ).reset_index(drop=True)
+
+
+def _masked_reconstruction_summary(summary: pd.DataFrame) -> pd.DataFrame:
+    masked = summary.loc[
+        summary["reconstruction_task"] == "masked_maturity_reconstruction"
+    ].copy()
+    return masked.drop(columns=["reconstruction_task"], errors="ignore").reset_index(drop=True)
+
+
+def _masked_reconstruction_hardest_maturities(masked_by_maturity: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        "country",
+        "representation",
+        "n_components",
+        "maturity_years",
+        "maturity_bucket",
+        "observations",
+        "dates",
+        "rmse",
+        "mae",
+        "mean_error",
+        "hardness_rank",
+    ]
+    if masked_by_maturity.empty:
+        return pd.DataFrame(columns=columns)
+
+    ranked = masked_by_maturity.copy()
+    ranked["hardness_rank"] = ranked.groupby(["country", "representation"], sort=False)[
+        "rmse"
+    ].rank(method="first", ascending=False)
+    return ranked.loc[ranked["hardness_rank"] <= WORST_MATURITIES_PER_GROUP, columns].sort_values(
+        ["country", "representation", "hardness_rank"]
     ).reset_index(drop=True)
 
 

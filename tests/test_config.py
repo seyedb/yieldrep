@@ -155,6 +155,15 @@ def test_load_config_reads_project_paths() -> None:
     assert config.reconstruction_oos_comparison_table_path == Path(
         "reports/tables/reconstruction_oos_comparison.csv"
     )
+    assert config.masked_reconstruction_by_maturity_table_path == Path(
+        "reports/tables/masked_reconstruction_by_maturity.csv"
+    )
+    assert config.masked_reconstruction_by_maturity_bucket_table_path == Path(
+        "reports/tables/masked_reconstruction_by_maturity_bucket.csv"
+    )
+    assert config.masked_reconstruction_hardest_maturities_table_path == Path(
+        "reports/tables/masked_reconstruction_hardest_maturities.csv"
+    )
 
 
 def test_load_config_reads_source_metadata() -> None:

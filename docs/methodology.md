@@ -454,6 +454,11 @@ curve reconstruction. Masked autoencoder results are reported as a standalone
 self-supervised diagnostic because PCA and Nelson-Siegel are not trained with the
 same missing-maturity objective.
 
+Masked reconstruction is summarized by maturity and by curve segment. The
+hardest-maturity table ranks where the autoencoder has the largest masked
+reconstruction error, which helps identify whether missing front-end, belly, or
+long-end points are hardest to infer from the rest of the curve.
+
 PCA, Nelson-Siegel, and autoencoder outputs are evaluated as standalone
 representations through reconstruction and diagnostics. They are not fed as
 inputs into downstream ridge, logistic, or elastic-net models.

@@ -36,6 +36,9 @@ def test_evaluate_reconstruction_writes_summary_tables(tmp_path: Path) -> None:
         tmp_path / "reports" / "tables" / "reconstruction_oos_by_maturity.csv",
         tmp_path / "reports" / "tables" / "reconstruction_oos_by_maturity_bucket.csv",
         tmp_path / "reports" / "tables" / "reconstruction_oos_comparison.csv",
+        tmp_path / "reports" / "tables" / "masked_reconstruction_by_maturity.csv",
+        tmp_path / "reports" / "tables" / "masked_reconstruction_by_maturity_bucket.csv",
+        tmp_path / "reports" / "tables" / "masked_reconstruction_hardest_maturities.csv",
     ]
     assert set(summary["representation"]) == {"pca", "nelson_siegel"}
     assert set(summary.loc[summary["representation"].eq("pca"), "n_components"]) == {1, 2}
@@ -58,6 +61,10 @@ def test_evaluate_reconstruction_writes_summary_tables(tmp_path: Path) -> None:
     assert {"maturity_bucket", "rmse"}.issubset(oos_by_bucket.columns)
     assert {"rmse_rank", "rmse_gap_to_best", "pct_rmse_gap_to_best"}.issubset(
         oos_comparison.columns
+    )
+    masked_hardest = pd.read_csv(output_paths[9])
+    assert {"maturity_years", "maturity_bucket", "hardness_rank", "rmse"}.issubset(
+        masked_hardest.columns
     )
 
 

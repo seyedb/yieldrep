@@ -95,6 +95,10 @@ Autoencoder latent time-series and state-space plots are now included as visual
 diagnostics for curve-state evolution. These plots are interpretability checks,
 not forecasting inputs.
 
+Masked-maturity reconstruction is now reported separately by maturity and curve
+segment. This identifies where the self-supervised autoencoder struggles to
+infer missing curve points from the observed rest of the curve.
+
 Residual relative-value ranking is a maturity-level task. In the current
 classical setup, direct curve-shape, lagged, and carry/roll-down features are
 the allowed supervised feature families.

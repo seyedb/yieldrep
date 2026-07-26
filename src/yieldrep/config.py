@@ -387,6 +387,18 @@ class ProjectConfig(BaseModel):
     def reconstruction_oos_comparison_table_path(self) -> Path:
         return self.tables_dir / "reconstruction_oos_comparison.csv"
 
+    @property
+    def masked_reconstruction_by_maturity_table_path(self) -> Path:
+        return self.tables_dir / "masked_reconstruction_by_maturity.csv"
+
+    @property
+    def masked_reconstruction_by_maturity_bucket_table_path(self) -> Path:
+        return self.tables_dir / "masked_reconstruction_by_maturity_bucket.csv"
+
+    @property
+    def masked_reconstruction_hardest_maturities_table_path(self) -> Path:
+        return self.tables_dir / "masked_reconstruction_hardest_maturities.csv"
+
 
 def load_config(path: Path) -> ProjectConfig:
     with path.open("r", encoding="utf-8") as handle:
