@@ -127,6 +127,9 @@ sovereign issuer. Euro-area unemployment is not yet included because the simple
 FRED/OECD euro-area unemployment endpoint is stale relative to the current
 sample.
 
+The baseline audit table provides the current scenario-level map:
+`reports/tables/baseline_audit.csv`.
+
 ## Next Step
 
 The next research step should improve the learned representation protocol itself,

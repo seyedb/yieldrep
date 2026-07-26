@@ -8,6 +8,7 @@ from yieldrep.evaluation.reports import (
     baseline_winners,
     overlap_sensitivity_table,
     scenario_method_comparison_table,
+    baseline_audit_table,
     residual_relative_value_scorecard,
     supervised_walk_forward_comparison,
     summarize_baselines,
@@ -50,6 +51,7 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
         tmp_path / "reports" / "tables" / "ae_classical_factor_correlations.csv",
         tmp_path / "reports" / "tables" / "benchmark_conclusions.csv",
         tmp_path / "reports" / "tables" / "scenario_method_comparison.csv",
+        tmp_path / "reports" / "tables" / "baseline_audit.csv",
         tmp_path / "reports" / "tables" / "baseline_by_maturity_bucket.csv",
         tmp_path / "reports" / "tables" / "residual_relative_value.csv",
         tmp_path / "reports" / "tables" / "baseline_by_maturity_point_top.csv",
@@ -68,9 +70,10 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     ae_classical_correlations = pd.read_csv(output_paths[11])
     benchmark_conclusions = pd.read_csv(output_paths[12])
     scenario_methods = pd.read_csv(output_paths[13])
-    bucket_summary = pd.read_csv(output_paths[14])
-    residual_rv = pd.read_csv(output_paths[15])
-    point_top = pd.read_csv(output_paths[16])
+    baseline_audit = pd.read_csv(output_paths[14])
+    bucket_summary = pd.read_csv(output_paths[15])
+    residual_rv = pd.read_csv(output_paths[16])
+    point_top = pd.read_csv(output_paths[17])
     assert {"target", "representation", "model", "mean_rmse"}.issubset(summary.columns)
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best", "mean_rank_ic"}.issubset(
         rank_table.columns
@@ -108,6 +111,9 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     )
     assert {"scenario", "valid_methods", "methodological_boundary"}.issubset(
         scenario_methods.columns
+    )
+    assert {"research_scenario", "valid_baselines", "next_action"}.issubset(
+        baseline_audit.columns
     )
     assert "maturity_bucket" in bucket_summary.columns
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best"}.issubset(residual_rv.columns)
@@ -148,6 +154,34 @@ def test_residual_relative_value_scorecard_summarizes_existing_evidence() -> Non
     assert scorecard.loc[0, "spread_method"] == "lagged/ridge"
     assert scorecard.loc[0, "rank_ic_method"] == "carry_roll/ridge"
     assert "Best current residual-RV evidence" in scorecard.loc[0, "takeaway"]
+
+
+def test_baseline_audit_table_summarizes_scenario_status(tmp_path: Path) -> None:
+    config = ProjectConfig(
+        data_dir=tmp_path / "data",
+        reports_dir=tmp_path / "reports",
+        sources={"test": SourceConfig(country="US", source="test", raw_file=tmp_path / "raw.csv")},
+    )
+    scenario_methods = scenario_method_comparison_table()
+    benchmark_conclusions = pd.DataFrame(
+        {
+            "research_question": ["curve_reconstruction"],
+            "current_best_baseline": ["US:pca/5 rmse=0.01"],
+        }
+    )
+    scorecard = pd.DataFrame({"evidence_label": ["moderate_positive_20d"]})
+
+    audit = baseline_audit_table(config, scenario_methods, benchmark_conclusions, scorecard)
+
+    assert set(audit["research_scenario"]) == set(scenario_methods["scenario"])
+    assert "US:pca/5" in audit.loc[
+        audit["research_scenario"] == "curve_reconstruction",
+        "current_best",
+    ].iloc[0]
+    assert "moderate" in audit.loc[
+        audit["research_scenario"] == "residual_relative_value",
+        "evidence_quality",
+    ].iloc[0]
 
 
 def test_top_maturity_point_metrics_rejects_invalid_top_n() -> None:

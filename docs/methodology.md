@@ -558,6 +558,10 @@ The same table is written to
 `reports/tables/scenario_method_comparison.csv` when baseline summaries are
 generated.
 
+A compact baseline audit is also written to `reports/tables/baseline_audit.csv`.
+It records the valid baseline families, current best result, evidence quality,
+and next action for each research scenario.
+
 ### Metric Protocol
 
 Metrics are interpreted by task. A single pooled error number is not treated as

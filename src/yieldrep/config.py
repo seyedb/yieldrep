@@ -358,6 +358,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "scenario_method_comparison.csv"
 
     @property
+    def baseline_audit_table_path(self) -> Path:
+        return self.tables_dir / "baseline_audit.csv"
+
+    @property
     def volatility_regime_table_path(self) -> Path:
         return self.tables_dir / "volatility_regime.csv"
 

@@ -146,6 +146,13 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
     benchmark_conclusions.to_csv(config.benchmark_conclusions_table_path, index=False)
     scenario_methods = scenario_method_comparison_table()
     scenario_methods.to_csv(config.scenario_method_table_path, index=False)
+    baseline_audit = baseline_audit_table(
+        config=config,
+        scenario_methods=scenario_methods,
+        benchmark_conclusions=benchmark_conclusions,
+        residual_rv_scorecard=residual_rv_scorecard,
+    )
+    baseline_audit.to_csv(config.baseline_audit_table_path, index=False)
 
     output_paths = [
         config.baseline_summary_table_path,
@@ -162,6 +169,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.ae_classical_factor_correlations_table_path,
         config.benchmark_conclusions_table_path,
         config.scenario_method_table_path,
+        config.baseline_audit_table_path,
         config.baseline_by_maturity_bucket_table_path,
         config.residual_relative_value_table_path,
         config.baseline_by_maturity_point_top_table_path,
@@ -644,6 +652,100 @@ def scenario_method_comparison_table() -> pd.DataFrame:
         },
     ]
     return pd.DataFrame(rows)
+
+
+def baseline_audit_table(
+    config: ProjectConfig,
+    scenario_methods: pd.DataFrame,
+    benchmark_conclusions: pd.DataFrame,
+    residual_rv_scorecard: pd.DataFrame,
+) -> pd.DataFrame:
+    """Summarize which baseline families are credible for each research scenario."""
+    columns = [
+        "research_scenario",
+        "valid_baselines",
+        "current_best",
+        "evidence_quality",
+        "next_action",
+    ]
+    rows: list[dict[str, object]] = []
+    conclusions = benchmark_conclusions.set_index("research_question")
+    scenarios = scenario_methods.set_index("scenario")
+
+    for scenario in scenarios.index:
+        conclusion = conclusions.loc[scenario] if scenario in conclusions.index else None
+        rows.append(
+            {
+                "research_scenario": scenario,
+                "valid_baselines": str(scenarios.loc[scenario, "valid_methods"]),
+                "current_best": _audit_current_best(config, scenario, conclusion),
+                "evidence_quality": _audit_evidence_quality(scenario, residual_rv_scorecard),
+                "next_action": _audit_next_action(scenario),
+            }
+        )
+    return pd.DataFrame(rows, columns=columns)
+
+
+def _audit_current_best(
+    config: ProjectConfig,
+    scenario: str,
+    conclusion: pd.Series | None,
+) -> str:
+    if scenario == "masked_maturity_reconstruction":
+        return _masked_reconstruction_current_best(config)
+    if conclusion is None:
+        return "not_evaluated"
+    return str(conclusion["current_best_baseline"])
+
+
+def _masked_reconstruction_current_best(config: ProjectConfig) -> str:
+    if not config.reconstruction_oos_comparison_table_path.exists():
+        return "not_evaluated"
+    comparison = pd.read_csv(config.reconstruction_oos_comparison_table_path)
+    masked = comparison.loc[
+        comparison["reconstruction_task"] == "masked_maturity_reconstruction"
+    ].copy()
+    if masked.empty:
+        return "not_evaluated"
+    best = (
+        masked.sort_values(["country", "rmse", "representation"])
+        .groupby("country", sort=True)
+        .first()
+        .reset_index()
+    )
+    return _country_winner_label(best, metric_column="rmse", lower_is_better=True)
+
+
+def _audit_evidence_quality(scenario: str, residual_rv_scorecard: pd.DataFrame) -> str:
+    if scenario == "curve_reconstruction":
+        return "strong classical hurdle; learned models evaluated but not best"
+    if scenario == "masked_maturity_reconstruction":
+        return "AE is current learned hurdle; Transformer remains weak"
+    if scenario == "outright_yield_forecasting":
+        return "weak and noisy; not the central win condition"
+    if scenario == "residual_relative_value":
+        if residual_rv_scorecard.empty:
+            return "not_evaluated"
+        labels = set(residual_rv_scorecard["evidence_label"].dropna().astype(str))
+        if any(label.startswith("moderate_positive") for label in labels):
+            return "moderate at selected 20d horizons; modest at shorter horizons"
+        if "weak_positive" in labels:
+            return "weak positive"
+        return "mixed"
+    if scenario == "volatility_regime_classification":
+        return "useful benchmark task; current hurdle is curve volatility and policy features"
+    return "not_evaluated"
+
+
+def _audit_next_action(scenario: str) -> str:
+    actions = {
+        "curve_reconstruction": "Keep PCA as reconstruction hurdle; improve learned models before downstream use.",
+        "masked_maturity_reconstruction": "Keep AE as learned baseline; diagnose Transformer training and maturity-grid handling.",
+        "outright_yield_forecasting": "Do not optimize the project around outright yield-change forecasts alone.",
+        "residual_relative_value": "Prioritize macro/regime conditioning and more realistic RV trade construction.",
+        "volatility_regime_classification": "Use as macro-relevant regime task after baseline and RV protocol are stable.",
+    }
+    return actions.get(scenario, "Review scenario definition before adding more models.")
 
 
 def _curve_reconstruction_conclusion(config: ProjectConfig) -> dict[str, object]:
