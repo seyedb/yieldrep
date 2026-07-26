@@ -9,6 +9,7 @@ from yieldrep.evaluation.reports import (
     overlap_sensitivity_table,
     scenario_method_comparison_table,
     baseline_audit_table,
+    residual_rv_regime_scorecard_table,
     residual_relative_value_scorecard,
     supervised_walk_forward_comparison,
     summarize_baselines,
@@ -48,6 +49,7 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
         tmp_path / "reports" / "tables" / "baseline_winners.csv",
         tmp_path / "reports" / "tables" / "volatility_regime.csv",
         tmp_path / "reports" / "tables" / "volatility_regime_benchmark.csv",
+        tmp_path / "reports" / "tables" / "residual_rv_regime_scorecard.csv",
         tmp_path / "reports" / "tables" / "ae_classical_factor_correlations.csv",
         tmp_path / "reports" / "tables" / "benchmark_conclusions.csv",
         tmp_path / "reports" / "tables" / "scenario_method_comparison.csv",
@@ -67,13 +69,14 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     winners = pd.read_csv(output_paths[8])
     volatility_regime = pd.read_csv(output_paths[9])
     volatility_regime_benchmark = pd.read_csv(output_paths[10])
-    ae_classical_correlations = pd.read_csv(output_paths[11])
-    benchmark_conclusions = pd.read_csv(output_paths[12])
-    scenario_methods = pd.read_csv(output_paths[13])
-    baseline_audit = pd.read_csv(output_paths[14])
-    bucket_summary = pd.read_csv(output_paths[15])
-    residual_rv = pd.read_csv(output_paths[16])
-    point_top = pd.read_csv(output_paths[17])
+    residual_rv_regime_scorecard = pd.read_csv(output_paths[11])
+    ae_classical_correlations = pd.read_csv(output_paths[12])
+    benchmark_conclusions = pd.read_csv(output_paths[13])
+    scenario_methods = pd.read_csv(output_paths[14])
+    baseline_audit = pd.read_csv(output_paths[15])
+    bucket_summary = pd.read_csv(output_paths[16])
+    residual_rv = pd.read_csv(output_paths[17])
+    point_top = pd.read_csv(output_paths[18])
     assert {"target", "representation", "model", "mean_rmse"}.issubset(summary.columns)
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best", "mean_rank_ic"}.issubset(
         rank_table.columns
@@ -103,6 +106,9 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
         "policy_beats_curve_vol",
         "curve_beats_curve_vol",
     }.issubset(volatility_regime_benchmark.columns)
+    assert {"regime_type", "best_regime", "interpretation"}.issubset(
+        residual_rv_regime_scorecard.columns
+    )
     assert {"ae_feature", "classical_feature", "abs_correlation", "match_rank"}.issubset(
         ae_classical_correlations.columns
     )
@@ -182,6 +188,44 @@ def test_baseline_audit_table_summarizes_scenario_status(tmp_path: Path) -> None
         audit["research_scenario"] == "residual_relative_value",
         "evidence_quality",
     ].iloc[0]
+
+
+def test_residual_rv_regime_scorecard_combines_market_and_macro_regimes() -> None:
+    market = pd.DataFrame(
+        [
+            _regime_row("MOVE", "US", 20, "high", hit_rate=0.58, rank_ic=0.10),
+            _regime_row("MOVE", "US", 20, "low", hit_rate=0.52, rank_ic=0.02),
+        ]
+    )
+    macro = pd.DataFrame(
+        [
+            _regime_row(
+                "inflation",
+                "US",
+                20,
+                "high",
+                hit_rate=0.53,
+                rank_ic=0.04,
+                regime_column="macro_regime",
+            ),
+            _regime_row(
+                "inflation",
+                "US",
+                20,
+                "low",
+                hit_rate=0.57,
+                rank_ic=0.08,
+                regime_column="macro_regime",
+            ),
+        ]
+    )
+
+    scorecard = residual_rv_regime_scorecard_table(market, macro)
+
+    assert set(scorecard["regime_type"]) == {"market", "macro"}
+    assert set(scorecard["best_regime"]) == {"high", "low"}
+    assert "stronger_in_high_market_regime" in set(scorecard["interpretation"])
+    assert "stronger_in_low_macro_regime" in set(scorecard["interpretation"])
 
 
 def test_top_maturity_point_metrics_rejects_invalid_top_n() -> None:
@@ -314,6 +358,29 @@ def _sample_point_metrics() -> pd.DataFrame:
             _metric_row(representation="lagged", rmse=0.12, maturity_years=10.0),
         ]
     )
+
+
+def _regime_row(
+    indicator: str,
+    country: str,
+    horizon_days: int,
+    regime: str,
+    hit_rate: float,
+    rank_ic: float,
+    regime_column: str = "market_vol_regime",
+) -> dict[str, object]:
+    return {
+        "indicator": indicator,
+        "country": country,
+        "horizon_days": horizon_days,
+        regime_column: regime,
+        "rows": 100,
+        "dates": 50,
+        "mean_convergence_score": 0.01,
+        "convergence_hit_rate": hit_rate,
+        "mean_rank_ic": rank_ic,
+        "rank_ic_dates": 50,
+    }
 
 
 def _metric_row(

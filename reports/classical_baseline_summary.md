@@ -130,6 +130,10 @@ sample.
 The baseline audit table provides the current scenario-level map:
 `reports/tables/baseline_audit.csv`.
 
+The residual RV regime scorecard highlights where mean-reversion evidence is
+stronger by market-volatility and macro regime:
+`reports/tables/residual_rv_regime_scorecard.csv`.
+
 ## Next Step
 
 The next research step should improve the learned representation protocol itself,

@@ -330,6 +330,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "residual_rv_by_macro_regime.csv"
 
     @property
+    def residual_rv_regime_scorecard_table_path(self) -> Path:
+        return self.tables_dir / "residual_rv_regime_scorecard.csv"
+
+    @property
     def residual_mean_reversion_table_path(self) -> Path:
         return self.tables_dir / "residual_mean_reversion.csv"
 

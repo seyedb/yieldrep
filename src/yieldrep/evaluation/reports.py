@@ -105,6 +105,22 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         and config.macro_regimes_path.exists()
     ):
         residual_rv_by_macro_regime_path = build_residual_rv_by_macro_regime_report(config)
+    residual_rv_regime_scorecard = residual_rv_regime_scorecard_table(
+        market_regimes=(
+            pd.read_csv(config.residual_rv_by_market_regime_table_path)
+            if config.residual_rv_by_market_regime_table_path.exists()
+            else pd.DataFrame()
+        ),
+        macro_regimes=(
+            pd.read_csv(config.residual_rv_by_macro_regime_table_path)
+            if config.residual_rv_by_macro_regime_table_path.exists()
+            else pd.DataFrame()
+        ),
+    )
+    residual_rv_regime_scorecard.to_csv(
+        config.residual_rv_regime_scorecard_table_path,
+        index=False,
+    )
 
     winners = baseline_winners(rank_table)
     winners.to_csv(config.baseline_winners_table_path, index=False)
@@ -166,6 +182,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.baseline_winners_table_path,
         config.volatility_regime_table_path,
         config.volatility_regime_benchmark_table_path,
+        config.residual_rv_regime_scorecard_table_path,
         config.ae_classical_factor_correlations_table_path,
         config.benchmark_conclusions_table_path,
         config.scenario_method_table_path,
@@ -1276,6 +1293,121 @@ def market_regime_rv_summary_table(regime_summary: pd.DataFrame) -> pd.DataFrame
     return pd.DataFrame(rows).loc[:, columns]
 
 
+def residual_rv_regime_scorecard_table(
+    market_regimes: pd.DataFrame,
+    macro_regimes: pd.DataFrame,
+) -> pd.DataFrame:
+    """Combine market and macro regime-conditioned RV diagnostics."""
+    columns = [
+        "regime_type",
+        "indicator",
+        "country",
+        "horizon_days",
+        "best_regime",
+        "best_hit_rate",
+        "best_rank_ic",
+        "worst_regime",
+        "worst_hit_rate",
+        "high_minus_low_hit_rate",
+        "high_minus_low_rank_ic",
+        "interpretation",
+    ]
+    frames = [
+        _regime_scorecard_rows(
+            market_regimes,
+            regime_type="market",
+            regime_column="market_vol_regime",
+        ),
+        _regime_scorecard_rows(
+            macro_regimes,
+            regime_type="macro",
+            regime_column="macro_regime",
+        ),
+    ]
+    non_empty = [frame for frame in frames if not frame.empty]
+    if not non_empty:
+        return pd.DataFrame(columns=columns)
+    return (
+        pd.concat(non_empty, ignore_index=True)
+        .loc[:, columns]
+        .sort_values(["regime_type", "indicator", "country", "horizon_days"])
+        .reset_index(drop=True)
+    )
+
+
+def _regime_scorecard_rows(
+    regime_summary: pd.DataFrame,
+    regime_type: str,
+    regime_column: str,
+) -> pd.DataFrame:
+    columns = [
+        "regime_type",
+        "indicator",
+        "country",
+        "horizon_days",
+        "best_regime",
+        "best_hit_rate",
+        "best_rank_ic",
+        "worst_regime",
+        "worst_hit_rate",
+        "high_minus_low_hit_rate",
+        "high_minus_low_rank_ic",
+        "interpretation",
+    ]
+    if regime_summary.empty:
+        return pd.DataFrame(columns=columns)
+
+    rows: list[dict[str, object]] = []
+    for group_values, group in regime_summary.groupby(
+        ["indicator", "country", "horizon_days"],
+        sort=True,
+    ):
+        indicator, country, horizon_days = group_values
+        best = group.sort_values(
+            ["convergence_hit_rate", "mean_rank_ic", regime_column],
+            ascending=[False, False, True],
+        ).iloc[0]
+        worst = group.sort_values(
+            ["convergence_hit_rate", "mean_rank_ic", regime_column],
+            ascending=[True, True, True],
+        ).iloc[0]
+        high = _named_regime_row(group, regime_column, "high")
+        low = _named_regime_row(group, regime_column, "low")
+        high_minus_low_hit = _difference(high, low, "convergence_hit_rate")
+        high_minus_low_rank_ic = _difference(high, low, "mean_rank_ic")
+        rows.append(
+            {
+                "regime_type": regime_type,
+                "indicator": indicator,
+                "country": country,
+                "horizon_days": horizon_days,
+                "best_regime": best[regime_column],
+                "best_hit_rate": best["convergence_hit_rate"],
+                "best_rank_ic": best["mean_rank_ic"],
+                "worst_regime": worst[regime_column],
+                "worst_hit_rate": worst["convergence_hit_rate"],
+                "high_minus_low_hit_rate": high_minus_low_hit,
+                "high_minus_low_rank_ic": high_minus_low_rank_ic,
+                "interpretation": _regime_scorecard_interpretation(
+                    regime_type,
+                    high_minus_low_hit,
+                ),
+            }
+        )
+    return pd.DataFrame(rows, columns=columns)
+
+
+def _named_regime_row(
+    group: pd.DataFrame,
+    regime_column: str,
+    regime: str,
+) -> pd.Series | None:
+    rows = group.loc[group[regime_column] == regime]
+    if rows.empty:
+        return None
+    return rows.iloc[0]
+
+
 def _regime_row(group: pd.DataFrame, regime: str) -> pd.Series | None:
     rows = group.loc[group["market_vol_regime"] == regime]
     if rows.empty:
@@ -1296,6 +1428,19 @@ def _market_regime_interpretation(high_minus_low_hit_rate: float | None) -> str:
         return "stronger_in_high_vol"
     if high_minus_low_hit_rate <= -0.03:
         return "stronger_in_low_vol"
+    return "similar_across_regimes"
+
+
+def _regime_scorecard_interpretation(
+    regime_type: str,
+    high_minus_low_hit_rate: float | None,
+) -> str:
+    if high_minus_low_hit_rate is None:
+        return "insufficient_regime_coverage"
+    if high_minus_low_hit_rate >= 0.03:
+        return f"stronger_in_high_{regime_type}_regime"
+    if high_minus_low_hit_rate <= -0.03:
+        return f"stronger_in_low_{regime_type}_regime"
     return "similar_across_regimes"
 
 

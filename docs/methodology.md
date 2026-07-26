@@ -562,6 +562,10 @@ A compact baseline audit is also written to `reports/tables/baseline_audit.csv`.
 It records the valid baseline families, current best result, evidence quality,
 and next action for each research scenario.
 
+Residual relative-value regime evidence is summarized in
+`reports/tables/residual_rv_regime_scorecard.csv`, combining market-volatility
+and macro-regime splits into one comparable scorecard.
+
 ### Metric Protocol
 
 Metrics are interpreted by task. A single pooled error number is not treated as
