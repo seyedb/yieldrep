@@ -5,6 +5,7 @@ from typing import Any
 
 import pandas as pd
 import plotly.express as px
+from plotly.graph_objects import Figure
 
 from yieldrep.config import ProjectConfig
 
@@ -22,13 +23,15 @@ def plot_reconstruction(config: ProjectConfig) -> list[Path]:
     comparison_path = config.figures_dir / "reconstruction_oos_rmse_comparison.html"
     bucket_path = config.figures_dir / "reconstruction_oos_rmse_by_maturity_bucket.html"
     maturity_path = config.figures_dir / "reconstruction_oos_rmse_by_maturity.html"
+    training_path = config.figures_dir / "reconstruction_autoencoder_training_history.html"
 
     _plot_pca_components(summary).write_html(component_path)
     _plot_representation_comparison(oos_summary).write_html(comparison_path)
     _plot_maturity_bucket_profile(oos_by_bucket).write_html(bucket_path)
     _plot_maturity_profile(oos_by_maturity).write_html(maturity_path)
+    _plot_training_history(config).write_html(training_path)
 
-    return [component_path, comparison_path, bucket_path, maturity_path]
+    return [component_path, comparison_path, bucket_path, maturity_path, training_path]
 
 
 def _plot_pca_components(summary: pd.DataFrame) -> Any:
@@ -108,3 +111,29 @@ def _representation_label(row: pd.Series) -> str:
     if row["representation"] == "autoencoder":
         return f"Autoencoder {int(row['n_components'])} latent dims"
     return "Nelson-Siegel"
+
+
+def _plot_training_history(config: ProjectConfig) -> Figure:
+    histories = [
+        pd.read_parquet(path)
+        for path in sorted(config.autoencoder_dir.glob("*_training_history.parquet"))
+    ]
+    if not histories:
+        return Figure()
+
+    history = pd.concat(histories, ignore_index=True)
+    long = history.melt(
+        id_vars=["country", "epoch"],
+        value_vars=["train_loss", "validation_loss"],
+        var_name="loss_type",
+        value_name="loss",
+    )
+    return px.line(
+        long,
+        x="epoch",
+        y="loss",
+        color="loss_type",
+        facet_col="country",
+        title="Autoencoder training history",
+        labels={"epoch": "Epoch", "loss": "Scaled reconstruction loss", "loss_type": "Loss"},
+    )

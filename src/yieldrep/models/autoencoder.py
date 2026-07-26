@@ -16,30 +16,58 @@ from yieldrep.factors.curve import curve_panel
 
 
 class CurveAutoencoder(nn.Module):
-    """Small MLP autoencoder for curve reconstruction, not forecasting."""
+    """Denoising MLP autoencoder for curve reconstruction, not forecasting."""
 
     def __init__(
         self,
         input_dim: int,
         hidden_dim: int,
         latent_dim: int,
+        depth: int,
+        dropout: float,
         output_dim: int | None = None,
     ) -> None:
         super().__init__()
         decoder_output_dim = output_dim if output_dim is not None else input_dim
-        self.encoder = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, latent_dim),
+        self.encoder = _mlp_stack(
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=latent_dim,
+            depth=depth,
+            dropout=dropout,
         )
-        self.decoder = nn.Sequential(
-            nn.Linear(latent_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, decoder_output_dim),
+        self.decoder = _mlp_stack(
+            input_dim=latent_dim,
+            hidden_dim=hidden_dim,
+            output_dim=decoder_output_dim,
+            depth=depth,
+            dropout=dropout,
         )
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         return cast(torch.Tensor, self.decoder(self.encoder(inputs)))
+
+
+def _mlp_stack(
+    input_dim: int,
+    hidden_dim: int,
+    output_dim: int,
+    depth: int,
+    dropout: float,
+) -> nn.Sequential:
+    layers: list[nn.Module] = []
+    current_dim = input_dim
+    for _ in range(depth):
+        layers.extend(
+            [
+                nn.Linear(current_dim, hidden_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+            ]
+        )
+        current_dim = hidden_dim
+    layers.append(nn.Linear(current_dim, output_dim))
+    return nn.Sequential(*layers)
 
 
 def build_autoencoder(config: ProjectConfig) -> list[Path]:
@@ -65,8 +93,12 @@ def build_autoencoder(config: ProjectConfig) -> list[Path]:
             test_fraction=config.evaluation.test_fraction,
             latent_dim=config.autoencoder.latent_dim,
             hidden_dim=config.autoencoder.hidden_dim,
+            depth=config.autoencoder.depth,
+            dropout=config.autoencoder.dropout,
             epochs=config.autoencoder.epochs,
+            batch_size=config.autoencoder.batch_size,
             learning_rate=config.autoencoder.learning_rate,
+            weight_decay=config.autoencoder.weight_decay,
             validation_fraction=config.autoencoder.validation_fraction,
             mask_probability=config.autoencoder.mask_probability,
             clean_loss_weight=config.autoencoder.clean_loss_weight,
@@ -81,12 +113,20 @@ def build_autoencoder(config: ProjectConfig) -> list[Path]:
             config.autoencoder_dir / f"{country_key}_masked_reconstruction.parquet"
         )
         metrics_path = config.autoencoder_dir / f"{country_key}_metrics.parquet"
+        history_path = config.autoencoder_dir / f"{country_key}_training_history.parquet"
         result.embeddings.to_parquet(embeddings_path, index=False)
         result.reconstruction.to_parquet(reconstruction_path, index=False)
         result.masked_reconstruction.to_parquet(masked_reconstruction_path, index=False)
         result.metrics.to_parquet(metrics_path, index=False)
+        result.training_history.to_parquet(history_path, index=False)
         output_paths.extend(
-            [embeddings_path, reconstruction_path, masked_reconstruction_path, metrics_path]
+            [
+                embeddings_path,
+                reconstruction_path,
+                masked_reconstruction_path,
+                metrics_path,
+                history_path,
+            ]
         )
 
     return output_paths
@@ -99,11 +139,13 @@ class AutoencoderResult:
         reconstruction: pd.DataFrame,
         masked_reconstruction: pd.DataFrame,
         metrics: pd.DataFrame,
+        training_history: pd.DataFrame,
     ) -> None:
         self.embeddings = embeddings
         self.reconstruction = reconstruction
         self.masked_reconstruction = masked_reconstruction
         self.metrics = metrics
+        self.training_history = training_history
 
 
 class MaskedPrediction:
@@ -117,8 +159,12 @@ def fit_autoencoder_panel(
     test_fraction: float,
     latent_dim: int,
     hidden_dim: int,
+    depth: int,
+    dropout: float,
     epochs: int,
+    batch_size: int,
     learning_rate: float,
+    weight_decay: float,
     validation_fraction: float,
     mask_probability: float,
     clean_loss_weight: float,
@@ -131,10 +177,18 @@ def fit_autoencoder_panel(
         raise ValueError("latent_dim must be positive")
     if hidden_dim <= 0:
         raise ValueError("hidden_dim must be positive")
+    if depth <= 0:
+        raise ValueError("depth must be positive")
+    if not 0 <= dropout < 1:
+        raise ValueError("dropout must be in [0, 1)")
     if epochs <= 0:
         raise ValueError("epochs must be positive")
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive")
     if learning_rate <= 0:
         raise ValueError("learning_rate must be positive")
+    if weight_decay < 0:
+        raise ValueError("weight_decay must be non-negative")
     if not 0 < validation_fraction < 1:
         raise ValueError("validation_fraction must be between 0 and 1")
     if not 0 < mask_probability < 1:
@@ -168,9 +222,11 @@ def fit_autoencoder_panel(
         input_dim=panel.shape[1] * 2,
         hidden_dim=hidden_dim,
         latent_dim=min(latent_dim, hidden_dim),
+        depth=depth,
+        dropout=dropout,
         output_dim=panel.shape[1],
     )
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     loss_fn = nn.MSELoss()
     train_tensor = torch.from_numpy(x_train)
     validation_tensor = torch.from_numpy(x_validation)
@@ -183,19 +239,30 @@ def fit_autoencoder_panel(
     epochs_without_improvement = 0
     final_train_loss = float("nan")
     final_validation_loss = float("nan")
+    history_rows: list[dict[str, object]] = []
 
     for epoch in range(1, epochs + 1):
         model.train()
-        optimizer.zero_grad()
-        train_mask = _random_mask(train_tensor.shape, mask_probability, generator)
-        train_input = _model_input(train_tensor, train_mask)
-        reconstructed = model(train_input)
-        masked_loss = loss_fn(reconstructed[train_mask], train_tensor[train_mask])
-        clean_reconstructed = model(_model_input(train_tensor, torch.zeros_like(train_mask)))
-        clean_loss = loss_fn(clean_reconstructed, train_tensor)
-        loss = masked_loss + clean_loss_weight * clean_loss
-        loss.backward()
-        optimizer.step()
+        train_loss_total = 0.0
+        train_masked_loss_total = 0.0
+        train_clean_loss_total = 0.0
+        train_rows = 0
+        for batch in _batch_iterator(train_tensor, batch_size, generator):
+            optimizer.zero_grad()
+            train_mask = _random_mask(batch.shape, mask_probability, generator)
+            train_input = _model_input(batch, train_mask)
+            reconstructed = model(train_input)
+            masked_loss = loss_fn(reconstructed[train_mask], batch[train_mask])
+            clean_reconstructed = model(_model_input(batch, torch.zeros_like(train_mask)))
+            clean_loss = loss_fn(clean_reconstructed, batch)
+            loss = masked_loss + clean_loss_weight * clean_loss
+            loss.backward()
+            optimizer.step()
+            rows = batch.shape[0]
+            train_rows += rows
+            train_loss_total += float(loss.detach().item()) * rows
+            train_masked_loss_total += float(masked_loss.detach().item()) * rows
+            train_clean_loss_total += float(clean_loss.detach().item()) * rows
 
         model.eval()
         with torch.no_grad():
@@ -211,8 +278,19 @@ def fit_autoencoder_panel(
             validation_clean_loss = loss_fn(validation_clean_reconstructed, validation_tensor)
             validation_loss = validation_masked_loss + clean_loss_weight * validation_clean_loss
 
-        final_train_loss = float(loss.detach().item())
+        final_train_loss = train_loss_total / train_rows
         final_validation_loss = float(validation_loss.detach().item())
+        history_rows.append(
+            {
+                "epoch": epoch,
+                "train_loss": final_train_loss,
+                "train_masked_loss": train_masked_loss_total / train_rows,
+                "train_clean_loss": train_clean_loss_total / train_rows,
+                "validation_loss": final_validation_loss,
+                "validation_masked_loss": float(validation_masked_loss.detach().item()),
+                "validation_clean_loss": float(validation_clean_loss.detach().item()),
+            }
+        )
         if final_validation_loss < best_validation_loss - min_delta:
             best_validation_loss = final_validation_loss
             best_epoch = epoch
@@ -277,6 +355,10 @@ def fit_autoencoder_panel(
         country=str(panel.attrs.get("country", "")),
         latent_dim=min(latent_dim, hidden_dim),
         hidden_dim=hidden_dim,
+        depth=depth,
+        dropout=dropout,
+        batch_size=batch_size,
+        weight_decay=weight_decay,
         mask_probability=mask_probability,
         clean_loss_weight=clean_loss_weight,
         epochs_trained=best_epoch,
@@ -289,6 +371,11 @@ def fit_autoencoder_panel(
         reconstruction=reconstruction,
         masked_reconstruction=masked_reconstruction,
         metrics=metrics,
+        training_history=_training_history_frame(
+            history_rows=history_rows,
+            country=str(panel.attrs.get("country", "")),
+            best_epoch=best_epoch,
+        ),
     )
 
 
@@ -424,6 +511,10 @@ def _metrics_frame(
     country: str,
     latent_dim: int,
     hidden_dim: int,
+    depth: int,
+    dropout: float,
+    batch_size: int,
+    weight_decay: float,
     mask_probability: float,
     clean_loss_weight: float,
     epochs_trained: int,
@@ -445,6 +536,10 @@ def _metrics_frame(
                 "split": split,
                 "latent_dim": latent_dim,
                 "hidden_dim": hidden_dim,
+                "depth": depth,
+                "dropout": dropout,
+                "batch_size": batch_size,
+                "weight_decay": weight_decay,
                 "mask_probability": mask_probability,
                 "clean_loss_weight": clean_loss_weight,
                 "epochs_trained": epochs_trained,
@@ -482,6 +577,18 @@ def _random_mask(
     return mask
 
 
+def _batch_iterator(
+    values: torch.Tensor,
+    batch_size: int,
+    generator: torch.Generator,
+) -> list[torch.Tensor]:
+    permutation = torch.randperm(values.shape[0], generator=generator)
+    return [
+        values[permutation[start : start + batch_size]]
+        for start in range(0, values.shape[0], batch_size)
+    ]
+
+
 def _model_input(values: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
     masked = values.clone()
     masked[mask] = 0.0
@@ -501,3 +608,41 @@ def _masked_prediction(
         reconstructed=reconstructed,
         mask=mask.numpy().astype(np.bool_),
     )
+
+
+def _training_history_frame(
+    history_rows: list[dict[str, object]],
+    country: str,
+    best_epoch: int,
+) -> pd.DataFrame:
+    frame = pd.DataFrame(history_rows)
+    if frame.empty:
+        return pd.DataFrame(
+            columns=[
+                "country",
+                "epoch",
+                "is_best_epoch",
+                "train_loss",
+                "train_masked_loss",
+                "train_clean_loss",
+                "validation_loss",
+                "validation_masked_loss",
+                "validation_clean_loss",
+            ]
+        )
+    frame.insert(0, "country", country)
+    frame["is_best_epoch"] = frame["epoch"].eq(best_epoch)
+    return frame.loc[
+        :,
+        [
+            "country",
+            "epoch",
+            "is_best_epoch",
+            "train_loss",
+            "train_masked_loss",
+            "train_clean_loss",
+            "validation_loss",
+            "validation_masked_loss",
+            "validation_clean_loss",
+        ],
+    ]

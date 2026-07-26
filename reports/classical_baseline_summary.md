@@ -81,10 +81,10 @@ the euro-area aggregate curve.
 PCA and Nelson-Siegel remain useful curve-level representations. They are most
 clearly validated through reconstruction and cross-market factor diagnostics.
 
-The masked autoencoder is a more appropriate learned-representation baseline
-than the initial plain autoencoder, but it is still not a win on clean held-out
-curve reconstruction. It establishes the PyTorch pipeline and gives future
-learned models a clear PCA reconstruction hurdle.
+The upgraded denoising autoencoder is materially better than the earlier shallow
+version, but it is still not a win on clean held-out curve reconstruction. It
+establishes the PyTorch pipeline and gives future learned models a clear PCA
+reconstruction hurdle.
 
 Residual relative-value ranking is a maturity-level task. In the current
 classical setup, direct curve-shape, lagged, and carry/roll-down features are

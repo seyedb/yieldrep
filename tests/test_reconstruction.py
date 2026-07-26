@@ -70,8 +70,12 @@ def test_fit_autoencoder_panel_returns_embeddings_and_reconstruction() -> None:
         test_fraction=0.5,
         latent_dim=2,
         hidden_dim=4,
+        depth=1,
+        dropout=0.0,
         epochs=20,
+        batch_size=2,
         learning_rate=0.01,
+        weight_decay=0.0,
         validation_fraction=0.5,
         mask_probability=0.4,
         clean_loss_weight=0.2,
@@ -89,8 +93,19 @@ def test_fit_autoencoder_panel_returns_embeddings_and_reconstruction() -> None:
         "fitted_yield",
         "split",
     }.issubset(result.reconstruction.columns)
-    assert {"split", "rmse", "mae", "epochs_trained", "best_validation_loss"}.issubset(
-        result.metrics.columns
+    assert {
+        "split",
+        "rmse",
+        "mae",
+        "depth",
+        "dropout",
+        "batch_size",
+        "weight_decay",
+        "epochs_trained",
+        "best_validation_loss",
+    }.issubset(result.metrics.columns)
+    assert {"epoch", "train_loss", "validation_loss", "is_best_epoch"}.issubset(
+        result.training_history.columns
     )
     assert set(result.reconstruction["split"]) == {"train", "validation", "test"}
     assert set(result.masked_reconstruction["split"]) == {"train", "validation", "test"}
@@ -98,6 +113,7 @@ def test_fit_autoencoder_panel_returns_embeddings_and_reconstruction() -> None:
     assert set(result.metrics["split"]) == {"train", "validation", "test"}
     assert len(result.reconstruction) == panel.size
     assert len(result.masked_reconstruction) < panel.size
+    assert result.training_history["is_best_epoch"].sum() == 1
 
 
 def _sample_curves() -> pd.DataFrame:

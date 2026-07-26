@@ -193,12 +193,16 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.nelson_siegel.tau == 1.5
     assert config.nelson_siegel.min_maturities == 3
     assert config.autoencoder.latent_dim == 5
-    assert config.autoencoder.hidden_dim == 64
-    assert config.autoencoder.epochs == 1200
+    assert config.autoencoder.hidden_dim == 128
+    assert config.autoencoder.depth == 2
+    assert config.autoencoder.dropout == 0.0
+    assert config.autoencoder.epochs == 2000
+    assert config.autoencoder.batch_size == 1024
+    assert config.autoencoder.weight_decay == 0.00001
     assert config.autoencoder.validation_fraction == 0.2
     assert config.autoencoder.mask_probability == 0.15
     assert config.autoencoder.clean_loss_weight == 1.0
-    assert config.autoencoder.early_stopping_patience == 100
+    assert config.autoencoder.early_stopping_patience == 150
     assert config.targets.horizons_days == [1, 5, 20]
     assert config.targets.realized_vol_window == 20
     assert config.evaluation.method == "date_ordered"

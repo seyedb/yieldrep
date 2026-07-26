@@ -423,14 +423,18 @@ r_t^{(m)}
 ```
 
 PCA reconstructs curves from the first \(K\) components. Nelson-Siegel
-reconstructs curves from the fitted parametric form. The first learned baseline
-is a small PyTorch MLP masked autoencoder trained only on the chronological
-train split, with an inner chronological validation split and early stopping on
-validation reconstruction loss. During training, a random subset of maturities is
-masked and the model receives both the masked curve and a binary mask indicator.
-The loss combines masked-maturity reconstruction with clean-curve reconstruction,
-so the embeddings remain defined for fully observed curves. The latent dimension
-is matched to the PCA component count.
+reconstructs curves from the fitted parametric form. The learned baseline is a
+PyTorch denoising autoencoder trained only on the chronological train split, with
+an inner chronological validation split and early stopping on validation
+reconstruction loss.
+
+The autoencoder uses a deeper MLP encoder/decoder with GELU activations, optional
+dropout, AdamW weight decay, and mini-batch training. During training, a random
+subset of maturities is masked and the model receives both the masked curve and a
+binary mask indicator. The loss combines masked-maturity
+reconstruction with clean-curve reconstruction, so the embeddings remain defined
+for fully observed curves. The latent dimension is matched to the PCA component
+count.
 
 The autoencoder is first evaluated on out-of-sample reconstruction:
 

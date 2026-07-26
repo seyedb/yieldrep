@@ -11,13 +11,17 @@ nelson_siegel:
 
 autoencoder:
   latent_dim: 5
-  hidden_dim: 64
-  epochs: 1200
-  learning_rate: 0.005
+  hidden_dim: 128
+  depth: 2
+  dropout: 0.0
+  epochs: 2000
+  batch_size: 1024
+  learning_rate: 0.003
+  weight_decay: 0.00001
   validation_fraction: 0.2
   mask_probability: 0.15
   clean_loss_weight: 1.0
-  early_stopping_patience: 100
+  early_stopping_patience: 150
   min_delta: 0.00001
   random_seed: 42
   min_train_dates: 252

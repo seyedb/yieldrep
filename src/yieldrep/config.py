@@ -26,13 +26,17 @@ class NelsonSiegelConfig(BaseModel):
 
 class AutoencoderConfig(BaseModel):
     latent_dim: int = 5
-    hidden_dim: int = 64
-    epochs: int = 1200
-    learning_rate: float = 0.005
+    hidden_dim: int = 128
+    depth: int = 2
+    dropout: float = 0.0
+    epochs: int = 2000
+    batch_size: int = 1024
+    learning_rate: float = 0.003
+    weight_decay: float = 1e-5
     validation_fraction: float = 0.2
     mask_probability: float = 0.15
     clean_loss_weight: float = 1.0
-    early_stopping_patience: int = 100
+    early_stopping_patience: int = 150
     min_delta: float = 1e-5
     random_seed: int = 42
     min_train_dates: int = 252
