@@ -99,12 +99,18 @@ Masked-maturity reconstruction is now reported separately by maturity and curve
 segment. This identifies where the self-supervised autoencoder struggles to
 infer missing curve points from the observed rest of the curve.
 
-A small maturity-aware Transformer is now included as a sequence-model benchmark
-for the same masked-maturity reconstruction task. It is evaluated only as a
-standalone representation model. Under the current lightweight default settings,
-it underperforms the masked autoencoder in US, Canada, and the euro-area
-aggregate curve; this should be read as a benchmark result for this configuration,
-not as a general conclusion about Transformer architectures.
+A maturity-aware Transformer is now included as a sequence-model benchmark for
+the same masked-maturity reconstruction task. It uses learned maturity
+embeddings and a learned curve token, and is evaluated only as a standalone
+representation model. The upgraded Transformer remains weaker than the masked
+autoencoder in US, Canada, and the euro-area aggregate curve under the current
+training protocol. This makes the masked autoencoder the stronger learned
+baseline at this stage.
+
+The residual relative-value scorecard condenses existing spread, rank-IC, and
+direct mean-reversion diagnostics into a single table. Current RV evidence is
+mostly positive but modest at short horizons, with stronger 20-day evidence in
+the US and euro-area aggregate curve.
 
 Residual relative-value ranking is a maturity-level task. In the current
 classical setup, direct curve-shape, lagged, and carry/roll-down features are

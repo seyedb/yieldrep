@@ -19,6 +19,7 @@ class MaturityTransformer(nn.Module):
 
     def __init__(
         self,
+        n_maturities: int,
         model_dim: int,
         n_heads: int,
         n_layers: int,
@@ -27,7 +28,10 @@ class MaturityTransformer(nn.Module):
         latent_dim: int,
     ) -> None:
         super().__init__()
-        self.input_projection = nn.Linear(3, model_dim)
+        self.input_projection = nn.Linear(2, model_dim)
+        self.maturity_projection = nn.Linear(1, model_dim)
+        self.maturity_embedding = nn.Embedding(n_maturities, model_dim)
+        self.curve_token = nn.Parameter(torch.zeros(1, 1, model_dim))
         layer = nn.TransformerEncoderLayer(
             d_model=model_dim,
             nhead=n_heads,
@@ -40,11 +44,21 @@ class MaturityTransformer(nn.Module):
         self.output_head = nn.Linear(model_dim, 1)
         self.latent_head = nn.Linear(model_dim, latent_dim)
 
-    def forward(self, inputs: Tensor) -> tuple[Tensor, Tensor]:
-        encoded = self.encoder(self.input_projection(inputs))
-        reconstructed = self.output_head(encoded).squeeze(-1)
-        pooled = encoded.mean(dim=1)
-        latent = self.latent_head(pooled)
+    def forward(self, inputs: Tensor, maturity_features: Tensor) -> tuple[Tensor, Tensor]:
+        batch_size, n_maturities, _ = inputs.shape
+        maturity_index = torch.arange(n_maturities, device=inputs.device)
+        maturity_positions = maturity_features.view(1, n_maturities, 1).to(inputs.device)
+        maturity_positions = maturity_positions.expand(batch_size, -1, -1)
+        tokens = (
+            self.input_projection(inputs)
+            + self.maturity_projection(maturity_positions)
+            + self.maturity_embedding(maturity_index).unsqueeze(0)
+        )
+        curve_token = self.curve_token.expand(batch_size, -1, -1)
+        encoded = self.encoder(torch.cat([curve_token, tokens], dim=1))
+        curve_encoded = encoded[:, 1:, :]
+        reconstructed = self.output_head(curve_encoded).squeeze(-1)
+        latent = self.latent_head(encoded[:, 0, :])
         return reconstructed, latent
 
 
@@ -101,6 +115,7 @@ def build_transformer(config: ProjectConfig) -> list[Path]:
             early_stopping_patience=config.transformer.early_stopping_patience,
             min_delta=config.transformer.min_delta,
             random_seed=config.transformer.random_seed,
+            max_train_dates=config.transformer.max_train_dates,
         )
         country_key = str(country).lower()
         embeddings_path = config.transformer_dir / f"{country_key}_embeddings.parquet"
@@ -139,6 +154,7 @@ def fit_transformer_panel(
     early_stopping_patience: int,
     min_delta: float,
     random_seed: int,
+    max_train_dates: int | None = None,
 ) -> TransformerResult:
     _validate_hyperparameters(
         latent_dim=latent_dim,
@@ -156,6 +172,7 @@ def fit_transformer_panel(
         clean_loss_weight=clean_loss_weight,
         early_stopping_patience=early_stopping_patience,
         min_delta=min_delta,
+        max_train_dates=max_train_dates,
     )
     split = _date_ordered_panel_split(panel, test_fraction)
     if split is None:
@@ -165,6 +182,7 @@ def fit_transformer_panel(
     if inner_split is None:
         raise ValueError("Training panel is too short for the requested validation split")
     train_panel, validation_panel = inner_split
+    train_panel = _cap_training_panel(train_panel, max_train_dates)
 
     torch.manual_seed(random_seed)
     np.random.seed(random_seed)
@@ -177,6 +195,7 @@ def fit_transformer_panel(
     maturity_features = _maturity_features(panel.columns.astype(float).to_numpy())
 
     model = MaturityTransformer(
+        n_maturities=x_train.shape[1],
         model_dim=model_dim,
         n_heads=n_heads,
         n_layers=n_layers,
@@ -206,10 +225,11 @@ def fit_transformer_panel(
         for batch in _batch_iterator(train_tensor, batch_size, generator):
             optimizer.zero_grad()
             train_mask = _random_mask(batch.shape, mask_probability, generator)
-            reconstructed, _ = model(_model_input(batch, train_mask, maturity_tensor))
+            reconstructed, _ = model(_model_input(batch, train_mask), maturity_tensor)
             masked_loss = loss_fn(reconstructed[train_mask], batch[train_mask])
             clean_reconstructed, _ = model(
-                _model_input(batch, torch.zeros_like(train_mask), maturity_tensor)
+                _model_input(batch, torch.zeros_like(train_mask)),
+                maturity_tensor,
             )
             clean_loss = loss_fn(clean_reconstructed, batch)
             loss = masked_loss + clean_loss_weight * clean_loss
@@ -219,14 +239,15 @@ def fit_transformer_panel(
 
         model.eval()
         with torch.no_grad():
-            validation_input = _model_input(validation_tensor, validation_mask, maturity_tensor)
-            validation_reconstructed, _ = model(validation_input)
+            validation_input = _model_input(validation_tensor, validation_mask)
+            validation_reconstructed, _ = model(validation_input, maturity_tensor)
             validation_masked_loss = loss_fn(
                 validation_reconstructed[validation_mask],
                 validation_tensor[validation_mask],
             )
             validation_clean_reconstructed, _ = model(
-                _model_input(validation_tensor, torch.zeros_like(validation_mask), maturity_tensor)
+                _model_input(validation_tensor, torch.zeros_like(validation_mask)),
+                maturity_tensor,
             )
             validation_clean_loss = loss_fn(validation_clean_reconstructed, validation_tensor)
             validation_loss = validation_masked_loss + clean_loss_weight * validation_clean_loss
@@ -260,8 +281,8 @@ def fit_transformer_panel(
     model.eval()
     with torch.no_grad():
         all_tensor = torch.from_numpy(x_all)
-        clean_input = _model_input(all_tensor, torch.zeros_like(all_tensor, dtype=torch.bool), maturity_tensor)
-        reconstructed_scaled, encoded = model(clean_input)
+        clean_input = _model_input(all_tensor, torch.zeros_like(all_tensor, dtype=torch.bool))
+        reconstructed_scaled, encoded = model(clean_input, maturity_tensor)
         masked_eval = _masked_prediction(
             model=model,
             values=all_tensor,
@@ -352,6 +373,7 @@ def _validate_hyperparameters(
     clean_loss_weight: float,
     early_stopping_patience: int,
     min_delta: float,
+    max_train_dates: int | None,
 ) -> None:
     if latent_dim <= 0 or model_dim <= 0 or n_heads <= 0 or n_layers <= 0 or feedforward_dim <= 0:
         raise ValueError("Transformer dimensions must be positive")
@@ -367,6 +389,8 @@ def _validate_hyperparameters(
         raise ValueError("Fractions must be between 0 and 1")
     if clean_loss_weight < 0 or early_stopping_patience <= 0 or min_delta < 0:
         raise ValueError("Invalid training hyperparameters")
+    if max_train_dates is not None and max_train_dates <= 0:
+        raise ValueError("max_train_dates must be positive when provided")
 
 
 def _date_ordered_panel_split(
@@ -381,6 +405,13 @@ def _date_ordered_panel_split(
     return panel.iloc[:split_index], panel.iloc[split_index:]
 
 
+def _cap_training_panel(panel: pd.DataFrame, max_train_dates: int | None) -> pd.DataFrame:
+    if max_train_dates is None or len(panel.index) <= max_train_dates:
+        return panel
+    positions = np.linspace(0, len(panel.index) - 1, max_train_dates).round().astype(int)
+    return panel.iloc[np.unique(positions)]
+
+
 def _maturity_features(maturities: NDArray[np.float64]) -> NDArray[np.float32]:
     log_maturities = np.log1p(maturities)
     denominator = log_maturities.max() - log_maturities.min()
@@ -391,11 +422,10 @@ def _maturity_features(maturities: NDArray[np.float64]) -> NDArray[np.float32]:
     return scaled.astype(np.float32)
 
 
-def _model_input(values: Tensor, mask: Tensor, maturity_features: Tensor) -> Tensor:
+def _model_input(values: Tensor, mask: Tensor) -> Tensor:
     masked = values.clone()
     masked[mask] = 0.0
-    maturity = maturity_features.view(1, -1).expand(values.shape[0], -1)
-    return torch.stack([masked, mask.float(), maturity], dim=-1)
+    return torch.stack([masked, mask.float()], dim=-1)
 
 
 def _random_mask(shape: torch.Size, mask_probability: float, generator: torch.Generator) -> Tensor:
@@ -440,7 +470,7 @@ def _masked_prediction(
 ) -> MaskedPrediction:
     generator = torch.Generator().manual_seed(random_seed)
     mask = _random_mask(values.shape, mask_probability, generator)
-    reconstructed, _ = model(_model_input(values, mask, maturity_features))
+    reconstructed, _ = model(_model_input(values, mask), maturity_features)
     return MaskedPrediction(reconstructed.numpy(), mask.numpy().astype(np.bool_))
 
 

@@ -106,6 +106,9 @@ def test_load_config_reads_project_paths() -> None:
     assert config.residual_relative_value_overview_table_path == Path(
         "reports/tables/residual_relative_value_overview.csv"
     )
+    assert config.residual_relative_value_scorecard_table_path == Path(
+        "reports/tables/residual_relative_value_scorecard.csv"
+    )
     assert config.residual_rv_by_market_regime_table_path == Path(
         "reports/tables/residual_rv_by_market_regime.csv"
     )
@@ -214,9 +217,10 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.autoencoder.clean_loss_weight == 1.0
     assert config.autoencoder.early_stopping_patience == 150
     assert config.transformer.latent_dim == 5
-    assert config.transformer.model_dim == 16
+    assert config.transformer.model_dim == 24
     assert config.transformer.n_heads == 4
     assert config.transformer.n_layers == 1
+    assert config.transformer.max_train_dates == 500
     assert config.targets.horizons_days == [1, 5, 20]
     assert config.targets.realized_vol_window == 20
     assert config.evaluation.method == "date_ordered"

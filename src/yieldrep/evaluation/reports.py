@@ -76,6 +76,11 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         mean_reversion=residual_mean_reversion,
     )
     residual_rv_overview.to_csv(config.residual_relative_value_overview_table_path, index=False)
+    residual_rv_scorecard = residual_relative_value_scorecard(residual_rv_overview)
+    residual_rv_scorecard.to_csv(
+        config.residual_relative_value_scorecard_table_path,
+        index=False,
+    )
     residual_rv_by_market_regime_path = None
     if (
         config.residual_features_path.exists()
@@ -150,6 +155,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.residual_relative_value_spread_table_path,
         config.residual_relative_value_benchmark_table_path,
         config.residual_relative_value_overview_table_path,
+        config.residual_relative_value_scorecard_table_path,
         config.baseline_winners_table_path,
         config.volatility_regime_table_path,
         config.volatility_regime_benchmark_table_path,
@@ -1002,6 +1008,39 @@ def residual_relative_value_overview(
     )
 
 
+def residual_relative_value_scorecard(overview: pd.DataFrame) -> pd.DataFrame:
+    """Build a compact RV evidence table from existing diagnostics."""
+    columns = [
+        "country",
+        "horizon_days",
+        "spread_method",
+        "spread_t_stat",
+        "spread_hit_rate",
+        "rank_ic_method",
+        "rank_ic",
+        "direct_mean_reversion_hit_rate",
+        "direct_mean_reversion_rank_ic",
+        "evidence_label",
+        "takeaway",
+    ]
+    if overview.empty:
+        return pd.DataFrame(columns=columns)
+
+    scorecard = overview.rename(
+        columns={
+            "best_by_spread": "spread_method",
+            "best_spread_t_stat": "spread_t_stat",
+            "best_hit_rate": "spread_hit_rate",
+            "best_by_rank_ic": "rank_ic_method",
+            "best_rank_ic": "rank_ic",
+            "mean_reversion_hit_rate": "direct_mean_reversion_hit_rate",
+            "mean_reversion_rank_ic": "direct_mean_reversion_rank_ic",
+        }
+    ).copy()
+    scorecard["takeaway"] = scorecard.apply(_residual_rv_takeaway, axis=1)
+    return scorecard.loc[:, columns].sort_values(["country", "horizon_days"]).reset_index(drop=True)
+
+
 def _mean_reversion_overview(mean_reversion: pd.DataFrame) -> pd.DataFrame:
     focused = mean_reversion.loc[
         (mean_reversion["sample"] == "abs_z_ge_1")
@@ -1069,6 +1108,18 @@ def _residual_rv_evidence_label(row: pd.Series) -> str:
     if has_positive_ranking:
         return "ranking_positive"
     return "mixed"
+
+
+def _residual_rv_takeaway(row: pd.Series) -> str:
+    label = str(row.get("evidence_label", "mixed"))
+    horizon = int(row["horizon_days"])
+    if label.startswith("moderate_positive"):
+        return f"Best current residual-RV evidence at {horizon}d."
+    if label == "weak_positive":
+        return f"Positive but modest residual-RV evidence at {horizon}d."
+    if label == "ranking_positive":
+        return f"Ranking evidence is positive, but direct mean reversion is weaker at {horizon}d."
+    return f"Mixed residual-RV evidence at {horizon}d."
 
 
 def market_regime_rv_summary_table(regime_summary: pd.DataFrame) -> pd.DataFrame:

@@ -8,6 +8,7 @@ from yieldrep.evaluation.reports import (
     baseline_winners,
     overlap_sensitivity_table,
     scenario_method_comparison_table,
+    residual_relative_value_scorecard,
     supervised_walk_forward_comparison,
     summarize_baselines,
     top_maturity_point_metrics,
@@ -42,6 +43,7 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
         tmp_path / "reports" / "tables" / "residual_relative_value_spread.csv",
         tmp_path / "reports" / "tables" / "residual_relative_value_benchmark.csv",
         tmp_path / "reports" / "tables" / "residual_relative_value_overview.csv",
+        tmp_path / "reports" / "tables" / "residual_relative_value_scorecard.csv",
         tmp_path / "reports" / "tables" / "baseline_winners.csv",
         tmp_path / "reports" / "tables" / "volatility_regime.csv",
         tmp_path / "reports" / "tables" / "volatility_regime_benchmark.csv",
@@ -59,15 +61,16 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     residual_rv_spread = pd.read_csv(output_paths[4])
     residual_rv_benchmark = pd.read_csv(output_paths[5])
     residual_rv_overview = pd.read_csv(output_paths[6])
-    winners = pd.read_csv(output_paths[7])
-    volatility_regime = pd.read_csv(output_paths[8])
-    volatility_regime_benchmark = pd.read_csv(output_paths[9])
-    ae_classical_correlations = pd.read_csv(output_paths[10])
-    benchmark_conclusions = pd.read_csv(output_paths[11])
-    scenario_methods = pd.read_csv(output_paths[12])
-    bucket_summary = pd.read_csv(output_paths[13])
-    residual_rv = pd.read_csv(output_paths[14])
-    point_top = pd.read_csv(output_paths[15])
+    residual_rv_scorecard = pd.read_csv(output_paths[7])
+    winners = pd.read_csv(output_paths[8])
+    volatility_regime = pd.read_csv(output_paths[9])
+    volatility_regime_benchmark = pd.read_csv(output_paths[10])
+    ae_classical_correlations = pd.read_csv(output_paths[11])
+    benchmark_conclusions = pd.read_csv(output_paths[12])
+    scenario_methods = pd.read_csv(output_paths[13])
+    bucket_summary = pd.read_csv(output_paths[14])
+    residual_rv = pd.read_csv(output_paths[15])
+    point_top = pd.read_csv(output_paths[16])
     assert {"target", "representation", "model", "mean_rmse"}.issubset(summary.columns)
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best", "mean_rank_ic"}.issubset(
         rank_table.columns
@@ -84,6 +87,9 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     }.issubset(residual_rv_benchmark.columns)
     assert {"mean_reversion_hit_rate", "evidence_label"}.issubset(
         residual_rv_overview.columns
+    )
+    assert {"spread_method", "rank_ic_method", "takeaway"}.issubset(
+        residual_rv_scorecard.columns
     )
     assert {"best_representation", "lagged_rank"}.issubset(winners.columns)
     assert {"mean_balanced_accuracy", "mean_macro_f1", "rank"}.issubset(
@@ -119,6 +125,29 @@ def test_scenario_method_comparison_table_documents_clean_boundaries() -> None:
         "volatility_regime_classification",
     }
     assert table["methodological_boundary"].str.contains("not fed|No PCA|not stacked").any()
+
+
+def test_residual_relative_value_scorecard_summarizes_existing_evidence() -> None:
+    overview = pd.DataFrame(
+        {
+            "country": ["US"],
+            "horizon_days": [20],
+            "best_by_spread": ["lagged/ridge"],
+            "best_spread_t_stat": [2.1],
+            "best_hit_rate": [0.58],
+            "best_by_rank_ic": ["carry_roll/ridge"],
+            "best_rank_ic": [0.07],
+            "mean_reversion_hit_rate": [0.57],
+            "mean_reversion_rank_ic": [0.08],
+            "evidence_label": ["moderate_positive_20d"],
+        }
+    )
+
+    scorecard = residual_relative_value_scorecard(overview)
+
+    assert scorecard.loc[0, "spread_method"] == "lagged/ridge"
+    assert scorecard.loc[0, "rank_ic_method"] == "carry_roll/ridge"
+    assert "Best current residual-RV evidence" in scorecard.loc[0, "takeaway"]
 
 
 def test_top_maturity_point_metrics_rejects_invalid_top_n() -> None:

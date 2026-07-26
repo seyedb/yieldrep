@@ -44,22 +44,23 @@ class AutoencoderConfig(BaseModel):
 
 class TransformerConfig(BaseModel):
     latent_dim: int = 5
-    model_dim: int = 16
+    model_dim: int = 24
     n_heads: int = 4
     n_layers: int = 1
-    feedforward_dim: int = 32
-    dropout: float = 0.0
-    epochs: int = 30
+    feedforward_dim: int = 48
+    dropout: float = 0.05
+    epochs: int = 40
     batch_size: int = 1024
     learning_rate: float = 0.001
     weight_decay: float = 1e-5
     validation_fraction: float = 0.2
     mask_probability: float = 0.15
     clean_loss_weight: float = 1.0
-    early_stopping_patience: int = 6
+    early_stopping_patience: int = 8
     min_delta: float = 1e-5
     random_seed: int = 42
     min_train_dates: int = 252
+    max_train_dates: int | None = 500
 
 
 class TargetConfig(BaseModel):
@@ -311,6 +312,10 @@ class ProjectConfig(BaseModel):
     @property
     def residual_relative_value_overview_table_path(self) -> Path:
         return self.tables_dir / "residual_relative_value_overview.csv"
+
+    @property
+    def residual_relative_value_scorecard_table_path(self) -> Path:
+        return self.tables_dir / "residual_relative_value_scorecard.csv"
 
     @property
     def residual_rv_by_market_regime_table_path(self) -> Path:

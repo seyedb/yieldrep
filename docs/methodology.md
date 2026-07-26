@@ -436,11 +436,15 @@ reconstruction with clean-curve reconstruction, so the embeddings remain defined
 for fully observed curves. The latent dimension is matched to the PCA component
 count.
 
-The first sequence model is a small maturity-aware Transformer encoder. It treats
-maturities as ordered tokens and gives each token its observed or masked yield,
-mask indicator, and normalized maturity coordinate. The objective is the same
-masked-maturity reconstruction task used for the autoencoder, so comparisons are
-made on the same held-out masked points.
+The first sequence model is a maturity-aware Transformer encoder. It treats
+maturities as ordered tokens, combines observed or masked yield values with a
+mask indicator, adds both a continuous maturity coordinate and learned maturity
+embeddings, and uses a learned curve token as the curve-level latent state. The
+objective is the same masked-maturity reconstruction task used for the
+autoencoder, so comparisons are made on the same held-out masked points. For
+runtime practicality on dense maturity grids, Transformer training can be capped
+to evenly spaced training dates while validation, test, and reconstruction
+outputs remain on the full curve panel.
 
 The autoencoder is first evaluated on out-of-sample reconstruction:
 
