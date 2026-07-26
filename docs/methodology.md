@@ -1,695 +1,361 @@
 # Methodology
 
-This note defines the current classical baseline protocol for `yieldrep`. The
-purpose is to keep the project focused while the data infrastructure and
-benchmark tasks are still being established.
-
 ## Objective
 
-The long-run research question is whether learned latent representations of
-sovereign yield curves capture information beyond classical term-structure
-features.
+The project evaluates representations of sovereign zero-coupon yield curves for
+curve reconstruction, residual relative-value diagnostics, volatility regimes,
+and macro/market regime conditioning.
 
-The current phase does not train learned representations. It builds the public
-data pipeline, classical curve representations, benchmark targets, and evaluation
-framework needed before representation learning is introduced.
+The central comparison is between classical term-structure representations and
+learned curve representations:
 
-Current results should be interpreted as research diagnostics, not trading
-signals or claims of predictive edge.
+- PCA factors
+- Nelson-Siegel factors and residuals
+- engineered curve-shape, carry, roll-down, policy, and volatility features
+- denoising autoencoder embeddings
+- maturity-aware Transformer embeddings
 
-## Data Schema
+Representations are evaluated within task-specific protocols. Each model is
+assessed against the task it is designed to solve.
 
-All source curves are normalized to one long-format panel:
+## Data
 
-```text
-date, country, maturity_years, yield, source
-```
+The normalized curve schema is long format:
 
-For country \(c\), date \(t\), and maturity \(m\), the observed zero-coupon
-yield is:
+| Column | Meaning |
+| --- | --- |
+| `date` | observation date |
+| `country` | market identifier |
+| `maturity_years` | maturity in years |
+| `yield` | zero-coupon yield |
+| `source` | raw data source |
+
+Current curve sources:
+
+- Federal Reserve Gürkaynak-Sack-Wright nominal Treasury curve data
+- Bank of Canada zero-coupon government curve data
+- ECB euro-area yield curve data
+
+The ECB source is treated as an aggregate euro-area curve (`EA`).
+
+Additional public data used for conditioning and benchmark features:
+
+- policy rates
+- VIX and MOVE
+- inflation
+- unemployment
+
+For each country \(c\), the normalized long data is pivoted into a curve panel:
 
 ```math
-r_t^{(c,m)}
-```
-
-A country curve at date \(t\) is the maturity vector:
-
-```math
-\mathbf{r}_t^{(c)}
+X^{(c)}
 =
 \left[
-r_t^{(c,m_1)},
-r_t^{(c,m_2)},
-\ldots,
-r_t^{(c,m_M)}
-\right]
+y_t^{(c,m_1)}, \ldots, y_t^{(c,m_M)}
+\right]_{t=1}^{T_c}
 ```
 
-The ECB source is treated as an aggregate euro-area curve (`EA`), not as a
-single sovereign issuer. The configured ECB series uses all-issuer euro-area
-zero-coupon spot rates.
+where rows are dates and columns are maturities.
 
-## Classical Representations
+## Representations
 
 ### PCA
 
-PCA treats each daily curve as a vector and estimates orthogonal linear factors
-that explain historical curve variation.
+PCA is fit by country on the curve panel. It provides the main linear
+reconstruction hurdle. PCA scores and explained variance are stored per market.
+
+The reconstruction for \(K\) components is:
 
 ```math
-\mathbf{z}_t^{(c)}
+\hat{x}_t
 =
-\left[
-PC_{1,t}^{(c)},
-PC_{2,t}^{(c)},
-\ldots,
-PC_{K,t}^{(c)}
-\right]
+\mu
++
+W_K z_{t,K}
 ```
 
-In rates applications, the first few components often resemble level, slope, and
-curvature. This interpretation is approximate: PCA signs are arbitrary, and the
-factor shapes depend on the sample, maturities, and scaling.
+where \(x_t\) is the curve vector, \(\mu\) is the sample mean, \(W_K\) are the
+first \(K\) loading vectors, and \(z_{t,K}\) are the component scores.
 
 ### Nelson-Siegel
 
-Nelson-Siegel fits a parametric curve with level, slope, and curvature loadings:
+Nelson-Siegel represents each curve using level, slope, and curvature factors:
 
 ```math
-r(m)
+y(\tau)
 =
 \beta_0
-+ \beta_1
-\frac{1 - e^{-m/\tau}}{m/\tau}
-+ \beta_2
++
+\beta_1
 \left(
-\frac{1 - e^{-m/\tau}}{m/\tau}
-- e^{-m/\tau}
+\frac{1-e^{-\tau/\lambda}}{\tau/\lambda}
+\right)
++
+\beta_2
+\left(
+\frac{1-e^{-\tau/\lambda}}{\tau/\lambda}
+-
+e^{-\tau/\lambda}
 \right)
 ```
 
-With fixed \(\tau\), the betas are estimated by ordinary least squares for each
-country and date. The fitted residuals measure maturity-specific richness or
-cheapness relative to the parametric curve.
+The project uses a fixed decay parameter and estimates factors by date and
+country. Residuals from this fitted curve define the current relative-value
+object.
 
-### Engineered Curve Features
+### Engineered Features
 
-The current engineered baseline includes transparent curve-shape features:
+Engineered baselines include:
 
-```text
-level
-slope_10y_2y
-curvature_2s5s10s
-front_slope_2y_1y
-long_slope_30y_10y
-```
+- level
+- slope
+- curvature
+- maturity-specific curve interactions
+- lagged yield and residual changes
+- carry and roll-down proxies
+- policy-rate levels and changes
+- realized curve volatility
 
-It also includes simple zero-curve carry and roll-down proxies:
+These are direct features derived from observed curve or macro/market data.
 
-```math
-\mathrm{carry}_{t,u}^{(m)}
-=
-u r_t^{(m)}
-```
+Typical curve-shape features are:
 
 ```math
-\mathrm{rolldown}_{t,u}^{(m)}
+\mathrm{level}_t
 =
-r_t^{(m-u)}
+y_t^{(10Y)}
+```
+
+```math
+\mathrm{slope}_t
+=
+y_t^{(10Y)}
 -
-r_t^{(m)}
+y_t^{(2Y)}
 ```
 
-These are not full bond return calculations. They are interpretable
-term-structure proxies built from public zero-coupon data.
-
-### Policy-Rate Features
-
-Policy-rate features add central-bank context to curve-level classification
-tasks. The current sources are the daily effective fed funds rate for the US,
-the Bank of Canada target overnight rate, and the ECB deposit facility rate for
-the euro area.
-
-For each country, policy observations are aligned to curve dates using the most
-recent available policy-rate observation:
-
 ```math
-p_t^{(c)}
-```
-
-The feature set includes policy-rate level, recent changes, and a simple
-curve-policy spread:
-
-```math
-\Delta_\ell p_t^{(c)}
+\mathrm{curvature}_t
 =
-p_t^{(c)}
+2y_t^{(5Y)}
 -
-p_{t-\ell}^{(c)}
-```
-
-```math
-\mathrm{policy\ spread}_t^{(c)}
-=
-r_t^{(c,2Y)}
+y_t^{(2Y)}
 -
-p_t^{(c)}
+y_t^{(10Y)}
 ```
 
-These are macro-policy context features, not learned representations.
-
-### Market-Volatility Regimes
-
-Market-volatility indicators add broad risk-regime context without becoming a
-large macro feature set. The current indicators are VIX and MOVE. VIX proxies
-equity volatility; MOVE is the more directly rates-volatility proxy.
-
-Each indicator is normalized to:
-
-```text
-date, indicator, value, source
-```
-
-Low, medium, and high regimes are assigned with expanding historical terciles.
-At date \(t\), the thresholds use only indicator observations available before
-that date:
+A simple roll-down proxy compares the current yield at maturity \(m\) with the
+interpolated yield at the rolled maturity:
 
 ```math
-q_{1/3,t}^{(j)}, q_{2/3,t}^{(j)}
-```
-
-These regimes are used as conditioning variables for relative-value
-diagnostics, not as standalone trading signals.
-
-### Macro Regimes
-
-Macro indicators add slower-moving inflation and labor-market context. The
-current macro schema is:
-
-```text
-date, country, indicator, value, source
-```
-
-Current indicators are:
-
-```text
-inflation: US, Canada, euro area
-unemployment: US, Canada
-```
-
-US and euro-area inflation are computed as 12-month percentage changes from CPI
-or HICP index levels. Canada inflation is read directly from a FRED/OECD
-year-over-year inflation series. Unemployment rates are read as monthly
-seasonally adjusted rates where current public sources are available.
-
-Low, medium, and high macro regimes are assigned with expanding historical
-terciles by country and indicator, again using only prior observations for the
-thresholds.
-
-### Lagged And Residual Features
-
-Lagged yield-change features are included as a simple autoregressive hurdle:
-
-```math
-\Delta_\ell r_t^{(c,m)}
+\mathrm{roll}_{t,h}^{(m)}
 =
-r_t^{(c,m)}
+y_t^{(m)}
 -
-r_{t-\ell}^{(c,m)}
+y_t^{(m-h)}
 ```
 
-Nelson-Siegel residuals are used for direct relative-value diagnostics, not as
-inputs to another supervised model:
+### Learned Representations
+
+The autoencoder is a denoising MLP trained on chronological train data. It
+receives masked curves and mask indicators, and is optimized for both clean and
+masked reconstruction.
+
+Let \(x_t\) be the standardized curve vector and \(b_t \in \{0,1\}^M\) be a
+random mask. The corrupted input is:
 
 ```math
-z_{t,W}^{(c,m)}
+\tilde{x}_t
 =
-\frac{
-e_t^{(c,m)} - \mu_{t,W}^{(c,m)}
-}{
-\sigma_{t,W}^{(c,m)}
-}
+(1-b_t) \odot x_t
 ```
 
-The residual mean-reversion tables ask whether local richness/cheapness tends
-to converge, without fitting a second predictive model on the residual signal.
+The autoencoder learns:
 
-### State-Maturity Linear Baselines
-
-For residual relative-value evaluation, the project also includes maturity-aware
-classical panel baselines. These combine direct curve-shape variables with a
-continuous maturity basis:
-
-```text
-maturity
-maturity_squared
-log_maturity
+```math
+z_t
+=
+f_\theta(\tilde{x}_t, b_t)
 ```
 
-and curve-shape-by-maturity interactions. The intent is to test whether direct
-curve-shape features can imply different residual-change forecasts at different
-points on the curve.
+```math
+\hat{x}_t
+=
+g_\phi(z_t)
+```
 
-These baselines are not interpreted as new representations. They are linear
-classical comparators for maturity-level residual RV ranking.
+with loss:
+
+```math
+\mathcal{L}
+=
+\frac{1}{|\mathcal{M}_t|}
+\sum_{j:b_{t,j}=1}
+\left(
+x_{t,j}-\hat{x}_{t,j}
+\right)^2
++
+\alpha
+\frac{1}{M}
+\sum_{j=1}^{M}
+\left(
+x_{t,j}-\hat{x}_{t,j}^{clean}
+\right)^2
+```
+
+The maturity Transformer treats maturities as tokens. Each token contains the
+observed or masked yield and a mask indicator. The model adds a continuous
+maturity coordinate, learned maturity embeddings, and a learned curve token. It
+is evaluated on the same masked-maturity reconstruction task as the autoencoder.
+
+For maturity \(m_j\), the token input is:
+
+```math
+u_{t,j}
+=
+\left[
+\tilde{x}_{t,j},
+b_{t,j}
+\right]
++
+e_j
++
+p(m_j)
+```
+
+where \(e_j\) is a learned maturity embedding and \(p(m_j)\) is a continuous
+maturity-position embedding. A learned curve token \(u_{t,0}\) produces the
+curve-level state.
+
+Learned embeddings are currently evaluated through reconstruction and
+curve-state diagnostics.
 
 ## Targets
 
-### Outright Yield Change
+### Yield Change
 
-For horizon \(h\):
-
-```math
-y_{t,h}^{(c,m)}
-=
-r_{t+h}^{(c,m)}
--
-r_t^{(c,m)}
-```
-
-This is the simplest forecasting target, but it is also difficult and often
-dominated by macro shocks.
-
-### Standardized Yield Change
-
-Yield changes can also be scaled by trailing realized volatility:
+For maturity \(m\), country \(c\), and horizon \(h\):
 
 ```math
-z_{t,h}^{(c,m)}
+\Delta y_{t,h}^{(c,m)}
 =
-\frac{
-r_{t+h}^{(c,m)}
+y_{t+h}^{(c,m)}
 -
-r_t^{(c,m)}
-}{
-\sigma_t^{(c,m)}
-}
+y_t^{(c,m)}
 ```
 
-This asks whether features explain risk-adjusted moves rather than raw
-basis-point changes.
+Outright yield-change forecasting is retained as a secondary benchmark task.
 
 ### Residual Change
 
-For fitted yield \(\hat{r}_t^{(c,m)}\), define the curve residual:
+Nelson-Siegel residuals are:
 
 ```math
-e_t^{(c,m)}
-=
 r_t^{(c,m)}
+=
+y_t^{(c,m)}
 -
-\hat{r}_t^{(c,m)}
+\hat{y}_t^{(c,m)}
 ```
 
-The residual-change target is:
+Residual change is:
 
 ```math
-y_{t,h,\mathrm{resid}}^{(c,m)}
+\Delta r_{t,h}^{(c,m)}
 =
-e_{t+h}^{(c,m)}
+r_{t+h}^{(c,m)}
 -
-e_t^{(c,m)}
+r_t^{(c,m)}
 ```
 
-This is the current relative-value target. It is more aligned with curve
-representation research than outright yield-change prediction.
+Residuals define the relative-value object: rich or cheap maturities relative to
+the fitted curve.
 
-The direct residual mean-reversion diagnostic asks whether the current residual
-predicts movement back toward the fitted curve:
+### Volatility Regimes
 
-```math
-C_{t,h}^{(c,m)}
-=
--
-\mathrm{sign}
-\left(
-e_t^{(c,m)}
-\right)
-\left(
-e_{t+h}^{(c,m)}
--
-e_t^{(c,m)}
-\right)
-```
+Curve volatility regimes are defined from future realized curve-move magnitude.
+Labels are assigned with training-sample quantiles to avoid look-ahead.
 
-A positive value means the residual moved in the opposite direction from its
-current sign. This is a simple rich/cheap diagnostic, not a tradable spread PnL.
-
-### Volatility Change
-
-Realized volatility is estimated from rolling yield changes:
-
-```math
-\sigma_t^{(c,m)}
-=
-\mathrm{std}
-\left(
-\Delta r_{t-W+1}^{(c,m)},
-\ldots,
-\Delta r_t^{(c,m)}
-\right)
-```
-
-The volatility-change target is:
-
-```math
-y_{t,h,\mathrm{vol}}^{(c,m)}
-=
-\sigma_{t+h}^{(c,m)}
--
-\sigma_t^{(c,m)}
-```
-
-### Curve Volatility Regime
-
-Curve-level volatility regimes are defined from the forward root-mean-square
-move of the whole curve:
+For a horizon \(h\), realized curve-move magnitude is:
 
 ```math
 v_{t,h}^{(c)}
 =
 \sqrt{
 \frac{1}{M}
-\sum_m
+\sum_{m}
 \left(
-r_{t+h}^{(c,m)}
--
-r_t^{(c,m)}
+\Delta y_{t,h}^{(c,m)}
 \right)^2
 }
 ```
 
-The current realized curve volatility feature is the root-mean-square of
-trailing maturity-level realized volatilities:
+Regimes are assigned by training-sample quantiles:
 
 ```math
-\sigma_{t,\mathrm{curve}}^{(c)}
+q_{low}, q_{high}
 =
-\sqrt{
-\frac{1}{M}
-\sum_m
-\left(
-\sigma_t^{(c,m)}
-\right)^2
-}
+Q_{train}(v_{t,h}^{(c)})
 ```
 
-Low, medium, and high regimes are assigned inside each train/test split using
-training-sample terciles of \(v_{t,h}^{(c)}\). The test set is then labeled with
-the training thresholds:
+Macro and market regimes are constructed from expanding historical quantiles of
+public indicators such as inflation, unemployment, VIX, and MOVE.
+
+For indicator \(a_t\), the expanding percentile at date \(t\) is:
 
 ```math
-g_{t,h}^{(c)}
-\in
-\{\mathrm{low}, \mathrm{medium}, \mathrm{high}\}
+p_t
+=
+\frac{1}{t-1}
+\sum_{s<t}
+\mathbf{1}
+\left[
+a_s \le a_t
+\right]
 ```
 
-This avoids using full-sample regime thresholds and makes direct curve features,
-policy-rate features, and recent realized curve volatility comparable on a
-natural curve-level classification task.
+Low, medium, and high regimes are assigned from this historical percentile.
 
 ## Evaluation Protocol
 
-### Reconstruction
-
-Reconstruction evaluates whether a representation compresses the observed curve:
-
-```math
-e_t^{(m)}
-=
-r_t^{(m)}
--
-\hat{r}_t^{(m)}
-```
-
-PCA reconstructs curves from the first \(K\) components. Nelson-Siegel
-reconstructs curves from the fitted parametric form. The learned baseline is a
-PyTorch denoising autoencoder trained only on the chronological train split, with
-an inner chronological validation split and early stopping on validation
-reconstruction loss.
-
-The autoencoder uses a deeper MLP encoder/decoder with GELU activations, optional
-dropout, AdamW weight decay, and mini-batch training. During training, a random
-subset of maturities is masked and the model receives both the masked curve and a
-binary mask indicator. The loss combines masked-maturity
-reconstruction with clean-curve reconstruction, so the embeddings remain defined
-for fully observed curves. The latent dimension is matched to the PCA component
-count.
-
-The first sequence model is a maturity-aware Transformer encoder. It treats
-maturities as ordered tokens, combines observed or masked yield values with a
-mask indicator, adds both a continuous maturity coordinate and learned maturity
-embeddings, and uses a learned curve token as the curve-level latent state. The
-objective is the same masked-maturity reconstruction task used for the
-autoencoder, so comparisons are made on the same held-out masked points. For
-runtime practicality on dense maturity grids, Transformer training can be capped
-to evenly spaced training dates while validation, test, and reconstruction
-outputs remain on the full curve panel.
-
-The autoencoder is first evaluated on out-of-sample reconstruction:
-
-```text
-does a nonlinear latent curve representation reconstruct held-out curves better
-than PCA or Nelson-Siegel?
-```
-
-A separate masked reconstruction diagnostic asks whether the model can recover
-held-out maturities from the rest of the same curve. This is closer to a
-self-supervised representation-learning task than ordinary full-curve
-reconstruction.
-
-Clean reconstruction and masked-maturity reconstruction are reported as separate
-tasks. PCA, Nelson-Siegel, and the autoencoder are compared on clean held-out
-curve reconstruction. Masked autoencoder and maturity Transformer results are
-reported as standalone self-supervised diagnostics because PCA and
-Nelson-Siegel are not trained with the same missing-maturity objective.
-
-Masked reconstruction is summarized by maturity and by curve segment. The
-hardest-maturity table ranks where each self-supervised model has the largest
-masked reconstruction error, which helps identify whether missing front-end,
-belly, or long-end points are hardest to infer from the rest of the curve.
-
-PCA, Nelson-Siegel, and autoencoder outputs are evaluated as standalone
-representations through reconstruction and diagnostics. They are not fed as
-inputs into downstream ridge, logistic, or elastic-net models.
-
-Autoencoder latent dimensions are also inspected by correlation with direct
-curve-shape features, PCA scores, and Nelson-Siegel factors. These correlations
-are interpretation diagnostics only: they ask whether latent dimensions align
-with recognizable term-structure states such as level, slope, and curvature.
-Latent time-series and state-space plots are used for the same purpose: visual
-inspection of curve-state evolution, not forecasting.
-
-### Supervised Forecasting
-
-Supervised benchmarks join features available at date \(t\) to a future target:
-
-```math
-y_{t,h}^{(c,m)}
-=
-f(\mathbf{x}_t^{(c,m)})
-+ \varepsilon_{t,h}^{(c,m)}
-```
-
-The current models are intentionally classical:
-
-```text
-train_mean
-ridge
-elastic_net
-```
-
-The training mean is the naive benchmark. Ridge and Elastic Net are regularized
-linear hurdles for testing whether each feature family adds incremental
-information.
-
 ### Splits
 
-The default split is chronological. Within each country and horizon:
+Default evaluation uses chronological splits:
 
 ```text
-train_dates = first 80% of dates
-test_dates  = last 20% of dates
+train = first 80% of dates
+test  = last 20% of dates
 ```
 
-All maturities for a date stay on the same side of the split.
+All maturities for a date remain on the same side of the split. Multi-step
+forecast targets use non-overlapping test windows by default.
 
-Non-overlapping target windows are used by default for multi-step horizons:
+### Task Families
+
+| Task | Valid methods | Primary metrics |
+| --- | --- | --- |
+| Clean reconstruction | PCA, Nelson-Siegel, autoencoder, Transformer | RMSE, MAE |
+| Masked maturity reconstruction | masked autoencoder, maturity Transformer | masked RMSE, masked MAE |
+| Residual relative value | Nelson-Siegel residual diagnostics, maturity-aware curve features | spread score, hit rate, rank IC |
+| Outright yield forecasting | lagged moves, curve-shape features, carry/roll-down proxies | RMSE, MAE |
+| Volatility-regime classification | curve-shape, policy-rate, realized-volatility features | balanced accuracy, macro F1 |
+| Macro/market RV regimes | residual RV diagnostics by regime | high-minus-low hit rate, high-minus-low rank IC |
+
+The generated scenario map is:
 
 ```text
-test_dates_non_overlapping = test_dates[::h]
+reports/tables/scenario_method_comparison.csv
 ```
 
-This reduces artificial predictability from overlapping forward-change labels.
-
-Walk-forward evaluation is available as a robustness check, not the main
-headline result.
-
-### Evaluation Level
-
-Not every representation is evaluated on every task in the same way. The project
-separates curve-level and maturity-level evaluation:
-
-| Level | Natural representations | Natural tasks |
-| --- | --- | --- |
-| Curve-level | PCA scores, Nelson-Siegel factors, autoencoder embeddings | reconstruction and representation diagnostics |
-| Curve-level direct features | curve-shape, policy-rate, realized-volatility features | volatility regimes |
-| Maturity-level direct features | lagged maturity moves, carry/roll-down proxies, curve-shape maturity interactions | residual relative value, cross-sectional maturity ranking |
-
-Model outputs are not used as inputs to other supervised models. A future
-learned representation must be evaluated directly through its own objective or
-through a clearly specified model architecture, not by stacking its embeddings
-into an unrelated second-stage benchmark.
-
-### Scenario-Method Comparison
-
-The current comparison is organized by scenario, so methods are only compared
-where the task is well-defined:
-
-| Scenario | Valid methods | Primary metrics |
-| --- | --- | --- |
-| Curve reconstruction | PCA, Nelson-Siegel, autoencoder | clean out-of-sample RMSE, MAE |
-| Masked maturity reconstruction | masked autoencoder, maturity Transformer | masked-maturity RMSE, MAE |
-| Outright yield forecasting | lagged moves, curve-shape features, carry/roll-down proxies | RMSE, MAE, directional accuracy |
-| Residual relative value | Nelson-Siegel residual diagnostics, curve-shape by maturity baseline | spread convergence, hit rate, rank IC |
-| Volatility-regime classification | curve-shape, policy-rate, realized curve-volatility features | balanced accuracy, macro F1 |
-
-The same table is written to
-`reports/tables/scenario_method_comparison.csv` when baseline summaries are
-generated.
-
-A compact baseline audit is also written to `reports/tables/baseline_audit.csv`.
-It records the valid baseline families, current best result, evidence quality,
-and next action for each research scenario.
-
-Residual relative-value regime evidence is summarized in
-`reports/tables/residual_rv_regime_scorecard.csv`, combining market-volatility
-and macro-regime splits into one comparable scorecard.
-The same evidence is visualized in
-`reports/figures/residual_rv_regime_heatmap.html`.
-
-### Metric Protocol
-
-Metrics are interpreted by task. A single pooled error number is not treated as
-the universal objective.
-
-The evaluation protocol separates core research tasks from supporting
-diagnostics:
-
-| Role | Tasks | Purpose |
-| --- | --- | --- |
-| Core baseline tasks | clean reconstruction, masked maturity reconstruction, residual relative value, volatility-regime classification | define the main classical and learned representation hurdles |
-| Supporting diagnostics | outright yield-change forecasting, cross-market factor comparison, latent-factor correlations | explain model behavior and failure modes |
-| Exploratory extensions | learned state/regime separation, graph learning | only added after the relevant baseline task is stable |
-
-This distinction is important because not every result should be interpreted as
-a trading signal or a final model comparison. Reconstruction tests whether a
-representation captures curve geometry. Residual relative value tests whether
-rich/cheap maturity structure mean-reverts. Volatility-regime classification
-tests whether observable curve and macro state variables identify future curve
-stress.
-
-The current metric hierarchy is:
-
-| Task | Primary metric | Secondary metric | Context metrics |
-| --- | --- | --- | --- |
-| Curve reconstruction | RMSE / MAE | PCA explained variance | maturity-level reconstruction error |
-| Residual relative value | residual RV spread score | cross-sectional rank IC | mean-reversion hit rate, RMSE, MAE |
-| Outright yield-change forecasting | RMSE / MAE | directional accuracy | rank IC where valid |
-| Volatility-regime classification | balanced accuracy / macro F1 | accuracy | class support |
-| Curve-state classification | balanced accuracy / macro F1 | accuracy | class support |
-
-This hierarchy is intentionally narrow. New metrics should only be added if they
-answer a distinct research question that the current set does not cover.
-
-The current evidence gates are:
-
-| Scenario | Evidence considered meaningful |
-| --- | --- |
-| Clean reconstruction | a learned representation narrows the gap to PCA without look-ahead |
-| Masked maturity reconstruction | a learned model improves masked RMSE / MAE versus the masked autoencoder hurdle |
-| Residual relative value | positive spread score, hit rate above chance, and positive rank IC by country/horizon |
-| Macro or market RV regimes | materially different high-minus-low hit rates or rank IC across regimes |
-| Volatility regimes | balanced accuracy and macro F1 above direct persistence / curve-volatility hurdles |
-
-Results that do not pass these gates are still useful diagnostics, but they are
-not treated as evidence that a representation improves the research task.
-
-Reconstruction uses RMSE and MAE as primary metrics because the task is curve
-compression: the question is whether the representation reproduces observed
-yield levels.
-
-Outright yield-change and volatility-change forecasting use RMSE and MAE as
-point-forecast metrics. Directional accuracy is reported as a secondary sign
-metric, but it is not sufficient on its own because it ignores forecast
-magnitude.
-
-Residual relative-value evaluation uses the residual RV spread score as the
-primary ranking metric. For each date, country, and horizon, maturities are
-sorted by predicted residual change. The score is the realized average residual
-change of the top-ranked maturities minus the realized average residual change
-of the bottom-ranked maturities:
-
-```math
-S_{t,h}^{(c)}
-=
-\frac{1}{|T_t|}
-\sum_{m \in T_t}
-y_{t,h}^{(c,m)}
--
-\frac{1}{|B_t|}
-\sum_{m \in B_t}
-y_{t,h}^{(c,m)}
-```
-
-where \(T_t\) and \(B_t\) are the top and bottom predicted maturity groups. This
-is a cross-sectional ranking score, not a tradable PnL or duration-neutral
-backtest.
-
-Cross-sectional rank IC is the secondary residual RV metric. RMSE and MAE remain
-useful context, but they are not headline metrics for this task because an RV
-workflow often cares more about ordering maturities than minimizing pooled
-basis-point error.
-
-The residual mean-reversion table reports convergence scores and hit rates for
-raw residuals and rolling residual z-scores. This is used as an interpretable
-sanity check before treating richer representation models as RV signals.
-
-Volatility-regime classification is evaluated separately with classification
-metrics from the baseline classifier output.
-
-Balanced accuracy averages recall across regimes:
-
-```math
-\mathrm{Balanced\ Accuracy}
-=
-\frac{1}{K}
-\sum_{k=1}^{K}
-\frac{TP_k}{TP_k + FN_k}
-```
-
-Macro F1 computes F1 for each regime and averages the class-level scores:
-
-```math
-\mathrm{Macro\ F1}
-=
-\frac{1}{K}
-\sum_{k=1}^{K}
-\frac{
-2\,\mathrm{Precision}_k\,\mathrm{Recall}_k
-}{
-\mathrm{Precision}_k + \mathrm{Recall}_k
-}
-```
-
-The compact volatility benchmark report compares curve representations against
-recent realized curve volatility as the direct persistence hurdle:
+The current scenario-level audit is:
 
 ```text
-reports/tables/volatility_regime_benchmark.csv
+reports/tables/baseline_audit.csv
 ```
 
-Regression metrics:
+### Reconstruction Metrics
+
+For observed curves \(x_i\) and fitted curves \(\hat{x}_i\):
 
 ```math
 RMSE
@@ -698,7 +364,7 @@ RMSE
 \frac{1}{N}
 \sum_i
 \left(
-y_i - \hat{y}_i
+x_i-\hat{x}_i
 \right)^2
 }
 ```
@@ -709,126 +375,137 @@ MAE
 \frac{1}{N}
 \sum_i
 \left|
-y_i - \hat{y}_i
+x_i-\hat{x}_i
 \right|
 ```
 
+For masked reconstruction, the sums are restricted to masked entries:
+
 ```math
-\text{Directional Accuracy}
+RMSE_{mask}
 =
-\frac{1}{N}
-\sum_i
-\mathbf{1}
-\left[
-\mathrm{sign}(y_i)
-=
-\mathrm{sign}(\hat{y}_i)
-\right]
+\sqrt{
+\frac{1}{|\mathcal{M}|}
+\sum_{(t,j):b_{t,j}=1}
+\left(
+x_{t,j}-\hat{x}_{t,j}
+\right)^2
+}
 ```
 
-Cross-sectional rank IC ranks predicted and realized targets across maturities
-within each date, country, and horizon:
+### Residual RV Metrics
+
+For each date, country, and horizon, maturities are ranked by predicted residual
+change. The spread score is the realized average target of the top-ranked group
+minus the bottom-ranked group:
+
+```math
+S_{t,h}^{(c)}
+=
+\frac{1}{|T_t|}
+\sum_{m \in T_t}
+\Delta r_{t,h}^{(c,m)}
+-
+\frac{1}{|B_t|}
+\sum_{m \in B_t}
+\Delta r_{t,h}^{(c,m)}
+```
+
+Rank IC is the cross-sectional correlation between predicted and realized
+maturity ranks:
 
 ```math
 IC_t
 =
 \mathrm{corr}
 \left(
-\mathrm{rank}(\hat{y}_{t}^{(m)}),
-\mathrm{rank}(y_{t}^{(m)})
+\mathrm{rank}(\hat{y}_t^{(m)}),
+\mathrm{rank}(y_t^{(m)})
 \right)
 ```
 
-This metric is included because relative-value research often cares about
-cross-sectional ordering more than pooled point forecast error.
+The mean-reversion hit rate for residual signal \(s_t^{(m)}\) is:
 
-For residual relative value, the main overview report is:
-
-```text
-reports/tables/residual_relative_value_overview.csv
+```math
+H
+=
+\frac{1}{N}
+\sum_{t,m}
+\mathbf{1}
+\left[
+\mathrm{sign}(s_t^{(m)})
+=
+-
+\mathrm{sign}(\Delta r_{t,h}^{(m)})
+\right]
 ```
 
-It combines the best RV ranking benchmark with the direct Nelson-Siegel residual
-mean-reversion diagnostic. The detailed spread-score report is:
+The RV regime scorecard compares residual mean-reversion diagnostics across
+high and low macro/market regimes:
 
-```text
-reports/tables/residual_relative_value_spread.csv
+```math
+\Delta H_{high-low}
+=
+H_{high}
+-
+H_{low}
 ```
 
-The rank-IC report is kept as a secondary ranking view:
-
-```text
-reports/tables/residual_relative_value_rank_ic.csv
+```math
+\Delta IC_{high-low}
+=
+IC_{high}
+-
+IC_{low}
 ```
 
-The bucket-level RMSE table is kept as supporting context:
-
 ```text
-reports/tables/residual_relative_value.csv
+reports/tables/residual_rv_regime_scorecard.csv
+reports/figures/residual_rv_regime_heatmap.html
 ```
 
-The rank-IC coverage audit explains which feature sets can produce valid
-cross-sectional rankings:
+### Classification Metrics
 
-```text
-reports/tables/residual_relative_value_rank_ic_coverage.csv
+Balanced accuracy:
+
+```math
+\mathrm{BalancedAccuracy}
+=
+\frac{1}{K}
+\sum_{k=1}^{K}
+\frac{TP_k}{TP_k + FN_k}
 ```
 
-Cross-market diagnostics compare representation behavior across US, Canada, and
-the euro-area aggregate curve:
+Macro F1:
 
-```text
-reports/tables/cross_market_summary.csv
-reports/figures/cross_market_pca_loadings.html
-```
-
-Market-volatility conditioning for residual relative value is reported in:
-
-```text
-reports/tables/residual_rv_by_market_regime.csv
-reports/tables/market_regime_rv_summary.csv
-```
-
-Macro-regime conditioning for residual relative value is reported in:
-
-```text
-reports/tables/residual_rv_by_macro_regime.csv
+```math
+\mathrm{MacroF1}
+=
+\frac{1}{K}
+\sum_{k=1}^{K}
+\frac{
+2\,\mathrm{Precision}_k\,\mathrm{Recall}_k
+}{
+\mathrm{Precision}_k + \mathrm{Recall}_k
+}
 ```
 
 ## Current Scope
 
-Included now:
+Implemented scope:
 
-- public US, Canada, and euro-area zero-coupon curve data
-- normalized long-format curve schema
-- PCA and Nelson-Siegel curve representations
-- PyTorch autoencoder reconstruction baseline
-- engineered slope, curvature, carry, roll-down, and lagged features
-- policy-rate level, change, and curve-policy spread features
-- VIX and MOVE market-volatility regimes for residual RV conditioning
-- inflation and unemployment macro regimes where current public sources are configured
-- reconstruction evaluation
-- classical supervised forecasting baselines
-- residual RV ranking metrics for maturity-level feature sets
-- curve-level volatility-regime classification
-- cross-market PCA and Nelson-Siegel representation diagnostics
-- chronological, non-overlapping, and walk-forward evaluation checks
-- Plotly figures and CSV report tables
+- public US, Canada, and euro-area curve data
+- common long-format curve schema
+- parquet data pipeline
+- PCA and Nelson-Siegel baselines
+- engineered curve, carry, roll-down, residual, policy, volatility, and macro features
+- residual RV diagnostics
+- market and macro regime conditioning
+- autoencoder and maturity Transformer reconstruction baselines
+- Plotly figures and CSV scorecards
 
-Not included yet:
+Planned next phase:
 
-- Transformer or graph neural network models
-- claim of tradable alpha or state-of-the-art forecasting performance
-- bond-level total return targets
-- transaction costs, RFQ execution constraints, or backtesting
-- euro-area unemployment regime source
-- broader macro feature sets
-
-## Current Limitations
-
-The current forecasting benchmarks are preliminary. Outright yield-change
-prediction is a noisy task, and strong curve reconstruction does not by itself
-imply forecastability.
-
-Near-term extensions should compare learned models through clearly defined
-objectives, without feeding one model's outputs into another benchmark model.
+- learned curve-state diagnostics against macro and RV-friendly regimes
+- improved learned-representation training only where diagnostics justify it
+- graph learning after the classical and learned-state protocols are stable
