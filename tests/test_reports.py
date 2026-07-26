@@ -77,21 +77,19 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     assert {
         "best_by_spread",
         "best_by_rank_ic",
-        "pca_maturity_spread_rank",
-        "autoencoder_maturity_spread_rank",
+        "curve_maturity_spread_rank",
     }.issubset(residual_rv_benchmark.columns)
     assert {"mean_reversion_hit_rate", "evidence_label"}.issubset(
         residual_rv_overview.columns
     )
-    assert {"best_representation", "pca_rank", "lagged_rank"}.issubset(winners.columns)
+    assert {"best_representation", "lagged_rank"}.issubset(winners.columns)
     assert {"mean_balanced_accuracy", "mean_macro_f1", "rank"}.issubset(
         volatility_regime.columns
     )
     assert {
         "best_model",
-        "pca_beats_curve_vol",
-        "autoencoder_beats_curve_vol",
-        "nelson_siegel_beats_curve_vol",
+        "policy_beats_curve_vol",
+        "curve_beats_curve_vol",
     }.issubset(volatility_regime_benchmark.columns)
     assert {"ae_feature", "classical_feature", "abs_correlation", "match_rank"}.issubset(
         ae_classical_correlations.columns
@@ -128,20 +126,20 @@ def test_baseline_winners_handles_missing_reference_representations() -> None:
     winners = baseline_winners(rank_table)
 
     assert winners.loc[0, "best_representation"] == "curve"
-    assert pd.isna(winners.loc[0, "pca_rank"])
+    assert pd.isna(winners.loc[0, "lagged_rank"])
 
 
 def test_overlap_sensitivity_table_compares_target_windows() -> None:
     overlapping = pd.DataFrame(
         [
             _metric_row(representation="lagged", rmse=0.10, maturity_years=None),
-            _metric_row(representation="pca", rmse=0.12, maturity_years=None),
+            _metric_row(representation="curve", rmse=0.12, maturity_years=None),
         ]
     ).drop(columns=["maturity_years"])
     non_overlapping = pd.DataFrame(
         [
             _metric_row(representation="lagged", rmse=0.16, maturity_years=None),
-            _metric_row(representation="pca", rmse=0.14, maturity_years=None),
+            _metric_row(representation="curve", rmse=0.14, maturity_years=None),
         ]
     ).drop(columns=["maturity_years"])
 
@@ -157,41 +155,41 @@ def test_overlap_sensitivity_table_compares_target_windows() -> None:
 def test_supervised_walk_forward_comparison_compares_split_methods() -> None:
     date_ordered = pd.DataFrame(
         [
-            _supervised_metric_row(representation="pca", rmse=0.10),
+            _supervised_metric_row(representation="lagged", rmse=0.10),
             _supervised_metric_row(representation="curve", rmse=0.12),
         ]
     )
     walk_forward = pd.DataFrame(
         [
-            _supervised_metric_row(representation="pca", rmse=0.14, window_id=1),
+            _supervised_metric_row(representation="lagged", rmse=0.14, window_id=1),
             _supervised_metric_row(representation="curve", rmse=0.11, window_id=1),
         ]
     )
 
     comparison = supervised_walk_forward_comparison(date_ordered, walk_forward)
 
-    pca = comparison.loc[comparison["representation"] == "pca"].iloc[0]
-    assert pca["date_ordered_rank"] == 1.0
-    assert pca["walk_forward_rank"] == 2.0
-    assert pca["rmse_change_walk_forward_minus_date_ordered"] == pytest.approx(0.04)
-    assert pca["rank_change_walk_forward_minus_date_ordered"] == pytest.approx(1.0)
+    lagged = comparison.loc[comparison["representation"] == "lagged"].iloc[0]
+    assert lagged["date_ordered_rank"] == 1.0
+    assert lagged["walk_forward_rank"] == 2.0
+    assert lagged["rmse_change_walk_forward_minus_date_ordered"] == pytest.approx(0.04)
+    assert lagged["rank_change_walk_forward_minus_date_ordered"] == pytest.approx(1.0)
 
 
 def _sample_metrics() -> pd.DataFrame:
     return pd.DataFrame(
         [
-            _metric_row(representation="pca", rmse=0.10, maturity_years=None),
-            _metric_row(representation="pca", rmse=0.10, maturity_years=None),
+            _metric_row(representation="lagged", rmse=0.10, maturity_years=None),
+            _metric_row(representation="lagged", rmse=0.10, maturity_years=None),
             _metric_row(representation="lagged", rmse=0.12, maturity_years=None),
             _metric_row(representation="curve", rmse=0.15, maturity_years=None),
             _metric_row(
-                representation="residual_feature",
+                representation="curve_maturity",
                 rmse=0.08,
                 maturity_years=None,
                 target="residual_change",
             ),
             _metric_row(
-                representation="pca",
+                representation="curve",
                 rmse=0.10,
                 maturity_years=None,
                 target="residual_change",
@@ -202,16 +200,16 @@ def _sample_metrics() -> pd.DataFrame:
 
 def _sample_bucket_metrics() -> pd.DataFrame:
     rows = [
-        _metric_row(representation="pca", rmse=0.10, maturity_years=None),
+        _metric_row(representation="lagged", rmse=0.10, maturity_years=None),
         _metric_row(representation="curve", rmse=0.15, maturity_years=None),
         _metric_row(
-            representation="residual_feature",
+            representation="curve_maturity",
             rmse=0.08,
             maturity_years=None,
             target="residual_change",
         ),
         _metric_row(
-            representation="pca",
+            representation="curve",
             rmse=0.10,
             maturity_years=None,
             target="residual_change",
@@ -229,7 +227,7 @@ def _sample_bucket_metrics() -> pd.DataFrame:
 def _sample_point_metrics() -> pd.DataFrame:
     return pd.DataFrame(
         [
-            _metric_row(representation="pca", rmse=0.10, maturity_years=2.0),
+            _metric_row(representation="lagged", rmse=0.10, maturity_years=2.0),
             _metric_row(representation="curve", rmse=0.08, maturity_years=5.0),
             _metric_row(representation="lagged", rmse=0.12, maturity_years=10.0),
         ]

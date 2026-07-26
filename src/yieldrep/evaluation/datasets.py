@@ -103,16 +103,12 @@ def make_supervised_feature_dataset(
     dataset["date"] = pd.to_datetime(dataset["date"])
 
     for features, keys in [
-        (_read_pca_features(config), ["date", "country"]),
-        (_read_autoencoder_features(config), ["date", "country"]),
-        (_read_nelson_siegel_features(config), ["date", "country"]),
         (_read_curve_features(config), ["date", "country"]),
         (
             make_lagged_yield_change_features(curves, config.evaluation.lag_days),
             ["date", "country", "maturity_years"],
         ),
         (_read_carry_roll_features(config), ["date", "country", "maturity_years"]),
-        (_read_residual_features(config), ["date", "country", "maturity_years"]),
     ]:
         if not features.empty:
             dataset = _merge_features(dataset, features, keys)
@@ -137,48 +133,10 @@ def _merge_features(
     return dataset.merge(features.loc[:, feature_columns], on=keys, how="left")
 
 
-def _read_pca_features(config: ProjectConfig) -> pd.DataFrame:
-    frames: list[pd.DataFrame] = []
-    for scores_path in sorted(config.pca_dir.glob("*_scores.parquet")):
-        country = scores_path.name.removesuffix("_scores.parquet").upper()
-        scores = pd.read_parquet(scores_path)
-        scores["country"] = country
-        frames.append(scores)
-    if not frames:
-        return pd.DataFrame()
-    return pd.concat(frames, ignore_index=True)
-
-
-def _read_autoencoder_features(config: ProjectConfig) -> pd.DataFrame:
-    frames = [
-        pd.read_parquet(embeddings_path).drop(columns=["split"], errors="ignore")
-        for embeddings_path in sorted(config.autoencoder_dir.glob("*_embeddings.parquet"))
-    ]
-    if not frames:
-        return pd.DataFrame()
-    return pd.concat(frames, ignore_index=True)
-
-
-def _read_nelson_siegel_features(config: ProjectConfig) -> pd.DataFrame:
-    frames = [
-        pd.read_parquet(factors_path)
-        for factors_path in sorted(config.nelson_siegel_dir.glob("*_factors.parquet"))
-    ]
-    if not frames:
-        return pd.DataFrame()
-    return pd.concat(frames, ignore_index=True)
-
-
 def _read_curve_features(config: ProjectConfig) -> pd.DataFrame:
     if not config.curve_features_path.exists():
         return pd.DataFrame()
     return pd.read_parquet(config.curve_features_path)
-
-
-def _read_residual_features(config: ProjectConfig) -> pd.DataFrame:
-    if not config.residual_features_path.exists():
-        return pd.DataFrame()
-    return pd.read_parquet(config.residual_features_path)
 
 
 def _read_carry_roll_features(config: ProjectConfig) -> pd.DataFrame:
@@ -260,24 +218,6 @@ def _build_target_family(
 ) -> list[Path]:
     output_paths: list[Path] = []
 
-    pca_targets = _join_pca_targets(config, targets)
-    if not pca_targets.empty:
-        pca_path = config.modeling_dir / f"pca{suffix}_targets.parquet"
-        pca_targets.to_parquet(pca_path, index=False)
-        output_paths.append(pca_path)
-
-    autoencoder_targets = _join_autoencoder_targets(config, targets)
-    if not autoencoder_targets.empty:
-        autoencoder_path = config.modeling_dir / f"autoencoder{suffix}_targets.parquet"
-        autoencoder_targets.to_parquet(autoencoder_path, index=False)
-        output_paths.append(autoencoder_path)
-
-    nelson_siegel_targets = _join_nelson_siegel_targets(config, targets)
-    if not nelson_siegel_targets.empty:
-        ns_path = config.modeling_dir / f"nelson_siegel{suffix}_targets.parquet"
-        nelson_siegel_targets.to_parquet(ns_path, index=False)
-        output_paths.append(ns_path)
-
     lagged_targets = _join_lagged_targets(curves, targets, config.evaluation.lag_days)
     if not lagged_targets.empty:
         lagged_path = config.modeling_dir / f"lagged{suffix}_targets.parquet"
@@ -296,12 +236,6 @@ def _build_target_family(
         carry_roll_targets.to_parquet(carry_roll_path, index=False)
         output_paths.append(carry_roll_path)
 
-    residual_feature_targets = _join_residual_feature_targets(config, targets)
-    if not residual_feature_targets.empty:
-        residual_feature_path = config.modeling_dir / f"residual_feature{suffix}_targets.parquet"
-        residual_feature_targets.to_parquet(residual_feature_path, index=False)
-        output_paths.append(residual_feature_path)
-
     return output_paths
 
 
@@ -313,9 +247,6 @@ def _build_curve_level_target_family(
     output_paths: list[Path] = []
 
     for representation, features in [
-        ("pca", _read_pca_features(config)),
-        ("autoencoder", _read_autoencoder_features(config)),
-        ("nelson_siegel", _read_nelson_siegel_features(config)),
         ("curve", _read_curve_features(config)),
         ("policy", _read_policy_features(config)),
     ]:
@@ -334,51 +265,6 @@ def _build_curve_level_target_family(
         curve_vol.to_parquet(curve_vol_path, index=False)
         output_paths.append(curve_vol_path)
     return output_paths
-
-
-def _join_pca_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFrame:
-    frames: list[pd.DataFrame] = []
-    for scores_path in sorted(config.pca_dir.glob("*_scores.parquet")):
-        country = scores_path.name.removesuffix("_scores.parquet").upper()
-        scores = pd.read_parquet(scores_path)
-        scores["country"] = country
-        frames.append(scores)
-    if not frames:
-        return pd.DataFrame()
-
-    features = pd.concat(frames, ignore_index=True)
-    merged = targets.merge(features, on=["date", "country"], how="inner")
-    return _add_state_maturity_features(
-        merged,
-        state_columns=[f"PC{index}" for index in range(1, config.pca.n_components + 1)],
-    )
-
-
-def _join_autoencoder_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFrame:
-    features = _read_autoencoder_features(config)
-    if features.empty:
-        return pd.DataFrame()
-
-    merged = targets.merge(features, on=["date", "country"], how="inner")
-    return _add_state_maturity_features(
-        merged,
-        state_columns=[f"AE{index}" for index in range(1, config.autoencoder.latent_dim + 1)],
-    )
-
-
-def _join_nelson_siegel_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFrame:
-    frames: list[pd.DataFrame] = []
-    for factors_path in sorted(config.nelson_siegel_dir.glob("*_factors.parquet")):
-        frames.append(pd.read_parquet(factors_path))
-    if not frames:
-        return pd.DataFrame()
-
-    features = pd.concat(frames, ignore_index=True)
-    merged = targets.merge(features, on=["date", "country"], how="inner")
-    return _add_state_maturity_features(
-        merged,
-        state_columns=["beta_level", "beta_slope", "beta_curvature", "rmse"],
-    )
 
 
 def _join_lagged_targets(
@@ -413,14 +299,6 @@ def _join_carry_roll_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd
         return pd.DataFrame()
 
     features = pd.read_parquet(config.carry_roll_features_path)
-    return targets.merge(features, on=["date", "country", "maturity_years"], how="inner")
-
-
-def _join_residual_feature_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFrame:
-    if not config.residual_features_path.exists():
-        return pd.DataFrame()
-
-    features = pd.read_parquet(config.residual_features_path)
     return targets.merge(features, on=["date", "country", "maturity_years"], how="inner")
 
 

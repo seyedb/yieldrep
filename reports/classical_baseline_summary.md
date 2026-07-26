@@ -10,8 +10,8 @@ Current evaluation covers:
 - US, Canada, and euro-area public zero-coupon yield curves
 - PCA and Nelson-Siegel curve representations
 - a first PyTorch autoencoder reconstruction baseline
-- curve-shape, carry/roll-down, lagged, residual-dynamic, and state-maturity
-  linear baselines
+- curve-shape, carry/roll-down, lagged, policy-rate, and realized-volatility
+  baselines
 - curve reconstruction metrics
 - residual relative-value ranking and mean-reversion diagnostics
 - VIX and MOVE market-volatility regime conditioning for residual RV
@@ -33,12 +33,6 @@ The current primary metrics are:
 
 ## Headline Results
 
-For residual relative value, `residual_feature / ridge` is currently the best
-classical baseline across the evaluated markets and horizons by:
-
-- residual RV spread score
-- cross-sectional rank IC
-
 The direct Nelson-Siegel residual mean-reversion diagnostic is now tracked
 separately. It checks whether positive residuals tend to fall and negative
 residuals tend to rise over the forward horizon.
@@ -57,10 +51,8 @@ Canada at 20d.
 Macro-regime conditioning shows stronger residual mean reversion in high
 inflation and high unemployment regimes, most clearly at the 20-day horizon.
 
-The maturity-aware PCA, Nelson-Siegel, and curve baselines produce valid
-cross-sectional RV metrics, which makes the comparison more structurally fair
-than using curve-level factors alone. They do not currently outperform the
-residual dynamic feature baseline.
+Maturity-aware curve-shape baselines produce valid cross-sectional RV metrics
+without feeding model outputs into another supervised model.
 
 For volatility regimes, the project now evaluates curve-level classifiers using
 future curve-move magnitude labels assigned from training-sample quantiles.
@@ -77,10 +69,9 @@ realized curve volatility remains the stronger hurdle.
 
 The first learned baseline is a masked autoencoder: maturities are randomly
 hidden during training, the model receives a mask indicator, and the objective
-combines masked-maturity reconstruction with clean-curve reconstruction. It is
-then reused as a learned embedding in the downstream forecasting, residual RV,
-and volatility-regime protocols. PCA-5 remains the strongest reconstruction
-benchmark overall.
+combines masked-maturity reconstruction with clean-curve reconstruction. Its
+embeddings are not fed into downstream benchmark models. PCA-5 remains the
+strongest reconstruction benchmark overall.
 
 ## Interpretation
 
@@ -89,13 +80,12 @@ clearly validated through reconstruction and cross-market factor diagnostics.
 
 The masked autoencoder is a more appropriate learned-representation baseline
 than the initial plain autoencoder, but it is still not a win. It establishes the
-PyTorch pipeline and gives future learned models clear PCA reconstruction and
-downstream forecasting hurdles.
+PyTorch pipeline and gives future learned models a clear PCA reconstruction
+hurdle.
 
 Residual relative-value ranking is a maturity-level task. In the current
-classical setup, features that directly describe maturity-specific residual
-dynamics are more effective for that task than curve-level state factors or
-state-maturity linear interactions.
+classical setup, direct curve-shape, lagged, and carry/roll-down features are
+the allowed supervised feature families.
 
 ## Limitations
 

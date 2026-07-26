@@ -3,9 +3,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from yieldrep.config import EvaluationConfig, PCAConfig, ProjectConfig, SourceConfig
+from yieldrep.config import EvaluationConfig, ProjectConfig, SourceConfig
 from yieldrep.models.baselines import (
-    _pca_features,
     date_ordered_split,
     evaluate_baselines,
     maturity_bucket,
@@ -17,14 +16,6 @@ from yieldrep.models.forecasting import evaluate_supervised_forecasts
 def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
     modeling_dir = tmp_path / "data" / "processed" / "modeling"
     modeling_dir.mkdir(parents=True)
-    _sample_modeling_data(feature_prefix="pca").to_parquet(
-        modeling_dir / "pca_targets.parquet",
-        index=False,
-    )
-    _sample_modeling_data(feature_prefix="ns").to_parquet(
-        modeling_dir / "nelson_siegel_targets.parquet",
-        index=False,
-    )
     _sample_modeling_data(feature_prefix="lagged").to_parquet(
         modeling_dir / "lagged_targets.parquet",
         index=False,
@@ -35,10 +26,6 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
     )
     _sample_modeling_data(feature_prefix="carry_roll").to_parquet(
         modeling_dir / "carry_roll_targets.parquet",
-        index=False,
-    )
-    _sample_modeling_data(feature_prefix="residual_feature").to_parquet(
-        modeling_dir / "residual_feature_targets.parquet",
         index=False,
     )
     config = ProjectConfig(
@@ -63,14 +50,7 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
 
     assert output_path == tmp_path / "data" / "processed" / "evaluation" / "baseline_metrics.parquet"
     assert set(metrics["target"]) == {"yield_change"}
-    expected_representations = {
-        "pca",
-        "nelson_siegel",
-        "lagged",
-        "curve",
-        "carry_roll",
-        "residual_feature",
-    }
+    expected_representations = {"lagged", "curve", "carry_roll"}
     assert set(metrics["representation"]) == expected_representations
     assert set(metrics["model"]) == {"train_mean", "ridge"}
     assert set(metrics["split_method"]) == {"date_ordered"}
@@ -97,8 +77,12 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
 def test_evaluate_baselines_supports_residual_targets(tmp_path: Path) -> None:
     modeling_dir = tmp_path / "data" / "processed" / "modeling"
     modeling_dir.mkdir(parents=True)
-    _sample_modeling_data(feature_prefix="pca", target_column="target_residual_change").to_parquet(
-        modeling_dir / "pca_residual_targets.parquet",
+    _sample_modeling_data(
+        feature_prefix="curve",
+        target_column="target_residual_change",
+        include_maturity_basis=True,
+    ).to_parquet(
+        modeling_dir / "curve_residual_targets.parquet",
         index=False,
     )
     config = ProjectConfig(
@@ -112,7 +96,7 @@ def test_evaluate_baselines_supports_residual_targets(tmp_path: Path) -> None:
     metrics = pd.read_parquet(output_path)
 
     assert set(metrics["target"]) == {"residual_change"}
-    assert set(metrics["representation"]) == {"pca"}
+    assert set(metrics["representation"]) == {"curve", "curve_maturity"}
     assert set(metrics["horizon_days"]) == {1, 5}
 
 
@@ -120,10 +104,10 @@ def test_evaluate_baselines_supports_standardized_targets(tmp_path: Path) -> Non
     modeling_dir = tmp_path / "data" / "processed" / "modeling"
     modeling_dir.mkdir(parents=True)
     _sample_modeling_data(
-        feature_prefix="pca",
+        feature_prefix="curve",
         target_column="target_standardized_yield_change",
     ).to_parquet(
-        modeling_dir / "pca_standardized_targets.parquet",
+        modeling_dir / "curve_standardized_targets.parquet",
         index=False,
     )
     config = ProjectConfig(
@@ -137,18 +121,18 @@ def test_evaluate_baselines_supports_standardized_targets(tmp_path: Path) -> Non
     metrics = pd.read_parquet(output_path)
 
     assert set(metrics["target"]) == {"standardized_yield_change"}
-    assert set(metrics["representation"]) == {"pca"}
+    assert set(metrics["representation"]) == {"curve"}
 
 
 def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
     modeling_dir = tmp_path / "data" / "processed" / "modeling"
     modeling_dir.mkdir(parents=True)
-    _sample_modeling_data(feature_prefix="pca", target_column="target_vol_change").to_parquet(
-        modeling_dir / "pca_vol_targets.parquet",
+    _sample_modeling_data(feature_prefix="curve", target_column="target_vol_change").to_parquet(
+        modeling_dir / "curve_vol_targets.parquet",
         index=False,
     )
-    _sample_curve_level_data(feature_prefix="pca").to_parquet(
-        modeling_dir / "pca_curve_vol_regime_targets.parquet",
+    _sample_curve_level_data(feature_prefix="curve").to_parquet(
+        modeling_dir / "curve_curve_vol_regime_targets.parquet",
         index=False,
     )
     config = ProjectConfig(
@@ -166,9 +150,9 @@ def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
     )
 
     assert set(metrics["target"]) == {"vol_change"}
-    assert set(metrics["representation"]) == {"pca"}
+    assert set(metrics["representation"]) == {"curve"}
     assert set(classification_metrics["target"]) == {"curve_vol_regime"}
-    assert set(classification_metrics["representation"]) == {"pca"}
+    assert set(classification_metrics["representation"]) == {"curve"}
     assert set(classification_metrics["model"]) == {"train_mode", "logistic_l2"}
     assert {"accuracy", "balanced_accuracy", "macro_f1"}.issubset(classification_metrics.columns)
     assert {"feature", "class_label", "coefficient", "abs_coefficient"}.issubset(
@@ -179,7 +163,7 @@ def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
 def test_evaluate_supervised_forecasts_writes_metrics_and_tables(tmp_path: Path) -> None:
     modeling_dir = tmp_path / "data" / "processed" / "modeling"
     modeling_dir.mkdir(parents=True)
-    data = _sample_modeling_data(feature_prefix="pca").assign(
+    data = _sample_modeling_data(feature_prefix="curve", include_direct_features=True).assign(
         split=lambda frame: [
             "train" if date < frame["date"].iloc[-3] else "test" for date in frame["date"]
         ],
@@ -217,7 +201,7 @@ def test_evaluate_supervised_forecasts_writes_metrics_and_tables(tmp_path: Path)
         config.supervised_forecast_by_maturity_bucket_table_path,
         config.supervised_forecast_coefficients_table_path,
     ]
-    assert set(metrics["representation"]) == {"pca", "residual_feature"}
+    assert set(metrics["representation"]) == {"curve", "lagged", "carry_roll"}
     assert set(metrics["target"]) == {"yield_change", "residual_change", "vol_change"}
     assert set(metrics["model"]) == {"train_mean", "ridge", "elastic_net"}
     assert {
@@ -231,11 +215,11 @@ def test_evaluate_supervised_forecasts_writes_metrics_and_tables(tmp_path: Path)
     assert set(coefficients["model"]) == {"ridge", "elastic_net"}
     assert set(coefficients["target"]) == {"yield_change", "residual_change", "vol_change"}
     assert {"feature", "coefficient", "abs_coefficient"}.issubset(coefficients.columns)
-    assert set(summary["representation"]) == {"pca", "residual_feature"}
+    assert set(summary["representation"]) == {"curve", "lagged", "carry_roll"}
 
 
 def test_date_ordered_split_keeps_dates_disjoint() -> None:
-    data = _sample_modeling_data(feature_prefix="pca")
+    data = _sample_modeling_data(feature_prefix="curve")
 
     train, test = date_ordered_split(data, test_fraction=0.25)
 
@@ -249,7 +233,7 @@ def test_date_ordered_split_keeps_dates_disjoint() -> None:
 
 
 def test_date_ordered_split_rejects_invalid_fraction() -> None:
-    data = _sample_modeling_data(feature_prefix="pca")
+    data = _sample_modeling_data(feature_prefix="curve")
 
     with pytest.raises(ValueError, match="between 0 and 1"):
         date_ordered_split(data, test_fraction=0.0)
@@ -258,8 +242,8 @@ def test_date_ordered_split_rejects_invalid_fraction() -> None:
 def test_evaluate_baselines_supports_walk_forward(tmp_path: Path) -> None:
     modeling_dir = tmp_path / "data" / "processed" / "modeling"
     modeling_dir.mkdir(parents=True)
-    _sample_modeling_data(feature_prefix="pca").to_parquet(
-        modeling_dir / "pca_targets.parquet",
+    _sample_modeling_data(feature_prefix="curve").to_parquet(
+        modeling_dir / "curve_targets.parquet",
         index=False,
     )
     config = ProjectConfig(
@@ -286,8 +270,8 @@ def test_evaluate_baselines_supports_walk_forward(tmp_path: Path) -> None:
 def test_evaluate_baselines_supports_non_overlapping_targets(tmp_path: Path) -> None:
     modeling_dir = tmp_path / "data" / "processed" / "modeling"
     modeling_dir.mkdir(parents=True)
-    _sample_modeling_data(feature_prefix="pca").to_parquet(
-        modeling_dir / "pca_targets.parquet",
+    _sample_modeling_data(feature_prefix="curve").to_parquet(
+        modeling_dir / "curve_targets.parquet",
         index=False,
     )
     config = ProjectConfig(
@@ -307,7 +291,7 @@ def test_evaluate_baselines_supports_non_overlapping_targets(tmp_path: Path) -> 
 
 
 def test_walk_forward_splits_use_expanding_training_window() -> None:
-    data = _sample_modeling_data(feature_prefix="pca")
+    data = _sample_modeling_data(feature_prefix="curve")
 
     splits = walk_forward_splits(
         data,
@@ -323,7 +307,7 @@ def test_walk_forward_splits_use_expanding_training_window() -> None:
 
 
 def test_walk_forward_splits_can_keep_latest_windows() -> None:
-    data = _sample_modeling_data(feature_prefix="pca")
+    data = _sample_modeling_data(feature_prefix="curve")
 
     splits = walk_forward_splits(
         data,
@@ -338,7 +322,7 @@ def test_walk_forward_splits_can_keep_latest_windows() -> None:
 
 
 def test_walk_forward_splits_reject_invalid_windows() -> None:
-    data = _sample_modeling_data(feature_prefix="pca")
+    data = _sample_modeling_data(feature_prefix="curve")
 
     with pytest.raises(ValueError, match="min_train_dates"):
         walk_forward_splits(
@@ -355,20 +339,11 @@ def test_maturity_bucket_maps_curve_segments() -> None:
     assert buckets.tolist() == ["front_end", "front_end", "belly", "belly", "long_end"]
 
 
-def test_pca_features_follow_configured_component_count(tmp_path: Path) -> None:
-    config = ProjectConfig(
-        data_dir=tmp_path / "data",
-        reports_dir=tmp_path / "reports",
-        sources={"test": SourceConfig(country="US", source="test", raw_file=tmp_path / "raw.csv")},
-        pca=PCAConfig(n_components=7),
-    )
-
-    assert _pca_features(config) == ["PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7"]
-
-
 def _sample_modeling_data(
     feature_prefix: str,
     target_column: str = "target_yield_change",
+    include_direct_features: bool = False,
+    include_maturity_basis: bool = False,
 ) -> pd.DataFrame:
     dates = pd.date_range("2024-01-01", periods=12)
     rows = []
@@ -386,18 +361,7 @@ def _sample_modeling_data(
                 }
                 if target_column == "target_vol_change":
                     row["future_vol_regime"] = ["low", "medium", "high"][index % 3]
-                if feature_prefix == "pca":
-                    row.update({"PC1": float(index), "PC2": float(horizon)})
-                elif feature_prefix == "ns":
-                    row.update(
-                        {
-                            "beta_level": float(index),
-                            "beta_slope": float(horizon),
-                            "beta_curvature": float(index + horizon),
-                            "rmse": 0.01,
-                        }
-                    )
-                elif feature_prefix == "lagged":
+                if feature_prefix == "lagged":
                     row.update(
                         {
                             "lag_1_change": index * 0.001,
@@ -437,6 +401,33 @@ def _sample_modeling_data(
                             "residual_vol_20": 0.002,
                         }
                     )
+                if include_direct_features:
+                    row.update(
+                        {
+                            "lag_1_change": index * 0.001,
+                            "lag_5_change": index * 0.002,
+                            "lag_20_change": index * 0.003,
+                            "carry_1m": maturity * 0.01,
+                            "roll_down_1m": -maturity * 0.001,
+                            "carry_3m": maturity * 0.03,
+                            "roll_down_3m": -maturity * 0.003,
+                            "carry_12m": maturity * 0.12,
+                            "roll_down_12m": -maturity * 0.012,
+                        }
+                    )
+                if include_maturity_basis:
+                    row.update(
+                        {
+                            "maturity": maturity,
+                            "maturity_squared": maturity**2,
+                            "log_maturity": 0.0 if maturity <= 0 else maturity,
+                            "level_x_maturity": (4.0 + index * 0.01) * maturity,
+                            "slope_10y_2y_x_maturity": maturity * 0.001 * maturity,
+                            "curvature_2s5s10s_x_maturity": horizon * 0.001 * maturity,
+                            "front_slope_2y_1y_x_maturity": 0.1 * maturity,
+                            "long_slope_30y_10y_x_maturity": 0.5 * maturity,
+                        }
+                    )
                 rows.append(row)
     return pd.DataFrame(rows)
 
@@ -454,9 +445,7 @@ def _sample_curve_level_data(feature_prefix: str) -> pd.DataFrame:
                 "future_curve_move_rms": 0.02 + index * 0.002 + horizon * 0.0001,
                 "available_maturities": 3,
             }
-            if feature_prefix == "pca":
-                row.update({"PC1": float(index), "PC2": float(horizon)})
-            elif feature_prefix == "curve":
+            if feature_prefix == "curve":
                 row.update(
                     {
                         "level": 4.0 + index * 0.01,

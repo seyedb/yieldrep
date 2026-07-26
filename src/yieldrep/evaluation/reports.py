@@ -479,14 +479,8 @@ def volatility_regime_benchmark_summary(summary: pd.DataFrame) -> pd.DataFrame:
         "best_balanced_accuracy",
         "curve_vol_balanced_accuracy",
         "policy_balanced_accuracy",
-        "pca_balanced_accuracy",
-        "autoencoder_balanced_accuracy",
-        "nelson_siegel_balanced_accuracy",
         "curve_balanced_accuracy",
         "policy_beats_curve_vol",
-        "pca_beats_curve_vol",
-        "autoencoder_beats_curve_vol",
-        "nelson_siegel_beats_curve_vol",
         "curve_beats_curve_vol",
     ]
     if summary.empty:
@@ -516,20 +510,8 @@ def volatility_regime_benchmark_summary(summary: pd.DataFrame) -> pd.DataFrame:
                 "best_balanced_accuracy": float(best["mean_balanced_accuracy"]),
                 "curve_vol_balanced_accuracy": curve_vol_score,
                 "policy_balanced_accuracy": scores.get("policy"),
-                "pca_balanced_accuracy": scores.get("pca"),
-                "autoencoder_balanced_accuracy": scores.get("autoencoder"),
-                "nelson_siegel_balanced_accuracy": scores.get("nelson_siegel"),
                 "curve_balanced_accuracy": scores.get("curve"),
                 "policy_beats_curve_vol": _beats_hurdle(scores.get("policy"), curve_vol_score),
-                "pca_beats_curve_vol": _beats_hurdle(scores.get("pca"), curve_vol_score),
-                "autoencoder_beats_curve_vol": _beats_hurdle(
-                    scores.get("autoencoder"),
-                    curve_vol_score,
-                ),
-                "nelson_siegel_beats_curve_vol": _beats_hurdle(
-                    scores.get("nelson_siegel"),
-                    curve_vol_score,
-                ),
                 "curve_beats_curve_vol": _beats_hurdle(scores.get("curve"), curve_vol_score),
             }
         )
@@ -799,7 +781,7 @@ def residual_relative_value_rank_ic_coverage(rank_table: pd.DataFrame) -> pd.Dat
         residual["rank_ic_dates"] > 0
     )
     residual["has_maturity_specific_features"] = residual["representation"].isin(
-        ["carry_roll", "lagged", "residual_feature"]
+        ["carry_roll", "lagged", "curve_maturity"]
     )
     residual["rank_ic_status"] = residual.apply(_rank_ic_status, axis=1)
     return (
@@ -882,14 +864,6 @@ def residual_relative_value_benchmark_summary(
         "best_hit_rate",
         "best_by_rank_ic",
         "best_rank_ic",
-        "residual_feature_spread_rank",
-        "residual_feature_rank_ic_rank",
-        "pca_maturity_spread_rank",
-        "pca_maturity_rank_ic_rank",
-        "autoencoder_maturity_spread_rank",
-        "autoencoder_maturity_rank_ic_rank",
-        "nelson_siegel_maturity_spread_rank",
-        "nelson_siegel_maturity_rank_ic_rank",
         "curve_maturity_spread_rank",
         "curve_maturity_rank_ic_rank",
     ]
@@ -917,18 +891,6 @@ def residual_relative_value_benchmark_summary(
                 "horizon_days": horizon_days,
                 **_best_spread_values(spread_group),
                 **_best_rank_ic_values(rank_ic_group),
-                **_representation_rank_values(spread_group, rank_ic_group, "residual_feature"),
-                **_representation_rank_values(spread_group, rank_ic_group, "pca_maturity"),
-                **_representation_rank_values(
-                    spread_group,
-                    rank_ic_group,
-                    "autoencoder_maturity",
-                ),
-                **_representation_rank_values(
-                    spread_group,
-                    rank_ic_group,
-                    "nelson_siegel_maturity",
-                ),
                 **_representation_rank_values(spread_group, rank_ic_group, "curve_maturity"),
             }
         )
@@ -949,8 +911,6 @@ def residual_relative_value_overview(
         "best_hit_rate",
         "best_by_rank_ic",
         "best_rank_ic",
-        "residual_feature_spread_rank",
-        "residual_feature_rank_ic_rank",
         "mean_reversion_hit_rate",
         "mean_reversion_score",
         "mean_reversion_rank_ic",
@@ -1348,12 +1308,11 @@ def rank_baselines(metrics: pd.DataFrame) -> pd.DataFrame:
 
 
 def baseline_winners(rank_table: pd.DataFrame) -> pd.DataFrame:
-    """Create a compact winner table with PCA and lagged gaps to best."""
+    """Create a compact winner table with lagged-baseline gaps to best."""
     rows: list[dict[str, object]] = []
     for group_values, group in rank_table.groupby(RANK_GROUP_COLUMNS, sort=True):
         keys = dict(zip(RANK_GROUP_COLUMNS, group_values, strict=True))
         best = group.sort_values(["rank", "mean_mae", "representation", "model"]).iloc[0]
-        pca = _best_representation_row(group, "pca")
         lagged = _best_representation_row(group, "lagged")
         rows.append(
             {
@@ -1362,9 +1321,6 @@ def baseline_winners(rank_table: pd.DataFrame) -> pd.DataFrame:
                 "best_model": best["model"],
                 "best_rmse": best["mean_rmse"],
                 "best_mae": best["mean_mae"],
-                "pca_rank": _rank_value(pca),
-                "pca_rmse_gap_to_best": _gap_value(pca),
-                "pca_pct_gap_to_best": _pct_gap_value(pca),
                 "lagged_rank": _rank_value(lagged),
                 "lagged_rmse_gap_to_best": _gap_value(lagged),
                 "lagged_pct_gap_to_best": _pct_gap_value(lagged),

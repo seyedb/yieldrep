@@ -54,11 +54,15 @@ def test_evaluate_baselines_command_writes_metric_outputs(tmp_path: Path) -> Non
             "yield": 4.0,
             "future_yield": 4.0 + index * 0.01,
             "target_yield_change": index * 0.01,
-            "PC1": float(index),
+            "level": 4.0 + index * 0.01,
+            "slope_10y_2y": 0.1,
+            "curvature_2s5s10s": 0.0,
+            "front_slope_2y_1y": 0.05,
+            "long_slope_30y_10y": 0.2,
         }
         for index, date in enumerate(dates)
     ]
-    pd.DataFrame(rows).to_parquet(modeling_dir / "pca_targets.parquet", index=False)
+    pd.DataFrame(rows).to_parquet(modeling_dir / "curve_targets.parquet", index=False)
     config_path = _write_config(
         tmp_path,
         [

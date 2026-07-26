@@ -218,8 +218,8 @@ r_t^{(c,m)}
 r_{t-\ell}^{(c,m)}
 ```
 
-Residual dynamic features use Nelson-Siegel residuals and rolling residual
-z-scores:
+Nelson-Siegel residuals are used for direct relative-value diagnostics, not as
+inputs to another supervised model:
 
 ```math
 z_{t,W}^{(c,m)}
@@ -231,13 +231,13 @@ e_t^{(c,m)} - \mu_{t,W}^{(c,m)}
 }
 ```
 
-These features are included because residual mean reversion and local
-richness/cheapness are standard relative-value ideas in rates research.
+The residual mean-reversion tables ask whether local richness/cheapness tends
+to converge, without fitting a second predictive model on the residual signal.
 
 ### State-Maturity Linear Baselines
 
 For residual relative-value evaluation, the project also includes maturity-aware
-classical panel baselines. These combine curve-level state variables with a
+classical panel baselines. These combine direct curve-shape variables with a
 continuous maturity basis:
 
 ```text
@@ -246,12 +246,12 @@ maturity_squared
 log_maturity
 ```
 
-and state-by-maturity interactions. The intent is to test whether a curve-level
-state representation, such as PCA scores or Nelson-Siegel factors, can imply
-different residual-change forecasts at different points on the curve.
+and curve-shape-by-maturity interactions. The intent is to test whether direct
+curve-shape features can imply different residual-change forecasts at different
+points on the curve.
 
-These baselines are not interpreted as new representations. They are stronger
-linear classical comparators for maturity-level residual RV ranking.
+These baselines are not interpreted as new representations. They are linear
+classical comparators for maturity-level residual RV ranking.
 
 ## Targets
 
@@ -444,13 +444,9 @@ held-out maturities from the rest of the same curve. This is closer to a
 self-supervised representation-learning task than ordinary full-curve
 reconstruction.
 
-Its learned embeddings are then passed through the same downstream protocols as
-the classical curve-level representations: outright yield-change forecasting,
-standardized yield-change forecasting, residual-change forecasting, volatility
-change forecasting, and curve-volatility regime classification. For residual
-relative value, maturity-interacted autoencoder features are evaluated alongside
-the maturity-aware PCA and Nelson-Siegel variants. PCA is used as a
-representation and reconstruction benchmark, not as a target-definition device.
+PCA, Nelson-Siegel, and autoencoder outputs are evaluated as standalone
+representations through reconstruction and diagnostics. They are not fed as
+inputs into downstream ridge, logistic, or elastic-net models.
 
 ### Supervised Forecasting
 
@@ -504,20 +500,14 @@ separates curve-level and maturity-level evaluation:
 
 | Level | Natural representations | Natural tasks |
 | --- | --- | --- |
-| Curve-level | PCA scores, Nelson-Siegel factors, curve-shape features | reconstruction, volatility regimes |
-| State-maturity panel | PCA/NS/curve factors with maturity basis interactions | residual RV ranking as a stronger classical comparator |
-| Maturity-level | residual features, lagged maturity moves, carry/roll-down proxies | residual relative value, cross-sectional maturity ranking |
+| Curve-level | PCA scores, Nelson-Siegel factors, autoencoder embeddings | reconstruction and representation diagnostics |
+| Curve-level direct features | curve-shape, policy-rate, realized-volatility features | volatility regimes |
+| Maturity-level direct features | lagged maturity moves, carry/roll-down proxies, curve-shape maturity interactions | residual relative value, cross-sectional maturity ranking |
 
-PCA and Nelson-Siegel are currently date/country-level curve representations.
-They describe the state of the whole curve at a point in time. In this
-implementation, they do not by themselves create maturity-varying predictions
-within the same date, so they are not expected to produce valid cross-sectional
-rank IC for maturity-level residual RV tasks.
-
-This is an evaluation-design distinction, not a claim that PCA or
-Nelson-Siegel are weak representations. A learned representation that is meant
-to compete on residual RV ranking should explicitly produce maturity-aware
-features or node-level embeddings.
+Model outputs are not used as inputs to other supervised models. A future
+learned representation must be evaluated directly through its own objective or
+through a clearly specified model architecture, not by stacking its embeddings
+into an unrelated second-stage benchmark.
 
 ### Metric Protocol
 
@@ -724,8 +714,8 @@ Included now:
 - public US, Canada, and euro-area zero-coupon curve data
 - normalized long-format curve schema
 - PCA and Nelson-Siegel curve representations
-- PyTorch autoencoder reconstruction baseline and downstream embedding benchmark
-- engineered slope, curvature, carry, roll-down, lagged, and residual features
+- PyTorch autoencoder reconstruction baseline
+- engineered slope, curvature, carry, roll-down, and lagged features
 - policy-rate level, change, and curve-policy spread features
 - VIX and MOVE market-volatility regimes for residual RV conditioning
 - inflation and unemployment macro regimes where current public sources are configured
@@ -752,5 +742,5 @@ The current forecasting benchmarks are preliminary. Outright yield-change
 prediction is a noisy task, and strong curve reconstruction does not by itself
 imply forecastability.
 
-Near-term extensions should compare learned embeddings against the established
-classical protocol before adding more model complexity.
+Near-term extensions should compare learned models through clearly defined
+objectives, without feeding one model's outputs into another benchmark model.
