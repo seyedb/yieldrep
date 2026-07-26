@@ -26,6 +26,8 @@ def plot_reconstruction(config: ProjectConfig) -> list[Path]:
     maturity_path = config.figures_dir / "reconstruction_oos_rmse_by_maturity.html"
     training_path = config.figures_dir / "reconstruction_autoencoder_training_history.html"
     latent_path = config.figures_dir / "autoencoder_latent_factor_correlations.html"
+    latent_time_path = config.figures_dir / "autoencoder_latent_time_series.html"
+    latent_scatter_path = config.figures_dir / "autoencoder_latent_state_space.html"
 
     _plot_pca_components(summary).write_html(component_path)
     _plot_representation_comparison(oos_summary).write_html(comparison_path)
@@ -33,8 +35,19 @@ def plot_reconstruction(config: ProjectConfig) -> list[Path]:
     _plot_maturity_profile(oos_by_maturity).write_html(maturity_path)
     _plot_training_history(config).write_html(training_path)
     _plot_latent_factor_correlations(config).write_html(latent_path)
+    _plot_latent_time_series(config).write_html(latent_time_path)
+    _plot_latent_state_space(config).write_html(latent_scatter_path)
 
-    return [component_path, comparison_path, bucket_path, maturity_path, training_path, latent_path]
+    return [
+        component_path,
+        comparison_path,
+        bucket_path,
+        maturity_path,
+        training_path,
+        latent_path,
+        latent_time_path,
+        latent_scatter_path,
+    ]
 
 
 def _plot_pca_components(summary: pd.DataFrame) -> Any:
@@ -169,3 +182,90 @@ def _plot_latent_factor_correlations(config: ProjectConfig) -> Figure:
         title="Autoencoder latent correlations with curve and classical factors",
         labels={"x": "AE latent dimension", "y": "Factor", "color": "|Correlation|"},
     )
+
+
+def _plot_latent_time_series(config: ProjectConfig) -> Figure:
+    embeddings = _read_autoencoder_embeddings(config)
+    if embeddings.empty:
+        return Figure()
+
+    latent_columns = _latent_columns(embeddings)[:3]
+    if not latent_columns:
+        return Figure()
+
+    long = embeddings.melt(
+        id_vars=["date", "country", "split"],
+        value_vars=latent_columns,
+        var_name="latent_dimension",
+        value_name="latent_value",
+    )
+    return px.line(
+        long,
+        x="date",
+        y="latent_value",
+        color="latent_dimension",
+        facet_col="country",
+        title="Autoencoder latent dimensions through time",
+        labels={
+            "date": "Date",
+            "latent_value": "Latent value",
+            "latent_dimension": "Latent dimension",
+        },
+    )
+
+
+def _plot_latent_state_space(config: ProjectConfig) -> Figure:
+    embeddings = _read_autoencoder_embeddings(config)
+    if embeddings.empty or not {"AE1", "AE2"}.issubset(embeddings.columns):
+        return Figure()
+
+    frame = _join_curve_features(config, embeddings)
+    color_column = "level" if "level" in frame.columns else "split"
+    return px.scatter(
+        frame,
+        x="AE1",
+        y="AE2",
+        color=color_column,
+        facet_col="country",
+        hover_data=["date", "split"],
+        title="Autoencoder latent state space",
+        labels={"AE1": "AE1", "AE2": "AE2", "level": "Curve level", "split": "Split"},
+    )
+
+
+def _read_autoencoder_embeddings(config: ProjectConfig) -> pd.DataFrame:
+    frames = [
+        pd.read_parquet(path)
+        for path in sorted(config.autoencoder_dir.glob("*_embeddings.parquet"))
+    ]
+    if not frames:
+        return pd.DataFrame()
+    embeddings = pd.concat(frames, ignore_index=True)
+    embeddings["date"] = pd.to_datetime(embeddings["date"])
+    return embeddings.sort_values(["country", "date"]).reset_index(drop=True)
+
+
+def _latent_columns(frame: pd.DataFrame) -> list[str]:
+    return sorted(
+        [column for column in frame.columns if column.startswith("AE")],
+        key=lambda column: int(column.removeprefix("AE")),
+    )
+
+
+def _join_curve_features(config: ProjectConfig, embeddings: pd.DataFrame) -> pd.DataFrame:
+    if not config.curve_features_path.exists():
+        return embeddings
+    features = pd.read_parquet(config.curve_features_path)
+    if features.empty:
+        return embeddings
+    features = features.copy()
+    features["date"] = pd.to_datetime(features["date"])
+    feature_columns = [
+        "date",
+        "country",
+        "level",
+        "slope_10y_2y",
+        "curvature_2s5s10s",
+    ]
+    available_columns = [column for column in feature_columns if column in features.columns]
+    return embeddings.merge(features.loc[:, available_columns], on=["date", "country"], how="left")

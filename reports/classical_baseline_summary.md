@@ -91,6 +91,10 @@ align with curve level, with some slope information appearing in selected latent
 dimensions. This is useful, but it also suggests the representation is not yet
 clearly disentangling level, slope, and curvature.
 
+Autoencoder latent time-series and state-space plots are now included as visual
+diagnostics for curve-state evolution. These plots are interpretability checks,
+not forecasting inputs.
+
 Residual relative-value ranking is a maturity-level task. In the current
 classical setup, direct curve-shape, lagged, and carry/roll-down features are
 the allowed supervised feature families.

@@ -462,6 +462,8 @@ Autoencoder latent dimensions are also inspected by correlation with direct
 curve-shape features, PCA scores, and Nelson-Siegel factors. These correlations
 are interpretation diagnostics only: they ask whether latent dimensions align
 with recognizable term-structure states such as level, slope, and curvature.
+Latent time-series and state-space plots are used for the same purpose: visual
+inspection of curve-state evolution, not forecasting.
 
 ### Supervised Forecasting
 
