@@ -122,6 +122,9 @@ def test_load_config_reads_project_paths() -> None:
     assert config.benchmark_conclusions_table_path == Path(
         "reports/tables/benchmark_conclusions.csv"
     )
+    assert config.scenario_method_table_path == Path(
+        "reports/tables/scenario_method_comparison.csv"
+    )
     assert config.supervised_walk_forward_summary_table_path == Path(
         "reports/tables/supervised_walk_forward_summary.csv"
     )

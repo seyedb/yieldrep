@@ -404,8 +404,8 @@ g_{t,h}^{(c)}
 \{\mathrm{low}, \mathrm{medium}, \mathrm{high}\}
 ```
 
-This avoids using full-sample regime thresholds and makes PCA, Nelson-Siegel,
-engineered curve features, and recent realized curve volatility comparable on a
+This avoids using full-sample regime thresholds and makes direct curve features,
+policy-rate features, and recent realized curve volatility comparable on a
 natural curve-level classification task.
 
 ## Evaluation Protocol
@@ -508,6 +508,22 @@ Model outputs are not used as inputs to other supervised models. A future
 learned representation must be evaluated directly through its own objective or
 through a clearly specified model architecture, not by stacking its embeddings
 into an unrelated second-stage benchmark.
+
+### Scenario-Method Comparison
+
+The current comparison is organized by scenario, so methods are only compared
+where the task is well-defined:
+
+| Scenario | Valid methods | Primary metrics |
+| --- | --- | --- |
+| Curve reconstruction | PCA, Nelson-Siegel, autoencoder | out-of-sample RMSE, MAE |
+| Outright yield forecasting | lagged moves, curve-shape features, carry/roll-down proxies | RMSE, MAE, directional accuracy |
+| Residual relative value | Nelson-Siegel residual diagnostics, curve-shape by maturity baseline | spread convergence, hit rate, rank IC |
+| Volatility-regime classification | curve-shape, policy-rate, realized curve-volatility features | balanced accuracy, macro F1 |
+
+The same table is written to
+`reports/tables/scenario_method_comparison.csv` when baseline summaries are
+generated.
 
 ### Metric Protocol
 

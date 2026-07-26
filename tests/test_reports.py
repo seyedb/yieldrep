@@ -7,6 +7,7 @@ from yieldrep.config import ProjectConfig, SourceConfig
 from yieldrep.evaluation.reports import (
     baseline_winners,
     overlap_sensitivity_table,
+    scenario_method_comparison_table,
     supervised_walk_forward_comparison,
     summarize_baselines,
     top_maturity_point_metrics,
@@ -46,6 +47,7 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
         tmp_path / "reports" / "tables" / "volatility_regime_benchmark.csv",
         tmp_path / "reports" / "tables" / "ae_classical_factor_correlations.csv",
         tmp_path / "reports" / "tables" / "benchmark_conclusions.csv",
+        tmp_path / "reports" / "tables" / "scenario_method_comparison.csv",
         tmp_path / "reports" / "tables" / "baseline_by_maturity_bucket.csv",
         tmp_path / "reports" / "tables" / "residual_relative_value.csv",
         tmp_path / "reports" / "tables" / "baseline_by_maturity_point_top.csv",
@@ -62,9 +64,10 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     volatility_regime_benchmark = pd.read_csv(output_paths[9])
     ae_classical_correlations = pd.read_csv(output_paths[10])
     benchmark_conclusions = pd.read_csv(output_paths[11])
-    bucket_summary = pd.read_csv(output_paths[12])
-    residual_rv = pd.read_csv(output_paths[13])
-    point_top = pd.read_csv(output_paths[14])
+    scenario_methods = pd.read_csv(output_paths[12])
+    bucket_summary = pd.read_csv(output_paths[13])
+    residual_rv = pd.read_csv(output_paths[14])
+    point_top = pd.read_csv(output_paths[15])
     assert {"target", "representation", "model", "mean_rmse"}.issubset(summary.columns)
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best", "mean_rank_ic"}.issubset(
         rank_table.columns
@@ -97,9 +100,24 @@ def test_summarize_baselines_writes_csv_tables(tmp_path: Path) -> None:
     assert {"research_question", "current_best_baseline", "conclusion"}.issubset(
         benchmark_conclusions.columns
     )
+    assert {"scenario", "valid_methods", "methodological_boundary"}.issubset(
+        scenario_methods.columns
+    )
     assert "maturity_bucket" in bucket_summary.columns
     assert {"rank", "rmse_gap_to_best", "pct_gap_to_best"}.issubset(residual_rv.columns)
     assert len(point_top) <= 2
+
+
+def test_scenario_method_comparison_table_documents_clean_boundaries() -> None:
+    table = scenario_method_comparison_table()
+
+    assert set(table["scenario"]) == {
+        "curve_reconstruction",
+        "outright_yield_forecasting",
+        "residual_relative_value",
+        "volatility_regime_classification",
+    }
+    assert table["methodological_boundary"].str.contains("not fed|No PCA|not stacked").any()
 
 
 def test_top_maturity_point_metrics_rejects_invalid_top_n() -> None:

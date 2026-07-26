@@ -139,6 +139,8 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         volatility_regime_benchmark=volatility_regime_benchmark,
     )
     benchmark_conclusions.to_csv(config.benchmark_conclusions_table_path, index=False)
+    scenario_methods = scenario_method_comparison_table()
+    scenario_methods.to_csv(config.scenario_method_table_path, index=False)
 
     output_paths = [
         config.baseline_summary_table_path,
@@ -153,6 +155,7 @@ def summarize_baselines(config: ProjectConfig, top_n: int = 100) -> list[Path]:
         config.volatility_regime_benchmark_table_path,
         config.ae_classical_factor_correlations_table_path,
         config.benchmark_conclusions_table_path,
+        config.scenario_method_table_path,
         config.baseline_by_maturity_bucket_table_path,
         config.residual_relative_value_table_path,
         config.baseline_by_maturity_point_top_table_path,
@@ -582,6 +585,45 @@ def benchmark_conclusion_summary(
     return pd.DataFrame(rows)
 
 
+def scenario_method_comparison_table() -> pd.DataFrame:
+    """Document which methods are valid comparators for each research scenario."""
+    rows = [
+        {
+            "scenario": "curve_reconstruction",
+            "question": "Which representation reconstructs the observed curve most accurately?",
+            "valid_methods": "PCA; Nelson-Siegel; autoencoder",
+            "primary_metrics": "out-of-sample RMSE; MAE by country and maturity",
+            "evidence_tables": "reconstruction_oos_summary.csv",
+            "methodological_boundary": "Representation outputs are evaluated directly, not fed into another supervised model.",
+        },
+        {
+            "scenario": "outright_yield_forecasting",
+            "question": "Which direct feature family predicts future yield changes?",
+            "valid_methods": "lagged yield changes; curve-shape features; carry/roll-down proxies",
+            "primary_metrics": "RMSE; MAE; directional accuracy; maturity-bucket RMSE",
+            "evidence_tables": "supervised_forecast_summary.csv; baseline_rank.csv",
+            "methodological_boundary": "Only directly observed or engineered curve features are used as predictors.",
+        },
+        {
+            "scenario": "residual_relative_value",
+            "question": "Do maturity residuals show convergence or useful cross-sectional ranking?",
+            "valid_methods": "Nelson-Siegel residual diagnostics; curve-shape by maturity baseline",
+            "primary_metrics": "spread convergence; hit rate; rank IC",
+            "evidence_tables": "residual_relative_value_benchmark.csv; residual_mean_reversion.csv",
+            "methodological_boundary": "Residuals define the relative-value object; they are not stacked into a second predictive model.",
+        },
+        {
+            "scenario": "volatility_regime_classification",
+            "question": "Which direct market state variables classify future curve-volatility regimes?",
+            "valid_methods": "curve-shape features; policy-rate features; realized curve-volatility features",
+            "primary_metrics": "balanced accuracy; macro F1",
+            "evidence_tables": "volatility_regime_benchmark.csv",
+            "methodological_boundary": "No PCA, Nelson-Siegel, or autoencoder outputs are used as classifier inputs.",
+        },
+    ]
+    return pd.DataFrame(rows)
+
+
 def _curve_reconstruction_conclusion(config: ProjectConfig) -> dict[str, object]:
     if not config.reconstruction_oos_summary_table_path.exists():
         return _conclusion_row(
@@ -647,7 +689,7 @@ def _yield_forecasting_conclusion(rank_table: pd.DataFrame) -> dict[str, object]
         research_question="outright_yield_forecasting",
         current_best_baseline=_winner_frequency_label(best),
         learned_representation_status=(
-            "mixed_some_best_ranks" if learned_best else "evaluated_but_not_dominant"
+            "mixed_some_best_ranks" if learned_best else "not_evaluated_for_supervised_forecasting"
         ),
         evidence_table="baseline_rank.csv",
         conclusion="Outright yield-change forecasting remains noisy and is not the central win condition.",
@@ -673,10 +715,10 @@ def _residual_rv_conclusion(benchmark: pd.DataFrame) -> dict[str, object]:
         research_question="residual_relative_value",
         current_best_baseline=f"spread={spread_winner}; rank_ic={rank_ic_winner}",
         learned_representation_status=(
-            "mixed_some_best_ranks" if learned_best else "evaluated_but_not_best"
+            "mixed_some_best_ranks" if learned_best else "not_evaluated_for_residual_rv"
         ),
         evidence_table="residual_relative_value_benchmark.csv",
-        conclusion="Explicit maturity residual features remain the strongest RV benchmark.",
+        conclusion="Direct residual diagnostics and maturity-aware curve features define the current RV benchmark.",
     )
 
 
@@ -696,7 +738,7 @@ def _volatility_regime_conclusion(benchmark: pd.DataFrame) -> dict[str, object]:
         research_question="volatility_regime_classification",
         current_best_baseline=best_label,
         learned_representation_status=(
-            "mixed_some_best_ranks" if learned_best else "evaluated_but_not_best"
+            "mixed_some_best_ranks" if learned_best else "not_evaluated_for_regime_classification"
         ),
         evidence_table="volatility_regime_benchmark.csv",
         conclusion="Realized curve-volatility and policy features remain the main hurdles.",

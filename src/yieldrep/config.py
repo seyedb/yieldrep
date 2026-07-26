@@ -320,6 +320,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "benchmark_conclusions.csv"
 
     @property
+    def scenario_method_table_path(self) -> Path:
+        return self.tables_dir / "scenario_method_comparison.csv"
+
+    @property
     def volatility_regime_table_path(self) -> Path:
         return self.tables_dir / "volatility_regime.csv"
 
