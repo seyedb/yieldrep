@@ -20,6 +20,10 @@ def test_load_config_reads_project_paths() -> None:
     assert config.nelson_siegel_dir == Path("data/processed/nelson_siegel")
     assert config.autoencoder_dir == Path("data/processed/autoencoder")
     assert config.transformer_dir == Path("data/processed/transformer")
+    assert config.learned_states_dir == Path("data/processed/learned_states")
+    assert config.learned_state_regimes_path == Path(
+        "data/processed/learned_states/regime_states.parquet"
+    )
     assert config.targets_path == Path("data/processed/targets.parquet")
     assert config.standardized_targets_path == Path("data/processed/standardized_targets.parquet")
     assert config.residual_targets_path == Path("data/processed/residual_targets.parquet")
@@ -127,6 +131,18 @@ def test_load_config_reads_project_paths() -> None:
     assert config.residual_zscores_figure_path == Path("reports/figures/residual_zscores.html")
     assert config.residual_rv_regime_heatmap_figure_path == Path(
         "reports/figures/residual_rv_regime_heatmap.html"
+    )
+    assert config.learned_state_regime_summary_table_path == Path(
+        "reports/tables/learned_state_regime_summary.csv"
+    )
+    assert config.learned_state_regime_means_table_path == Path(
+        "reports/tables/learned_state_regime_means.csv"
+    )
+    assert config.learned_state_regime_heatmap_figure_path == Path(
+        "reports/figures/learned_state_regime_heatmap.html"
+    )
+    assert config.learned_state_space_figure_path == Path(
+        "reports/figures/learned_state_space_regimes.html"
     )
     assert config.overlap_sensitivity_table_path == Path("reports/tables/overlap_sensitivity.csv")
     assert config.benchmark_conclusions_table_path == Path(

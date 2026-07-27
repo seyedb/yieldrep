@@ -230,6 +230,41 @@ curve-level state.
 Learned embeddings are currently evaluated through reconstruction and
 curve-state diagnostics.
 
+For a learned state vector \(z_t\), regime separation is measured by comparing
+latent means across regimes. For high and low regimes:
+
+```math
+D_{high,low}
+=
+\left\|
+\bar{z}_{high}
+-
+\bar{z}_{low}
+\right\|_2
+```
+
+The variance ratio compares between-regime dispersion with within-regime
+dispersion:
+
+```math
+R
+=
+\frac{
+\sum_g n_g
+\left\|
+\bar{z}_g-\bar{z}
+\right\|_2^2
+}{
+\sum_g
+\sum_{t \in g}
+\left\|
+z_t-\bar{z}_g
+\right\|_2^2
+}
+```
+
+where \(g\) indexes low, medium, and high regimes.
+
 ## Targets
 
 ### Yield Change
@@ -464,6 +499,16 @@ reports/tables/residual_rv_regime_scorecard.csv
 reports/figures/residual_rv_regime_heatmap.html
 ```
 
+Learned-state regime diagnostics are reported in:
+
+```text
+data/processed/learned_states/regime_states.parquet
+reports/tables/learned_state_regime_summary.csv
+reports/tables/learned_state_regime_means.csv
+reports/figures/learned_state_regime_heatmap.html
+reports/figures/learned_state_space_regimes.html
+```
+
 ### Classification Metrics
 
 Balanced accuracy:
@@ -502,6 +547,7 @@ Implemented scope:
 - residual RV diagnostics
 - market and macro regime conditioning
 - autoencoder and maturity Transformer reconstruction baselines
+- learned-state regime diagnostics
 - Plotly figures and CSV scorecards
 
 Planned next phase:

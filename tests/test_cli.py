@@ -207,6 +207,12 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr(cli, "evaluate_supervised_forecasts", multi_step("evaluate_supervised_forecasts"))
     monkeypatch.setattr(cli, "summarize_baselines", multi_step("summarize_baselines"))
     monkeypatch.setattr(cli, "plot_baseline_metrics", multi_step("plot_baseline_metrics"))
+    monkeypatch.setattr(
+        cli,
+        "build_learned_state_regime_diagnostics",
+        multi_step("build_learned_state_regime_diagnostics"),
+    )
+    monkeypatch.setattr(cli, "plot_learned_state_regimes", multi_step("plot_learned_state_regimes"))
     monkeypatch.setattr(cli, "build_cross_market_report", single_step("build_cross_market_report"))
     monkeypatch.setattr(cli, "plot_cross_market_pca", multi_step("plot_cross_market_pca"))
 
@@ -236,6 +242,8 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "evaluate_supervised_forecasts",
         "summarize_baselines",
         "plot_baseline_metrics",
+        "build_learned_state_regime_diagnostics",
+        "plot_learned_state_regimes",
         "build_cross_market_report",
         "plot_cross_market_pca",
     ]

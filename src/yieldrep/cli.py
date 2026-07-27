@@ -16,6 +16,7 @@ from yieldrep.data.policy_rates import build_policy_rates
 from yieldrep.evaluation.datasets import build_modeling_datasets
 from yieldrep.evaluation.cross_market import build_cross_market_report
 from yieldrep.evaluation.diagnostics import diagnose_lagged_baseline
+from yieldrep.evaluation.learned_states import build_learned_state_regime_diagnostics
 from yieldrep.evaluation.reports import (
     build_overlap_sensitivity_report,
     build_supervised_walk_forward_report,
@@ -41,6 +42,7 @@ from yieldrep.models.transformer import build_transformer
 from yieldrep.visualization.plotly_baselines import plot_baseline_metrics
 from yieldrep.visualization.plotly_cross_market import plot_cross_market_pca
 from yieldrep.visualization.plotly_curves import plot_curves
+from yieldrep.visualization.plotly_learned_states import plot_learned_state_regimes
 from yieldrep.visualization.plotly_nelson_siegel import plot_nelson_siegel
 from yieldrep.visualization.plotly_pca import plot_pca
 from yieldrep.visualization.plotly_reconstruction import plot_reconstruction
@@ -258,6 +260,16 @@ def cross_market_command(config: Path = Path("configs/default.yaml")) -> None:
         typer.echo(output_path)
 
 
+@app.command("learned-states")
+def learned_states_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Evaluate learned curve states against macro and market regimes."""
+    project_config = load_config(config)
+    for output_path in build_learned_state_regime_diagnostics(project_config):
+        typer.echo(output_path)
+    for output_path in plot_learned_state_regimes(project_config):
+        typer.echo(output_path)
+
+
 @app.command("reconstruction")
 def reconstruction_command(config: Path = Path("configs/default.yaml")) -> None:
     """Evaluate and plot curve reconstruction quality."""
@@ -333,6 +345,8 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.extend(evaluate_supervised_forecasts(project_config))
     output_paths.extend(summarize_baselines(project_config))
     output_paths.extend(plot_baseline_metrics(project_config))
+    output_paths.extend(build_learned_state_regime_diagnostics(project_config))
+    output_paths.extend(plot_learned_state_regimes(project_config))
     output_paths.append(build_cross_market_report(project_config))
     output_paths.extend(plot_cross_market_pca(project_config))
     return output_paths

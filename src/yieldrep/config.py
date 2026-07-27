@@ -170,6 +170,14 @@ class ProjectConfig(BaseModel):
         return self.processed_dir / "transformer"
 
     @property
+    def learned_states_dir(self) -> Path:
+        return self.processed_dir / "learned_states"
+
+    @property
+    def learned_state_regimes_path(self) -> Path:
+        return self.learned_states_dir / "regime_states.parquet"
+
+    @property
     def targets_path(self) -> Path:
         return self.processed_dir / "targets.parquet"
 
@@ -344,6 +352,22 @@ class ProjectConfig(BaseModel):
     @property
     def residual_rv_regime_heatmap_figure_path(self) -> Path:
         return self.figures_dir / "residual_rv_regime_heatmap.html"
+
+    @property
+    def learned_state_regime_summary_table_path(self) -> Path:
+        return self.tables_dir / "learned_state_regime_summary.csv"
+
+    @property
+    def learned_state_regime_means_table_path(self) -> Path:
+        return self.tables_dir / "learned_state_regime_means.csv"
+
+    @property
+    def learned_state_regime_heatmap_figure_path(self) -> Path:
+        return self.figures_dir / "learned_state_regime_heatmap.html"
+
+    @property
+    def learned_state_space_figure_path(self) -> Path:
+        return self.figures_dir / "learned_state_space_regimes.html"
 
     @property
     def baseline_by_maturity_point_top_table_path(self) -> Path:

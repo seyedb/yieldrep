@@ -34,6 +34,8 @@ Current evaluation covers:
 | Residual RV scorecard | `reports/tables/residual_relative_value_scorecard.csv` |
 | RV regime scorecard | `reports/tables/residual_rv_regime_scorecard.csv` |
 | RV regime heatmap | `reports/figures/residual_rv_regime_heatmap.html` |
+| Learned-state regime summary | `reports/tables/learned_state_regime_summary.csv` |
+| Learned-state regime heatmap | `reports/figures/learned_state_regime_heatmap.html` |
 
 ## Interpretation
 
@@ -50,9 +52,13 @@ The most relevant research direction is now residual relative value under macro
 and market regimes. This is the clearest bridge from classical rates structure
 to learned curve-state analysis.
 
+Initial learned-state diagnostics compare AE and Transformer latent states across
+macro and market regimes. The strongest current separations appear in Canada
+unemployment regimes and selected inflation/MOVE regimes.
+
 ## Next Phase
 
-The next phase is learned curve-state diagnostics:
+The next phase extends learned curve-state diagnostics:
 
 - compare AE and Transformer states across inflation, unemployment, VIX, and MOVE regimes
 - test whether learned states separate RV-friendly environments
