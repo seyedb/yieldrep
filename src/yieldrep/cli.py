@@ -17,6 +17,7 @@ from yieldrep.evaluation.datasets import build_modeling_datasets
 from yieldrep.evaluation.cross_market import build_cross_market_report
 from yieldrep.evaluation.diagnostics import diagnose_lagged_baseline
 from yieldrep.evaluation.learned_states import build_learned_state_regime_diagnostics
+from yieldrep.evaluation.macro_conditioning import build_macro_conditioned_representation_summary
 from yieldrep.evaluation.reports import (
     build_overlap_sensitivity_report,
     build_supervised_walk_forward_report,
@@ -278,6 +279,13 @@ def compare_representations_command(config: Path = Path("configs/default.yaml"))
     typer.echo(build_representation_comparison(project_config))
 
 
+@app.command("macro-conditioned-summary")
+def macro_conditioned_summary_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Write macro- and market-conditioned representation diagnostics."""
+    project_config = load_config(config)
+    typer.echo(build_macro_conditioned_representation_summary(project_config))
+
+
 @app.command("reconstruction")
 def reconstruction_command(config: Path = Path("configs/default.yaml")) -> None:
     """Evaluate and plot curve reconstruction quality."""
@@ -356,6 +364,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.extend(build_learned_state_regime_diagnostics(project_config))
     output_paths.extend(plot_learned_state_regimes(project_config))
     output_paths.append(build_representation_comparison(project_config))
+    output_paths.append(build_macro_conditioned_representation_summary(project_config))
     output_paths.append(build_cross_market_report(project_config))
     output_paths.extend(plot_cross_market_pca(project_config))
     return output_paths
