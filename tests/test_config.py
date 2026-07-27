@@ -144,6 +144,9 @@ def test_load_config_reads_project_paths() -> None:
     assert config.learned_state_space_figure_path == Path(
         "reports/figures/learned_state_space_regimes.html"
     )
+    assert config.representation_comparison_table_path == Path(
+        "reports/tables/representation_comparison.csv"
+    )
     assert config.overlap_sensitivity_table_path == Path("reports/tables/overlap_sensitivity.csv")
     assert config.benchmark_conclusions_table_path == Path(
         "reports/tables/benchmark_conclusions.csv"

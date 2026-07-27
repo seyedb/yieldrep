@@ -30,6 +30,7 @@ Current evaluation covers:
 | --- | --- |
 | Baseline audit | `reports/tables/baseline_audit.csv` |
 | Scenario-method map | `reports/tables/scenario_method_comparison.csv` |
+| Representation comparison | `reports/tables/representation_comparison.csv` |
 | Reconstruction comparison | `reports/tables/reconstruction_oos_comparison.csv` |
 | Residual RV scorecard | `reports/tables/residual_relative_value_scorecard.csv` |
 | RV regime scorecard | `reports/tables/residual_rv_regime_scorecard.csv` |
@@ -56,10 +57,15 @@ Initial learned-state diagnostics compare AE and Transformer latent states acros
 macro and market regimes. The strongest current separations appear in Canada
 unemployment regimes and selected inflation/MOVE regimes.
 
+The representation comparison table consolidates reconstruction quality,
+masked-maturity reconstruction, learned-state regime separation, and direct
+engineered benchmark feature sets. These columns are reported side by side, but
+they are not treated as the same statistical task.
+
 ## Next Phase
 
-The next phase extends learned curve-state diagnostics:
+The next phase uses the representation checkpoint for macro-aware evaluation:
 
-- compare AE and Transformer states across inflation, unemployment, VIX, and MOVE regimes
-- test whether learned states separate RV-friendly environments
-- keep learned representations as standalone diagnostics before using them in downstream models
+- compare representation behavior across inflation, unemployment, VIX, and MOVE regimes
+- emphasize residual RV and volatility-state questions over average outright forecasts
+- keep representation outputs separated from target-definition tools

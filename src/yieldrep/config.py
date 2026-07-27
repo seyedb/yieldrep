@@ -370,6 +370,10 @@ class ProjectConfig(BaseModel):
         return self.figures_dir / "learned_state_space_regimes.html"
 
     @property
+    def representation_comparison_table_path(self) -> Path:
+        return self.tables_dir / "representation_comparison.csv"
+
+    @property
     def baseline_by_maturity_point_top_table_path(self) -> Path:
         return self.tables_dir / "baseline_by_maturity_point_top.csv"
 

@@ -22,6 +22,7 @@ from yieldrep.evaluation.reports import (
     build_supervised_walk_forward_report,
     summarize_baselines,
 )
+from yieldrep.evaluation.representations import build_representation_comparison
 from yieldrep.evaluation.reconstruction import evaluate_reconstruction
 from yieldrep.evaluation.targets import (
     build_residual_targets,
@@ -270,6 +271,13 @@ def learned_states_command(config: Path = Path("configs/default.yaml")) -> None:
         typer.echo(output_path)
 
 
+@app.command("compare-representations")
+def compare_representations_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Write a unified comparison table for current representation artifacts."""
+    project_config = load_config(config)
+    typer.echo(build_representation_comparison(project_config))
+
+
 @app.command("reconstruction")
 def reconstruction_command(config: Path = Path("configs/default.yaml")) -> None:
     """Evaluate and plot curve reconstruction quality."""
@@ -347,6 +355,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.extend(plot_baseline_metrics(project_config))
     output_paths.extend(build_learned_state_regime_diagnostics(project_config))
     output_paths.extend(plot_learned_state_regimes(project_config))
+    output_paths.append(build_representation_comparison(project_config))
     output_paths.append(build_cross_market_report(project_config))
     output_paths.extend(plot_cross_market_pca(project_config))
     return output_paths
