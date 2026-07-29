@@ -30,6 +30,7 @@ Current evaluation covers:
 | --- | --- |
 | Baseline audit | `reports/tables/baseline_audit.csv` |
 | Scenario-method map | `reports/tables/scenario_method_comparison.csv` |
+| Learned model comparison | `reports/tables/learned_model_comparison.csv` |
 | Representation comparison | `reports/tables/representation_comparison.csv` |
 | Macro-conditioned representation summary | `reports/tables/macro_conditioned_representation_summary.csv` |
 | Reconstruction comparison | `reports/tables/reconstruction_oos_comparison.csv` |

@@ -378,6 +378,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "macro_conditioned_representation_summary.csv"
 
     @property
+    def learned_model_comparison_table_path(self) -> Path:
+        return self.tables_dir / "learned_model_comparison.csv"
+
+    @property
     def baseline_by_maturity_point_top_table_path(self) -> Path:
         return self.tables_dir / "baseline_by_maturity_point_top.csv"
 
