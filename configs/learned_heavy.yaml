@@ -1,0 +1,9 @@
+extends: default.yaml
+
+transformer:
+  model_dim: 32
+  feedforward_dim: 96
+  epochs: 120
+  learning_rate: 0.0003
+  early_stopping_patience: 20
+  max_train_dates: 1500

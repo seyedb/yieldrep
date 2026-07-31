@@ -294,6 +294,14 @@ def compare_learned_models_command(config: Path = Path("configs/default.yaml")) 
     typer.echo(build_learned_model_comparison(project_config))
 
 
+@app.command("train-learned-models")
+def train_learned_models_command(config: Path = Path("configs/learned_heavy.yaml")) -> None:
+    """Train learned reconstruction models and refresh dependent summaries."""
+    project_config = load_config(config)
+    for output_path in train_learned_model_pipeline(project_config):
+        typer.echo(output_path)
+
+
 @app.command("reconstruction")
 def reconstruction_command(config: Path = Path("configs/default.yaml")) -> None:
     """Evaluate and plot curve reconstruction quality."""
@@ -376,6 +384,26 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_macro_conditioned_representation_summary(project_config))
     output_paths.append(build_cross_market_report(project_config))
     output_paths.extend(plot_cross_market_pca(project_config))
+    return output_paths
+
+
+def train_learned_model_pipeline(project_config: ProjectConfig) -> list[Path]:
+    """Run the explicit learned-model training protocol."""
+    output_paths: list[Path] = []
+    typer.echo("training autoencoder models")
+    output_paths.extend(build_autoencoder(project_config))
+    typer.echo("training maturity Transformer models")
+    output_paths.extend(build_transformer(project_config))
+    typer.echo("evaluating reconstruction")
+    output_paths.extend(evaluate_reconstruction(project_config))
+    output_paths.extend(plot_reconstruction(project_config))
+    typer.echo("refreshing learned-state diagnostics")
+    output_paths.extend(build_learned_state_regime_diagnostics(project_config))
+    output_paths.extend(plot_learned_state_regimes(project_config))
+    typer.echo("refreshing comparison summaries")
+    output_paths.append(build_learned_model_comparison(project_config))
+    output_paths.append(build_representation_comparison(project_config))
+    output_paths.append(build_macro_conditioned_representation_summary(project_config))
     return output_paths
 
 

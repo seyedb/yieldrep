@@ -67,6 +67,9 @@ they are not treated as the same statistical task.
 The macro-conditioned summary reports the same evidence by inflation,
 unemployment, VIX, and MOVE regimes where those regime labels are available.
 
+Heavier learned-model training is kept outside the default pipeline through
+`configs/learned_heavy.yaml` and the `train-learned-models` CLI command.
+
 ## Next Phase
 
 The next phase uses the representation checkpoint for macro-aware evaluation:
@@ -74,3 +77,4 @@ The next phase uses the representation checkpoint for macro-aware evaluation:
 - compare representation behavior across inflation, unemployment, VIX, and MOVE regimes
 - emphasize residual RV and volatility-state questions over average outright forecasts
 - keep representation outputs separated from target-definition tools
+- treat time-series Transformers for next-move prediction as a separate forecasting model

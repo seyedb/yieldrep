@@ -266,3 +266,11 @@ def test_load_config_reads_source_metadata() -> None:
     assert config.evaluation.non_overlapping_targets is True
     assert config.evaluation.lag_days == [1, 5, 20]
     assert config.plots.selected_maturities == [0.25, 1.0, 2.0, 5.0, 10.0, 30.0]
+
+
+def test_load_config_supports_inherited_overrides() -> None:
+    config = load_config(Path("configs/learned_heavy.yaml"))
+
+    assert config.sources["fed_gsw"].country == "US"
+    assert config.transformer.model_dim == 32
+    assert config.transformer.max_train_dates == 1500

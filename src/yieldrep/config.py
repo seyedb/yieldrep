@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
@@ -479,6 +479,28 @@ class ProjectConfig(BaseModel):
 
 
 def load_config(path: Path) -> ProjectConfig:
-    with path.open("r", encoding="utf-8") as handle:
-        payload: Any = yaml.safe_load(handle)
+    payload = _load_config_payload(path)
     return ProjectConfig.model_validate(payload)
+
+
+def _load_config_payload(path: Path) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
+        payload = cast(dict[str, Any], yaml.safe_load(handle))
+
+    base_path = payload.pop("extends", None)
+    if base_path is None:
+        return payload
+
+    inherited = _load_config_payload(path.parent / Path(str(base_path)))
+    return _deep_merge(inherited, payload)
+
+
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in override.items():
+        base_value = merged.get(key)
+        if isinstance(base_value, dict) and isinstance(value, dict):
+            merged[key] = _deep_merge(base_value, value)
+        else:
+            merged[key] = value
+    return merged
