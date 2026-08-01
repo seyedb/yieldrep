@@ -30,6 +30,7 @@ Current evaluation covers:
 | --- | --- |
 | Baseline audit | `reports/tables/baseline_audit.csv` |
 | Scenario-method map | `reports/tables/scenario_method_comparison.csv` |
+| Representation task scorecard | `reports/tables/representation_task_scorecard.csv` |
 | Learned model comparison | `reports/tables/learned_model_comparison.csv` |
 | Representation comparison | `reports/tables/representation_comparison.csv` |
 | Macro-conditioned representation summary | `reports/tables/macro_conditioned_representation_summary.csv` |
@@ -77,9 +78,8 @@ Heavier learned-model training is kept outside the default pipeline through
 
 ## Next Phase
 
-The next phase uses the representation checkpoint for macro-aware evaluation:
+The next phase uses the representation scorecard to choose focused follow-up work:
 
 - compare representation behavior across inflation, unemployment, VIX, and MOVE regimes
 - emphasize residual RV and volatility-state questions over average outright forecasts
 - keep representation outputs separated from target-definition tools
-- treat time-series Transformers for next-move prediction as a separate forecasting model

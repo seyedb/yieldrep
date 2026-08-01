@@ -382,6 +382,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "learned_model_comparison.csv"
 
     @property
+    def representation_task_scorecard_table_path(self) -> Path:
+        return self.tables_dir / "representation_task_scorecard.csv"
+
+    @property
     def baseline_by_maturity_point_top_table_path(self) -> Path:
         return self.tables_dir / "baseline_by_maturity_point_top.csv"
 

@@ -153,6 +153,9 @@ def test_load_config_reads_project_paths() -> None:
     assert config.learned_model_comparison_table_path == Path(
         "reports/tables/learned_model_comparison.csv"
     )
+    assert config.representation_task_scorecard_table_path == Path(
+        "reports/tables/representation_task_scorecard.csv"
+    )
     assert config.overlap_sensitivity_table_path == Path("reports/tables/overlap_sensitivity.csv")
     assert config.benchmark_conclusions_table_path == Path(
         "reports/tables/benchmark_conclusions.csv"
