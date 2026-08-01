@@ -104,6 +104,8 @@ def make_supervised_feature_dataset(
 
     for features, keys in [
         (_read_curve_features(config), ["date", "country"]),
+        (_read_autoencoder_embeddings(config), ["date", "country"]),
+        (_read_transformer_embeddings(config), ["date", "country"]),
         (
             make_lagged_yield_change_features(curves, config.evaluation.lag_days),
             ["date", "country", "maturity_years"],
@@ -149,6 +151,28 @@ def _read_policy_features(config: ProjectConfig) -> pd.DataFrame:
     if not config.policy_features_path.exists():
         return pd.DataFrame()
     return pd.read_parquet(config.policy_features_path)
+
+
+def _read_autoencoder_embeddings(config: ProjectConfig) -> pd.DataFrame:
+    return _read_learned_embeddings(config.autoencoder_dir, "AE")
+
+
+def _read_transformer_embeddings(config: ProjectConfig) -> pd.DataFrame:
+    return _read_learned_embeddings(config.transformer_dir, "TE")
+
+
+def _read_learned_embeddings(model_dir: Path, prefix: str) -> pd.DataFrame:
+    if not model_dir.exists():
+        return pd.DataFrame()
+
+    rows = []
+    for path in sorted(model_dir.glob("*_embeddings.parquet")):
+        frame = pd.read_parquet(path)
+        feature_columns = [column for column in frame.columns if column.startswith(prefix)]
+        if frame.empty or not feature_columns:
+            continue
+        rows.append(frame.loc[:, ["date", "country", *feature_columns]].copy())
+    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
 
 
 def _attach_evaluation_splits(data: pd.DataFrame, config: ProjectConfig) -> pd.DataFrame:
@@ -236,6 +260,19 @@ def _build_target_family(
         carry_roll_targets.to_parquet(carry_roll_path, index=False)
         output_paths.append(carry_roll_path)
 
+    for representation, features in [
+        ("autoencoder", _read_autoencoder_embeddings(config)),
+        ("transformer", _read_transformer_embeddings(config)),
+    ]:
+        if features.empty:
+            continue
+        learned_targets = targets.merge(features, on=["date", "country"], how="inner")
+        if learned_targets.empty:
+            continue
+        learned_path = config.modeling_dir / f"{representation}{suffix}_targets.parquet"
+        learned_targets.to_parquet(learned_path, index=False)
+        output_paths.append(learned_path)
+
     return output_paths
 
 
@@ -249,6 +286,8 @@ def _build_curve_level_target_family(
     for representation, features in [
         ("curve", _read_curve_features(config)),
         ("policy", _read_policy_features(config)),
+        ("autoencoder", _read_autoencoder_embeddings(config)),
+        ("transformer", _read_transformer_embeddings(config)),
     ]:
         if features.empty:
             continue

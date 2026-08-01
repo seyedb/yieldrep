@@ -514,8 +514,12 @@ def volatility_regime_benchmark_summary(summary: pd.DataFrame) -> pd.DataFrame:
         "curve_vol_balanced_accuracy",
         "policy_balanced_accuracy",
         "curve_balanced_accuracy",
+        "autoencoder_balanced_accuracy",
+        "transformer_balanced_accuracy",
         "policy_beats_curve_vol",
         "curve_beats_curve_vol",
+        "autoencoder_beats_curve_vol",
+        "transformer_beats_curve_vol",
     ]
     if summary.empty:
         return pd.DataFrame(columns=columns)
@@ -545,8 +549,18 @@ def volatility_regime_benchmark_summary(summary: pd.DataFrame) -> pd.DataFrame:
                 "curve_vol_balanced_accuracy": curve_vol_score,
                 "policy_balanced_accuracy": scores.get("policy"),
                 "curve_balanced_accuracy": scores.get("curve"),
+                "autoencoder_balanced_accuracy": scores.get("autoencoder"),
+                "transformer_balanced_accuracy": scores.get("transformer"),
                 "policy_beats_curve_vol": _beats_hurdle(scores.get("policy"), curve_vol_score),
                 "curve_beats_curve_vol": _beats_hurdle(scores.get("curve"), curve_vol_score),
+                "autoencoder_beats_curve_vol": _beats_hurdle(
+                    scores.get("autoencoder"),
+                    curve_vol_score,
+                ),
+                "transformer_beats_curve_vol": _beats_hurdle(
+                    scores.get("transformer"),
+                    curve_vol_score,
+                ),
             }
         )
 

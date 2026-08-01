@@ -22,7 +22,7 @@ Current evaluation covers:
 | Outright yield-change forecasting | Results are noisy and remain secondary to RV and regime tasks. |
 | Residual relative value | Evidence is positive but modest at short horizons, with stronger 20-day results in selected markets. |
 | Macro/market RV regimes | High inflation and high MOVE regimes show stronger residual RV mean-reversion in several country/horizon pairs. |
-| Volatility regimes | Realized curve volatility and policy features are the main classification hurdles. |
+| Volatility regimes | Realized curve volatility and policy features remain main hurdles; AE embeddings currently lead CA 20-day classification. |
 
 ## Core Outputs
 
@@ -50,6 +50,11 @@ The autoencoder is the strongest learned reconstruction baseline currently in
 the project. The maturity Transformer has a more appropriate token-based
 architecture; under the current protocol its masked-reconstruction error remains
 above the autoencoder benchmark.
+
+AE and maturity-Transformer embeddings are now evaluated as standalone
+downstream feature sets against the same yield-change, residual-change,
+volatility-change, and curve-volatility-regime targets as the classical
+benchmarks.
 
 The most relevant research direction is now residual relative value under macro
 and market regimes. This is the clearest bridge from classical rates structure

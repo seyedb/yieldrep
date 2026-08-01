@@ -470,6 +470,20 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                     path=config.modeling_dir / f"carry_roll{suffix}_targets.parquet",
                     features=CARRY_ROLL_FEATURES,
                 ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
+                    representation="autoencoder",
+                    path=config.modeling_dir / f"autoencoder{suffix}_targets.parquet",
+                    features=_autoencoder_features(config),
+                ),
+                EvaluationSpec(
+                    target=target,
+                    target_column=target_column,
+                    representation="transformer",
+                    path=config.modeling_dir / f"transformer{suffix}_targets.parquet",
+                    features=_transformer_features(config),
+                ),
             ]
         )
         if target == "residual_change":
@@ -514,8 +528,32 @@ def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
             features=POLICY_FEATURES,
             base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
         ),
+        EvaluationSpec(
+            target="curve_vol_regime",
+            target_column="future_curve_move_rms",
+            representation="autoencoder",
+            path=config.modeling_dir / "autoencoder_curve_vol_regime_targets.parquet",
+            features=_autoencoder_features(config),
+            base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
+        ),
+        EvaluationSpec(
+            target="curve_vol_regime",
+            target_column="future_curve_move_rms",
+            representation="transformer",
+            path=config.modeling_dir / "transformer_curve_vol_regime_targets.parquet",
+            features=_transformer_features(config),
+            base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
+        ),
     ]
     return specs
+
+
+def _autoencoder_features(config: ProjectConfig) -> list[str]:
+    return [f"AE{i}" for i in range(1, config.autoencoder.latent_dim + 1)]
+
+
+def _transformer_features(config: ProjectConfig) -> list[str]:
+    return [f"TE{i}" for i in range(1, config.transformer.latent_dim + 1)]
 
 
 def maturity_bucket(maturity_years: pd.Series) -> pd.Series:

@@ -395,6 +395,8 @@ def _feature_sets(config: ProjectConfig) -> list[FeatureSet]:
                 "roll_down_12m",
             ],
         ),
+        FeatureSet("autoencoder", [f"AE{i}" for i in range(1, config.autoencoder.latent_dim + 1)]),
+        FeatureSet("transformer", [f"TE{i}" for i in range(1, config.transformer.latent_dim + 1)]),
     ]
 
 

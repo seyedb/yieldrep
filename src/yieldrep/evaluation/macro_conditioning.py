@@ -184,6 +184,8 @@ def _volatility_classification_summary(config: ProjectConfig) -> pd.DataFrame:
         "curve_vol": "curve_vol_balanced_accuracy",
         "policy": "policy_balanced_accuracy",
         "curve": "curve_balanced_accuracy",
+        "autoencoder": "autoencoder_balanced_accuracy",
+        "transformer": "transformer_balanced_accuracy",
     }
     for representation, column in metric_map.items():
         if column not in frame.columns:
