@@ -90,6 +90,12 @@ class PlotConfig(BaseModel):
     )
 
 
+class GraphConfig(BaseModel):
+    realized_vol_window: int = 20
+    correlation_min_observations: int = 252
+    correlation_top_k: int = 3
+
+
 class ProjectConfig(BaseModel):
     data_dir: Path
     reports_dir: Path
@@ -104,6 +110,7 @@ class ProjectConfig(BaseModel):
     targets: TargetConfig = Field(default_factory=TargetConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     plots: PlotConfig = Field(default_factory=PlotConfig)
+    graph: GraphConfig = Field(default_factory=GraphConfig)
 
     @property
     def raw_dir(self) -> Path:
@@ -172,6 +179,18 @@ class ProjectConfig(BaseModel):
     @property
     def learned_states_dir(self) -> Path:
         return self.processed_dir / "learned_states"
+
+    @property
+    def graph_dir(self) -> Path:
+        return self.processed_dir / "graph"
+
+    @property
+    def graph_nodes_path(self) -> Path:
+        return self.graph_dir / "maturity_graph_nodes.parquet"
+
+    @property
+    def graph_edges_path(self) -> Path:
+        return self.graph_dir / "maturity_graph_edges.parquet"
 
     @property
     def learned_state_regimes_path(self) -> Path:
@@ -384,10 +403,6 @@ class ProjectConfig(BaseModel):
     @property
     def representation_task_scorecard_table_path(self) -> Path:
         return self.tables_dir / "representation_task_scorecard.csv"
-
-    @property
-    def autoencoder_edge_analysis_table_path(self) -> Path:
-        return self.tables_dir / "autoencoder_edge_analysis.csv"
 
     @property
     def baseline_by_maturity_point_top_table_path(self) -> Path:

@@ -66,6 +66,11 @@ evaluation:
 plots:
   selected_maturities: [0.25, 1.0, 2.0, 5.0, 10.0, 30.0]
 
+graph:
+  realized_vol_window: 20
+  correlation_min_observations: 252
+  correlation_top_k: 3
+
 sources:
   fed_gsw:
     country: US

@@ -191,6 +191,9 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr(cli, "build_transformer", multi_step("build_transformer"))
     monkeypatch.setattr(cli, "build_curve_features", single_step("build_curve_features"))
     monkeypatch.setattr(cli, "build_carry_roll_features", single_step("build_carry_roll_features"))
+    monkeypatch.setattr(
+        cli, "build_maturity_graph_dataset", multi_step("build_maturity_graph_dataset")
+    )
     monkeypatch.setattr(cli, "build_residual_features", single_step("build_residual_features"))
     monkeypatch.setattr(cli, "build_policy_rates", single_step("build_policy_rates"))
     monkeypatch.setattr(cli, "build_policy_features", single_step("build_policy_features"))
@@ -199,12 +202,16 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr(cli, "build_macro_indicators", single_step("build_macro_indicators"))
     monkeypatch.setattr(cli, "build_macro_regimes", single_step("build_macro_regimes"))
     monkeypatch.setattr(cli, "build_targets", single_step("build_targets"))
-    monkeypatch.setattr(cli, "build_standardized_targets", single_step("build_standardized_targets"))
+    monkeypatch.setattr(
+        cli, "build_standardized_targets", single_step("build_standardized_targets")
+    )
     monkeypatch.setattr(cli, "build_residual_targets", single_step("build_residual_targets"))
     monkeypatch.setattr(cli, "build_vol_targets", multi_step("build_vol_targets"))
     monkeypatch.setattr(cli, "build_modeling_datasets", multi_step("build_modeling_datasets"))
     monkeypatch.setattr(cli, "evaluate_baselines", single_step("evaluate_baselines"))
-    monkeypatch.setattr(cli, "evaluate_supervised_forecasts", multi_step("evaluate_supervised_forecasts"))
+    monkeypatch.setattr(
+        cli, "evaluate_supervised_forecasts", multi_step("evaluate_supervised_forecasts")
+    )
     monkeypatch.setattr(cli, "summarize_baselines", multi_step("summarize_baselines"))
     monkeypatch.setattr(cli, "plot_baseline_metrics", multi_step("plot_baseline_metrics"))
     monkeypatch.setattr(
@@ -213,8 +220,12 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         multi_step("build_learned_state_regime_diagnostics"),
     )
     monkeypatch.setattr(cli, "plot_learned_state_regimes", multi_step("plot_learned_state_regimes"))
-    monkeypatch.setattr(cli, "build_learned_model_comparison", single_step("build_learned_model_comparison"))
-    monkeypatch.setattr(cli, "build_representation_comparison", single_step("build_representation_comparison"))
+    monkeypatch.setattr(
+        cli, "build_learned_model_comparison", single_step("build_learned_model_comparison")
+    )
+    monkeypatch.setattr(
+        cli, "build_representation_comparison", single_step("build_representation_comparison")
+    )
     monkeypatch.setattr(
         cli,
         "build_macro_conditioned_representation_summary",
@@ -225,7 +236,6 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_representation_task_scorecard",
         single_step("build_representation_task_scorecard"),
     )
-    monkeypatch.setattr(cli, "build_autoencoder_edge_analysis", single_step("build_autoencoder_edge_analysis"))
     monkeypatch.setattr(cli, "build_cross_market_report", single_step("build_cross_market_report"))
     monkeypatch.setattr(cli, "plot_cross_market_pca", multi_step("plot_cross_market_pca"))
 
@@ -239,6 +249,7 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_transformer",
         "build_curve_features",
         "build_carry_roll_features",
+        "build_maturity_graph_dataset",
         "build_residual_features",
         "build_policy_rates",
         "build_policy_features",
@@ -261,7 +272,6 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_representation_comparison",
         "build_macro_conditioned_representation_summary",
         "build_representation_task_scorecard",
-        "build_autoencoder_edge_analysis",
         "build_cross_market_report",
         "plot_cross_market_pca",
     ]

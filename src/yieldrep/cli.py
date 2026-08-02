@@ -16,7 +16,6 @@ from yieldrep.data.policy_rates import build_policy_rates
 from yieldrep.evaluation.datasets import build_modeling_datasets
 from yieldrep.evaluation.cross_market import build_cross_market_report
 from yieldrep.evaluation.diagnostics import diagnose_lagged_baseline
-from yieldrep.evaluation.edge_analysis import build_autoencoder_edge_analysis
 from yieldrep.evaluation.learned_states import build_learned_state_regime_diagnostics
 from yieldrep.evaluation.learned_models import build_learned_model_comparison
 from yieldrep.evaluation.macro_conditioning import build_macro_conditioned_representation_summary
@@ -40,6 +39,7 @@ from yieldrep.factors.nelson_siegel import build_nelson_siegel
 from yieldrep.factors.pca import build_pca
 from yieldrep.factors.policy import build_policy_features
 from yieldrep.factors.residual import build_residual_features
+from yieldrep.graph.dataset import build_maturity_graph_dataset
 from yieldrep.models.baselines import evaluate_baselines
 from yieldrep.models.autoencoder import build_autoencoder
 from yieldrep.models.forecasting import evaluate_supervised_forecasts
@@ -191,6 +191,14 @@ def build_carry_roll_features_command(config: Path = Path("configs/default.yaml"
     typer.echo(build_carry_roll_features(project_config))
 
 
+@app.command("build-graph-dataset")
+def build_graph_dataset_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Build maturity-graph node and edge parquet datasets."""
+    project_config = load_config(config)
+    for output_path in build_maturity_graph_dataset(project_config):
+        typer.echo(output_path)
+
+
 @app.command("build-residual-features")
 def build_residual_features_command(config: Path = Path("configs/default.yaml")) -> None:
     """Build dynamic Nelson-Siegel residual baseline features."""
@@ -296,13 +304,6 @@ def scorecard_command(config: Path = Path("configs/default.yaml")) -> None:
     typer.echo(build_representation_task_scorecard(project_config))
 
 
-@app.command("ae-edge-analysis")
-def ae_edge_analysis_command(config: Path = Path("configs/default.yaml")) -> None:
-    """Write granular diagnostics for autoencoder-positive scorecard rows."""
-    project_config = load_config(config)
-    typer.echo(build_autoencoder_edge_analysis(project_config))
-
-
 @app.command("compare-learned-models")
 def compare_learned_models_command(config: Path = Path("configs/default.yaml")) -> None:
     """Write AE/Transformer training and reconstruction comparison."""
@@ -374,6 +375,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.extend(build_transformer(project_config))
     output_paths.append(build_curve_features(project_config))
     output_paths.append(build_carry_roll_features(project_config))
+    output_paths.extend(build_maturity_graph_dataset(project_config))
     output_paths.append(build_residual_features(project_config))
     if project_config.policy_rates:
         output_paths.append(build_policy_rates(project_config))
@@ -399,7 +401,6 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_representation_comparison(project_config))
     output_paths.append(build_macro_conditioned_representation_summary(project_config))
     output_paths.append(build_representation_task_scorecard(project_config))
-    output_paths.append(build_autoencoder_edge_analysis(project_config))
     output_paths.append(build_cross_market_report(project_config))
     output_paths.extend(plot_cross_market_pca(project_config))
     return output_paths
@@ -423,7 +424,6 @@ def train_learned_model_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_representation_comparison(project_config))
     output_paths.append(build_macro_conditioned_representation_summary(project_config))
     output_paths.append(build_representation_task_scorecard(project_config))
-    output_paths.append(build_autoencoder_edge_analysis(project_config))
     return output_paths
 
 

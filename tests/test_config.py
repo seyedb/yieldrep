@@ -44,7 +44,9 @@ def test_load_config_reads_project_paths() -> None:
         "data/processed/modeling/supervised_vol_change.parquet"
     )
     assert config.evaluation_dir == Path("data/processed/evaluation")
-    assert config.baseline_metrics_path == Path("data/processed/evaluation/baseline_metrics.parquet")
+    assert config.baseline_metrics_path == Path(
+        "data/processed/evaluation/baseline_metrics.parquet"
+    )
     assert config.baseline_classification_metrics_path == Path(
         "data/processed/evaluation/baseline_classification_metrics.parquet"
     )
@@ -144,6 +146,8 @@ def test_load_config_reads_project_paths() -> None:
     assert config.learned_state_space_figure_path == Path(
         "reports/figures/learned_state_space_regimes.html"
     )
+    assert config.graph_nodes_path == Path("data/processed/graph/maturity_graph_nodes.parquet")
+    assert config.graph_edges_path == Path("data/processed/graph/maturity_graph_edges.parquet")
     assert config.representation_comparison_table_path == Path(
         "reports/tables/representation_comparison.csv"
     )
@@ -155,9 +159,6 @@ def test_load_config_reads_project_paths() -> None:
     )
     assert config.representation_task_scorecard_table_path == Path(
         "reports/tables/representation_task_scorecard.csv"
-    )
-    assert config.autoencoder_edge_analysis_table_path == Path(
-        "reports/tables/autoencoder_edge_analysis.csv"
     )
     assert config.overlap_sensitivity_table_path == Path("reports/tables/overlap_sensitivity.csv")
     assert config.benchmark_conclusions_table_path == Path(

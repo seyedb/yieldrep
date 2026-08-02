@@ -265,6 +265,70 @@ z_t-\bar{z}_g
 
 where \(g\) indexes low, medium, and high regimes.
 
+### Maturity Graph Dataset
+
+For each country \(c\) and date \(t\), the maturity graph is:
+
+```math
+G_t^{(c)}
+=
+\left(
+V_t^{(c)}, E^{(c)}
+\right)
+```
+
+Each node corresponds to one maturity \(m\):
+
+```math
+v_{t,m}^{(c)}
+=
+\left[
+y_t^{(c,m)},
+\Delta y_t^{(c,m)},
+\sigma_t^{(c,m)},
+\mathrm{carry}_t^{(c,m)},
+\mathrm{roll}_t^{(c,m)}
+\right]
+```
+
+where \(\Delta y_t^{(c,m)} = y_t^{(c,m)} - y_{t-1}^{(c,m)}\), and
+\(\sigma_t^{(c,m)}\) is trailing realized volatility of daily yield changes.
+
+The initial edge set links adjacent maturities:
+
+```math
+(m_i, m_j) \in E_{adj}^{(c)}
+\quad
+\mathrm{if}
+\quad
+j=i+1
+```
+
+with distance weight:
+
+```math
+w_{ij}^{dist}
+=
+\frac{1}{1 + |m_i - m_j|}
+```
+
+Correlation edges connect each maturity to its strongest historical
+yield-change peers:
+
+```math
+\rho_{ij}^{(c)}
+=
+\mathrm{corr}
+\left(
+\Delta y^{(c,m_i)},
+\Delta y^{(c,m_j)}
+\right)
+```
+
+These graph datasets are saved as node and edge parquet tables. They define the
+data object for later graph-learning experiments; no GNN model is trained at
+this stage.
+
 ## Targets
 
 ### Yield Change
@@ -548,10 +612,11 @@ Implemented scope:
 - market and macro regime conditioning
 - autoencoder and maturity Transformer reconstruction baselines
 - learned-state regime diagnostics
+- maturity-graph node and edge datasets
 - Plotly figures and CSV scorecards
 
 Planned next phase:
 
 - learned curve-state diagnostics against macro and RV-friendly regimes
 - improved learned-representation training only where diagnostics justify it
-- graph learning after the classical and learned-state protocols are stable
+- graph learning on the maturity-graph dataset

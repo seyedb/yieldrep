@@ -1,0 +1,1 @@
+"""Graph-ready curve datasets."""
