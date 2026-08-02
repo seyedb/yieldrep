@@ -386,6 +386,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "representation_task_scorecard.csv"
 
     @property
+    def autoencoder_edge_analysis_table_path(self) -> Path:
+        return self.tables_dir / "autoencoder_edge_analysis.csv"
+
+    @property
     def baseline_by_maturity_point_top_table_path(self) -> Path:
         return self.tables_dir / "baseline_by_maturity_point_top.csv"
 

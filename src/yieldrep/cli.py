@@ -16,6 +16,7 @@ from yieldrep.data.policy_rates import build_policy_rates
 from yieldrep.evaluation.datasets import build_modeling_datasets
 from yieldrep.evaluation.cross_market import build_cross_market_report
 from yieldrep.evaluation.diagnostics import diagnose_lagged_baseline
+from yieldrep.evaluation.edge_analysis import build_autoencoder_edge_analysis
 from yieldrep.evaluation.learned_states import build_learned_state_regime_diagnostics
 from yieldrep.evaluation.learned_models import build_learned_model_comparison
 from yieldrep.evaluation.macro_conditioning import build_macro_conditioned_representation_summary
@@ -295,6 +296,13 @@ def scorecard_command(config: Path = Path("configs/default.yaml")) -> None:
     typer.echo(build_representation_task_scorecard(project_config))
 
 
+@app.command("ae-edge-analysis")
+def ae_edge_analysis_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Write granular diagnostics for autoencoder-positive scorecard rows."""
+    project_config = load_config(config)
+    typer.echo(build_autoencoder_edge_analysis(project_config))
+
+
 @app.command("compare-learned-models")
 def compare_learned_models_command(config: Path = Path("configs/default.yaml")) -> None:
     """Write AE/Transformer training and reconstruction comparison."""
@@ -391,6 +399,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_representation_comparison(project_config))
     output_paths.append(build_macro_conditioned_representation_summary(project_config))
     output_paths.append(build_representation_task_scorecard(project_config))
+    output_paths.append(build_autoencoder_edge_analysis(project_config))
     output_paths.append(build_cross_market_report(project_config))
     output_paths.extend(plot_cross_market_pca(project_config))
     return output_paths
@@ -414,6 +423,7 @@ def train_learned_model_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_representation_comparison(project_config))
     output_paths.append(build_macro_conditioned_representation_summary(project_config))
     output_paths.append(build_representation_task_scorecard(project_config))
+    output_paths.append(build_autoencoder_edge_analysis(project_config))
     return output_paths
 
 

@@ -225,6 +225,7 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_representation_task_scorecard",
         single_step("build_representation_task_scorecard"),
     )
+    monkeypatch.setattr(cli, "build_autoencoder_edge_analysis", single_step("build_autoencoder_edge_analysis"))
     monkeypatch.setattr(cli, "build_cross_market_report", single_step("build_cross_market_report"))
     monkeypatch.setattr(cli, "plot_cross_market_pca", multi_step("plot_cross_market_pca"))
 
@@ -260,6 +261,7 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_representation_comparison",
         "build_macro_conditioned_representation_summary",
         "build_representation_task_scorecard",
+        "build_autoencoder_edge_analysis",
         "build_cross_market_report",
         "plot_cross_market_pca",
     ]

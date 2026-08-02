@@ -31,6 +31,7 @@ Current evaluation covers:
 | Baseline audit | `reports/tables/baseline_audit.csv` |
 | Scenario-method map | `reports/tables/scenario_method_comparison.csv` |
 | Representation task scorecard | `reports/tables/representation_task_scorecard.csv` |
+| Autoencoder edge analysis | `reports/tables/autoencoder_edge_analysis.csv` |
 | Learned model comparison | `reports/tables/learned_model_comparison.csv` |
 | Representation comparison | `reports/tables/representation_comparison.csv` |
 | Macro-conditioned representation summary | `reports/tables/macro_conditioned_representation_summary.csv` |
@@ -72,6 +73,10 @@ they are not treated as the same statistical task.
 
 The representation task scorecard includes materiality flags to separate
 learned edges from competitive ties and non-material differences.
+
+The autoencoder edge analysis checks AE-positive rows at country, horizon,
+maturity-bucket, and regime levels and labels whether the edge is broad,
+localized, or fragile under the current evaluation protocol.
 
 The macro-conditioned summary reports the same evidence by inflation,
 unemployment, VIX, and MOVE regimes where those regime labels are available.
