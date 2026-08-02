@@ -70,6 +70,9 @@ masked-maturity reconstruction, learned-state regime separation, and direct
 engineered benchmark feature sets. These columns are reported side by side, but
 they are not treated as the same statistical task.
 
+The representation task scorecard includes materiality flags to separate
+learned edges from competitive ties and non-material differences.
+
 The macro-conditioned summary reports the same evidence by inflation,
 unemployment, VIX, and MOVE regimes where those regime labels are available.
 

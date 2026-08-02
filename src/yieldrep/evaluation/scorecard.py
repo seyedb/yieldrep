@@ -9,6 +9,8 @@ from yieldrep.config import ProjectConfig
 
 
 LEARNED_REPRESENTATIONS = {"autoencoder", "transformer"}
+RMSE_MATERIAL_RELATIVE_GAP = 0.005
+CLASSIFICATION_MATERIAL_GAP = 0.02
 SCORECARD_COLUMNS = [
     "scenario",
     "question",
@@ -16,10 +18,17 @@ SCORECARD_COLUMNS = [
     "best_model",
     "primary_metric",
     "best_value",
+    "best_classical_representation",
+    "best_classical_model",
+    "best_classical_value",
     "best_learned_representation",
     "best_learned_model",
     "best_learned_value",
     "best_learned_rank",
+    "learned_gap_to_best",
+    "learned_pct_gap_to_best",
+    "learned_improvement_vs_train_mean",
+    "materiality_flag",
     "evidence_table",
     "interpretation",
 ]
@@ -71,6 +80,16 @@ def _reconstruction_row(config: ProjectConfig, task: str) -> dict[str, object]:
 
     best = data.sort_values(["rmse", "mae", "representation", "n_components"]).iloc[0]
     learned = _best_learned(data, metric="rmse", ascending=True)
+    classical = _best_classical(data, metric="rmse", ascending=True)
+    materiality = _materiality_for_lower_is_better(
+        best_representation=str(best["representation"]),
+        best_value=float(best["rmse"]),
+        learned_value=learned.get("best_learned_value"),
+        classical_value=classical.get("best_classical_value"),
+        train_mean_value=np.nan,
+        learned_rank=learned.get("best_learned_rank"),
+        learned_only=task == "masked_maturity_reconstruction",
+    )
     return {
         **_base_row(
             scenario=task,
@@ -81,10 +100,19 @@ def _reconstruction_row(config: ProjectConfig, task: str) -> dict[str, object]:
         "best_model": f"n_components={int(best['n_components'])}",
         "primary_metric": "rmse",
         "best_value": float(best["rmse"]),
+        **classical,
         **learned,
+        **_learned_gap_columns(
+            best_value=float(best["rmse"]),
+            learned_value=learned.get("best_learned_value"),
+            lower_is_better=True,
+        ),
+        "learned_improvement_vs_train_mean": np.nan,
+        "materiality_flag": materiality,
         "interpretation": _interpret_learned_rank(
             learned.get("best_learned_rank"),
             best_representation=str(best["representation"]),
+            materiality_flag=materiality,
         ),
     }
 
@@ -96,8 +124,9 @@ def _forecast_row(config: ProjectConfig, target: str, scenario: str) -> dict[str
         if not table.exists():
             return _empty_row(scenario, str(table))
 
-    data = pd.read_csv(table)
-    data = data.loc[(data["target"] == target) & (data["model"] != "train_mean")].copy()
+    target_data = pd.read_csv(table)
+    target_data = target_data.loc[target_data["target"] == target].copy()
+    data = target_data.loc[target_data["model"] != "train_mean"].copy()
     if data.empty:
         return _empty_row(scenario, str(table))
 
@@ -112,6 +141,24 @@ def _forecast_row(config: ProjectConfig, target: str, scenario: str) -> dict[str
         ascending=True,
         rank_column="scorecard_rank",
     )
+    classical = _best_classical(data, metric="mean_rmse", ascending=True)
+    train_mean_value = _train_mean_value(
+        target_data,
+        learned.get("best_learned_representation"),
+    )
+    learned_improvement = _learned_improvement_vs_train_mean(
+        learned_value=learned.get("best_learned_value"),
+        train_mean_value=train_mean_value,
+        lower_is_better=True,
+    )
+    materiality = _materiality_for_lower_is_better(
+        best_representation=str(best["representation"]),
+        best_value=float(best["mean_rmse"]),
+        learned_value=learned.get("best_learned_value"),
+        classical_value=classical.get("best_classical_value"),
+        train_mean_value=train_mean_value,
+        learned_rank=learned.get("best_learned_rank"),
+    )
     return {
         **_base_row(
             scenario=scenario,
@@ -122,10 +169,19 @@ def _forecast_row(config: ProjectConfig, target: str, scenario: str) -> dict[str
         "best_model": best["model"],
         "primary_metric": "mean_rmse",
         "best_value": float(best["mean_rmse"]),
+        **classical,
         **learned,
+        **_learned_gap_columns(
+            best_value=float(best["mean_rmse"]),
+            learned_value=learned.get("best_learned_value"),
+            lower_is_better=True,
+        ),
+        "learned_improvement_vs_train_mean": learned_improvement,
+        "materiality_flag": materiality,
         "interpretation": _interpret_learned_rank(
             learned.get("best_learned_rank"),
             best_representation=str(best["representation"]),
+            materiality_flag=materiality,
         ),
     }
 
@@ -152,10 +208,17 @@ def _residual_rv_row(config: ProjectConfig) -> dict[str, object]:
         "best_model": model,
         "primary_metric": "spread_t_stat",
         "best_value": float(best["spread_t_stat"]),
+        "best_classical_representation": representation,
+        "best_classical_model": model,
+        "best_classical_value": float(best["spread_t_stat"]),
         "best_learned_representation": np.nan,
         "best_learned_model": np.nan,
         "best_learned_value": np.nan,
         "best_learned_rank": np.nan,
+        "learned_gap_to_best": np.nan,
+        "learned_pct_gap_to_best": np.nan,
+        "learned_improvement_vs_train_mean": np.nan,
+        "materiality_flag": "no_learned_comparison",
         "interpretation": str(best["takeaway"]),
     }
 
@@ -179,6 +242,15 @@ def _volatility_regime_row(config: ProjectConfig) -> dict[str, object]:
             if not selected.empty:
                 learned_scores.append((representation_name, selected.iloc[0]))
     learned = _best_learned_classification(learned_scores)
+    classical = _best_classical_classification(data)
+    materiality = _materiality_for_higher_is_better(
+        best_representation=representation,
+        best_value=float(best["best_balanced_accuracy"]),
+        learned_value=learned.get("best_learned_value"),
+        classical_value=classical.get("best_classical_value"),
+        learned_rank=learned.get("best_learned_rank"),
+        material_gap=CLASSIFICATION_MATERIAL_GAP,
+    )
     return {
         **_base_row(
             scenario="volatility_regime_classification",
@@ -189,10 +261,19 @@ def _volatility_regime_row(config: ProjectConfig) -> dict[str, object]:
         "best_model": model,
         "primary_metric": "balanced_accuracy",
         "best_value": float(best["best_balanced_accuracy"]),
+        **classical,
         **learned,
+        **_learned_gap_columns(
+            best_value=float(best["best_balanced_accuracy"]),
+            learned_value=learned.get("best_learned_value"),
+            lower_is_better=False,
+        ),
+        "learned_improvement_vs_train_mean": np.nan,
+        "materiality_flag": materiality,
         "interpretation": _interpret_learned_rank(
             learned.get("best_learned_rank"),
             best_representation=representation,
+            materiality_flag=materiality,
         ),
     }
 
@@ -218,10 +299,17 @@ def _macro_regime_rv_row(config: ProjectConfig) -> dict[str, object]:
         "best_model": f"{best['regime_type']}:{best['indicator']}",
         "primary_metric": "abs_high_minus_low_hit_rate",
         "best_value": float(best["abs_hit_rate_gap"]),
+        "best_classical_representation": "nelson_siegel_residual",
+        "best_classical_model": f"{best['regime_type']}:{best['indicator']}",
+        "best_classical_value": float(best["abs_hit_rate_gap"]),
         "best_learned_representation": np.nan,
         "best_learned_model": np.nan,
         "best_learned_value": np.nan,
         "best_learned_rank": np.nan,
+        "learned_gap_to_best": np.nan,
+        "learned_pct_gap_to_best": np.nan,
+        "learned_improvement_vs_train_mean": np.nan,
+        "materiality_flag": "no_learned_comparison",
         "interpretation": str(best["interpretation"]),
     }
 
@@ -246,10 +334,17 @@ def _learned_state_row(config: ProjectConfig) -> dict[str, object]:
         "best_model": f"{best['country']} {best['regime_type']}:{best['indicator']}",
         "primary_metric": "separation_ratio",
         "best_value": float(best["separation_ratio"]),
+        "best_classical_representation": np.nan,
+        "best_classical_model": np.nan,
+        "best_classical_value": np.nan,
         "best_learned_representation": best["representation"],
         "best_learned_model": f"{best['country']} {best['regime_type']}:{best['indicator']}",
         "best_learned_value": float(best["separation_ratio"]),
         "best_learned_rank": 1.0,
+        "learned_gap_to_best": 0.0,
+        "learned_pct_gap_to_best": 0.0,
+        "learned_improvement_vs_train_mean": np.nan,
+        "materiality_flag": "diagnostic_only",
         "interpretation": "Learned-state diagnostic; not a forecasting result.",
     }
 
@@ -276,6 +371,54 @@ def _best_learned(
         "best_learned_value": float(best[metric]),
         "best_learned_rank": float(best[rank_column]) if rank_column in best.index else np.nan,
     }
+
+
+def _best_classical(data: pd.DataFrame, metric: str, ascending: bool) -> dict[str, object]:
+    classical = data.loc[~data["representation"].isin(LEARNED_REPRESENTATIONS)].copy()
+    classical = classical.loc[classical["model"] != "train_mean"] if "model" in classical else classical
+    if classical.empty:
+        return _empty_classical()
+
+    sort_columns = [metric, "representation"]
+    sort_order = [ascending, True]
+    if "model" in classical.columns:
+        sort_columns.append("model")
+        sort_order.append(True)
+    best = classical.sort_values(sort_columns, ascending=sort_order).iloc[0]
+    return {
+        "best_classical_representation": best["representation"],
+        "best_classical_model": best["model"] if "model" in classical.columns else np.nan,
+        "best_classical_value": float(best[metric]),
+    }
+
+
+def _best_classical_classification(data: pd.DataFrame) -> dict[str, object]:
+    classical_columns = {
+        "curve_vol": "curve_vol_balanced_accuracy",
+        "policy": "policy_balanced_accuracy",
+        "curve": "curve_balanced_accuracy",
+    }
+    rows = []
+    for representation, column in classical_columns.items():
+        if column not in data.columns:
+            continue
+        selected = data.dropna(subset=[column]).sort_values(column, ascending=False)
+        if selected.empty:
+            continue
+        rows.append(
+            {
+                "best_classical_representation": representation,
+                "best_classical_model": "logistic_l2",
+                "best_classical_value": float(selected.iloc[0][column]),
+            }
+        )
+    if not rows:
+        return _empty_classical()
+    return sorted(
+        rows,
+        key=lambda row: float(str(row["best_classical_value"])),
+        reverse=True,
+    )[0]
 
 
 def _best_learned_classification(
@@ -327,7 +470,126 @@ def _empty_learned() -> dict[str, object]:
     }
 
 
-def _interpret_learned_rank(rank: object, best_representation: str) -> str:
+def _empty_classical() -> dict[str, object]:
+    return {
+        "best_classical_representation": np.nan,
+        "best_classical_model": np.nan,
+        "best_classical_value": np.nan,
+    }
+
+
+def _learned_gap_columns(
+    best_value: float,
+    learned_value: object,
+    lower_is_better: bool,
+) -> dict[str, float]:
+    if pd.isna(learned_value):
+        return {"learned_gap_to_best": np.nan, "learned_pct_gap_to_best": np.nan}
+
+    learned_float = float(str(learned_value))
+    gap = learned_float - best_value if lower_is_better else best_value - learned_float
+    pct_gap = gap / abs(best_value) if best_value != 0.0 else np.nan
+    return {"learned_gap_to_best": gap, "learned_pct_gap_to_best": pct_gap}
+
+
+def _train_mean_value(data: pd.DataFrame, learned_representation: object) -> float:
+    train_mean = data.loc[data["model"] == "train_mean"].copy()
+    if train_mean.empty:
+        return np.nan
+
+    if not pd.isna(learned_representation):
+        matched = train_mean.loc[train_mean["representation"] == learned_representation]
+        if not matched.empty:
+            return float(matched.sort_values("mean_rmse").iloc[0]["mean_rmse"])
+    return float(train_mean.sort_values("mean_rmse").iloc[0]["mean_rmse"])
+
+
+def _learned_improvement_vs_train_mean(
+    learned_value: object,
+    train_mean_value: float,
+    lower_is_better: bool,
+) -> float:
+    if pd.isna(learned_value) or pd.isna(train_mean_value):
+        return np.nan
+
+    learned_float = float(str(learned_value))
+    return train_mean_value - learned_float if lower_is_better else learned_float - train_mean_value
+
+
+def _materiality_for_lower_is_better(
+    best_representation: str,
+    best_value: float,
+    learned_value: object,
+    classical_value: object,
+    train_mean_value: object,
+    learned_rank: object,
+    learned_only: bool = False,
+) -> str:
+    if pd.isna(learned_value):
+        return "no_learned_comparison"
+    if learned_only and best_representation in LEARNED_REPRESENTATIONS:
+        return "material_learned_edge"
+
+    learned_float = float(str(learned_value))
+    if best_representation in LEARNED_REPRESENTATIONS:
+        if not pd.isna(train_mean_value):
+            improvement = float(str(train_mean_value)) - learned_float
+            relative_improvement = improvement / abs(float(str(train_mean_value)))
+            if relative_improvement < RMSE_MATERIAL_RELATIVE_GAP:
+                return "competitive_tie"
+        if not pd.isna(classical_value):
+            classical_float = float(str(classical_value))
+            improvement = classical_float - learned_float
+            relative_improvement = improvement / abs(classical_float)
+            if relative_improvement >= RMSE_MATERIAL_RELATIVE_GAP:
+                return "material_learned_edge"
+        return "competitive_tie"
+
+    if pd.isna(learned_rank):
+        return "not_material"
+    gap = learned_float - best_value
+    pct_gap = gap / abs(best_value) if best_value != 0.0 else np.nan
+    if pct_gap <= RMSE_MATERIAL_RELATIVE_GAP and float(str(learned_rank)) <= 3.0:
+        return "competitive_tie"
+    return "not_material"
+
+
+def _materiality_for_higher_is_better(
+    best_representation: str,
+    best_value: float,
+    learned_value: object,
+    classical_value: object,
+    learned_rank: object,
+    material_gap: float,
+) -> str:
+    if pd.isna(learned_value):
+        return "no_learned_comparison"
+
+    learned_float = float(str(learned_value))
+    if best_representation in LEARNED_REPRESENTATIONS:
+        if not pd.isna(classical_value):
+            if learned_float - float(str(classical_value)) >= material_gap:
+                return "material_learned_edge"
+        return "competitive_tie"
+
+    if pd.isna(learned_rank):
+        return "not_material"
+    if best_value - learned_float <= material_gap and float(str(learned_rank)) <= 3.0:
+        return "competitive_tie"
+    return "not_material"
+
+
+def _interpret_learned_rank(
+    rank: object,
+    best_representation: str,
+    materiality_flag: str,
+) -> str:
+    if materiality_flag == "material_learned_edge":
+        return "A learned representation has a material edge in this scenario."
+    if materiality_flag == "competitive_tie":
+        return "A learned representation is competitive, but the edge is small or tied."
+    if materiality_flag == "not_material":
+        return "Classical or engineered baselines remain stronger in this scenario."
     if best_representation in LEARNED_REPRESENTATIONS:
         return "A learned representation is the current best method for this scenario."
     if pd.isna(rank):
