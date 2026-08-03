@@ -20,6 +20,7 @@ def test_load_config_reads_project_paths() -> None:
     assert config.nelson_siegel_dir == Path("data/processed/nelson_siegel")
     assert config.autoencoder_dir == Path("data/processed/autoencoder")
     assert config.transformer_dir == Path("data/processed/transformer")
+    assert config.gnn_dir == Path("data/processed/gnn")
     assert config.learned_states_dir == Path("data/processed/learned_states")
     assert config.learned_state_regimes_path == Path(
         "data/processed/learned_states/regime_states.parquet"

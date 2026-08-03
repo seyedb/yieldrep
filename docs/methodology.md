@@ -14,6 +14,7 @@ learned curve representations:
 - engineered curve-shape, carry, roll-down, policy, and volatility features
 - denoising autoencoder embeddings
 - maturity-aware Transformer embeddings
+- maturity-graph autoencoder embeddings
 
 Representations are evaluated within task-specific protocols. Each model is
 assessed against the task it is designed to solve.
@@ -326,8 +327,39 @@ yield-change peers:
 ```
 
 These graph datasets are saved as node and edge parquet tables. They define the
-data object for later graph-learning experiments; no GNN model is trained at
-this stage.
+data object for graph-learning experiments.
+
+The first graph model uses this same maturity graph for masked maturity
+reconstruction. Given node-feature matrix \(H_t^{(0)}\), a graph convolution
+layer is:
+
+```math
+H_t^{(\ell+1)}
+=
+\phi
+\left(
+\tilde{A}^{(c)}
+H_t^{(\ell)}
+W^{(\ell)}
+\right)
+```
+
+where \(\tilde{A}^{(c)}\) is the row-normalized maturity adjacency matrix with
+self-loops, distance edges, and correlation edges. The decoder predicts each
+masked maturity yield from its graph-updated node state:
+
+```math
+\hat{y}_t^{(c,m)}
+=
+q_\theta
+\left(
+h_{t,m}^{(L)}
+\right)
+```
+
+The model is evaluated only on masked reconstruction at this stage. Its inputs
+are observed curve-derived node features, not PCA, Nelson-Siegel, autoencoder,
+or Transformer outputs.
 
 ## Targets
 
@@ -434,7 +466,7 @@ forecast targets use non-overlapping test windows by default.
 | Task | Valid methods | Primary metrics |
 | --- | --- | --- |
 | Clean reconstruction | PCA, Nelson-Siegel, autoencoder, Transformer | RMSE, MAE |
-| Masked maturity reconstruction | masked autoencoder, maturity Transformer | masked RMSE, masked MAE |
+| Masked maturity reconstruction | masked autoencoder, maturity Transformer, maturity-graph autoencoder | masked RMSE, masked MAE |
 | Residual relative value | Nelson-Siegel residual diagnostics, maturity-aware curve features | spread score, hit rate, rank IC |
 | Outright yield forecasting | lagged moves, curve-shape features, carry/roll-down proxies | RMSE, MAE |
 | Volatility-regime classification | curve-shape, policy-rate, realized-volatility features | balanced accuracy, macro F1 |
@@ -613,6 +645,7 @@ Implemented scope:
 - autoencoder and maturity Transformer reconstruction baselines
 - learned-state regime diagnostics
 - maturity-graph node and edge datasets
+- maturity-graph autoencoder masked reconstruction baseline
 - Plotly figures and CSV scorecards
 
 Planned next phase:

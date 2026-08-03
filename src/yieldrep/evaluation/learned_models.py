@@ -35,7 +35,7 @@ COMPARISON_COLUMNS = [
 
 
 def build_learned_model_comparison(config: ProjectConfig) -> Path:
-    """Write a compact AE/Transformer training and reconstruction comparison."""
+    """Write a compact learned-model training and reconstruction comparison."""
     config.tables_dir.mkdir(parents=True, exist_ok=True)
     table = learned_model_comparison_table(config)
     table.to_csv(config.learned_model_comparison_table_path, index=False)
@@ -49,6 +49,11 @@ def learned_model_comparison_table(config: ProjectConfig) -> pd.DataFrame:
             "transformer",
             config.transformer_dir,
             max_train_dates=config.transformer.max_train_dates,
+        ),
+        _model_rows(
+            "graph_autoencoder",
+            config.gnn_dir,
+            max_train_dates=config.gnn.max_train_dates,
         ),
     ]
     non_empty = [row for row in rows if not row.empty]
@@ -100,9 +105,7 @@ def _metric_values(metrics: pd.DataFrame) -> dict[str, object]:
     row: dict[str, object] = {}
     for scope in ["clean", "masked"]:
         for split in ["validation", "test"]:
-            selected = metrics.loc[
-                (metrics["metric_scope"] == scope) & (metrics["split"] == split)
-            ]
+            selected = metrics.loc[(metrics["metric_scope"] == scope) & (metrics["split"] == split)]
             if selected.empty:
                 row[f"{scope}_{split}_rmse"] = np.nan
                 row[f"{scope}_{split}_mae"] = np.nan

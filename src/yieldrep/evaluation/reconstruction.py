@@ -10,6 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from yieldrep.config import ProjectConfig
 from yieldrep.factors.curve import curve_panel
 from yieldrep.models.autoencoder import autoencoder_reconstruction_errors
+from yieldrep.models.gnn import gnn_reconstruction_errors
 from yieldrep.models.transformer import transformer_reconstruction_errors
 
 
@@ -23,7 +24,10 @@ def evaluate_reconstruction(config: ProjectConfig) -> list[Path]:
     """Evaluate how well classical representations reconstruct observed curves."""
     curves = pd.read_parquet(config.curves_path)
 
-    rows = [_pca_reconstruction_errors(curves, config), _nelson_siegel_reconstruction_errors(config)]
+    rows = [
+        _pca_reconstruction_errors(curves, config),
+        _nelson_siegel_reconstruction_errors(config),
+    ]
     errors = pd.concat([row for row in rows if not row.empty], ignore_index=True)
     oos_errors = _out_of_sample_reconstruction_errors(curves, config)
 
@@ -84,7 +88,9 @@ def _pca_reconstruction_errors(curves: pd.DataFrame, config: ProjectConfig) -> p
     return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
 
 
-def _out_of_sample_reconstruction_errors(curves: pd.DataFrame, config: ProjectConfig) -> pd.DataFrame:
+def _out_of_sample_reconstruction_errors(
+    curves: pd.DataFrame, config: ProjectConfig
+) -> pd.DataFrame:
     rows: list[pd.DataFrame] = []
     test_dates_by_country: dict[str, set[pd.Timestamp]] = {}
     for country in sorted(curves["country"].dropna().unique()):
@@ -127,6 +133,9 @@ def _out_of_sample_reconstruction_errors(curves: pd.DataFrame, config: ProjectCo
     transformer = transformer_reconstruction_errors(config)
     if not transformer.empty:
         rows.append(_format_errors(transformer))
+    gnn = gnn_reconstruction_errors(config)
+    if not gnn.empty:
+        rows.append(_format_errors(gnn))
 
     return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
 
@@ -193,7 +202,9 @@ def _fit_pca_oos_reconstructions(
                 representation="pca",
                 n_components=n_components,
                 actual=test_panel,
-                fitted=pd.DataFrame(reconstructed, index=test_panel.index, columns=test_panel.columns),
+                fitted=pd.DataFrame(
+                    reconstructed, index=test_panel.index, columns=test_panel.columns
+                ),
             )
         )
     return rows
@@ -301,7 +312,9 @@ def _summarize_reconstruction(errors: pd.DataFrame, group_columns: list[str]) ->
         .reset_index()
     )
     summary["rmse"] = np.sqrt(summary["mse"])
-    return summary.drop(columns=["mse"]).sort_values([*group_columns, "rmse"]).reset_index(drop=True)
+    return (
+        summary.drop(columns=["mse"]).sort_values([*group_columns, "rmse"]).reset_index(drop=True)
+    )
 
 
 def _oos_comparison_table(oos_summary: pd.DataFrame) -> pd.DataFrame:
@@ -324,22 +337,26 @@ def _oos_comparison_table(oos_summary: pd.DataFrame) -> pd.DataFrame:
         ["reconstruction_task", "country"],
         sort=False,
     )["rmse"].rank(method="min")
-    best = comparison.groupby(["reconstruction_task", "country"], sort=False)["rmse"].transform("min")
+    best = comparison.groupby(["reconstruction_task", "country"], sort=False)["rmse"].transform(
+        "min"
+    )
     comparison["rmse_gap_to_best"] = comparison["rmse"] - best
     comparison["pct_rmse_gap_to_best"] = np.where(
         best > 0.0,
         comparison["rmse_gap_to_best"] / best,
         np.nan,
     )
-    return comparison.loc[:, columns].sort_values(
-        ["reconstruction_task", "country", "rmse_rank", "representation", "n_components"]
-    ).reset_index(drop=True)
+    return (
+        comparison.loc[:, columns]
+        .sort_values(
+            ["reconstruction_task", "country", "rmse_rank", "representation", "n_components"]
+        )
+        .reset_index(drop=True)
+    )
 
 
 def _masked_reconstruction_summary(summary: pd.DataFrame) -> pd.DataFrame:
-    masked = summary.loc[
-        summary["reconstruction_task"] == "masked_maturity_reconstruction"
-    ].copy()
+    masked = summary.loc[summary["reconstruction_task"] == "masked_maturity_reconstruction"].copy()
     return masked.drop(columns=["reconstruction_task"], errors="ignore").reset_index(drop=True)
 
 
@@ -364,9 +381,11 @@ def _masked_reconstruction_hardest_maturities(masked_by_maturity: pd.DataFrame) 
     ranked["hardness_rank"] = ranked.groupby(["country", "representation"], sort=False)[
         "rmse"
     ].rank(method="first", ascending=False)
-    return ranked.loc[ranked["hardness_rank"] <= WORST_MATURITIES_PER_GROUP, columns].sort_values(
-        ["country", "representation", "hardness_rank"]
-    ).reset_index(drop=True)
+    return (
+        ranked.loc[ranked["hardness_rank"] <= WORST_MATURITIES_PER_GROUP, columns]
+        .sort_values(["country", "representation", "hardness_rank"])
+        .reset_index(drop=True)
+    )
 
 
 def _worst_maturity_diagnostics(by_maturity: pd.DataFrame) -> pd.DataFrame:

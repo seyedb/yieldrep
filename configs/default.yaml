@@ -47,6 +47,24 @@ transformer:
   min_train_dates: 252
   max_train_dates: 500
 
+gnn:
+  latent_dim: 5
+  hidden_dim: 64
+  n_layers: 2
+  dropout: 0.05
+  epochs: 80
+  batch_size: 1024
+  learning_rate: 0.001
+  weight_decay: 0.00001
+  validation_fraction: 0.2
+  mask_probability: 0.15
+  clean_loss_weight: 1.0
+  early_stopping_patience: 10
+  min_delta: 0.00001
+  random_seed: 42
+  min_train_dates: 252
+  max_train_dates: 1500
+
 targets:
   horizons_days: [1, 5, 20]
 

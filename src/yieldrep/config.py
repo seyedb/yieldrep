@@ -96,6 +96,25 @@ class GraphConfig(BaseModel):
     correlation_top_k: int = 3
 
 
+class GNNConfig(BaseModel):
+    latent_dim: int = 5
+    hidden_dim: int = 64
+    n_layers: int = 2
+    dropout: float = 0.05
+    epochs: int = 80
+    batch_size: int = 1024
+    learning_rate: float = 0.001
+    weight_decay: float = 1e-5
+    validation_fraction: float = 0.2
+    mask_probability: float = 0.15
+    clean_loss_weight: float = 1.0
+    early_stopping_patience: int = 10
+    min_delta: float = 1e-5
+    random_seed: int = 42
+    min_train_dates: int = 252
+    max_train_dates: int | None = 1500
+
+
 class ProjectConfig(BaseModel):
     data_dir: Path
     reports_dir: Path
@@ -111,6 +130,7 @@ class ProjectConfig(BaseModel):
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     plots: PlotConfig = Field(default_factory=PlotConfig)
     graph: GraphConfig = Field(default_factory=GraphConfig)
+    gnn: GNNConfig = Field(default_factory=GNNConfig)
 
     @property
     def raw_dir(self) -> Path:
@@ -175,6 +195,10 @@ class ProjectConfig(BaseModel):
     @property
     def transformer_dir(self) -> Path:
         return self.processed_dir / "transformer"
+
+    @property
+    def gnn_dir(self) -> Path:
+        return self.processed_dir / "gnn"
 
     @property
     def learned_states_dir(self) -> Path:

@@ -43,6 +43,7 @@ from yieldrep.graph.dataset import build_maturity_graph_dataset
 from yieldrep.models.baselines import evaluate_baselines
 from yieldrep.models.autoencoder import build_autoencoder
 from yieldrep.models.forecasting import evaluate_supervised_forecasts
+from yieldrep.models.gnn import build_gnn
 from yieldrep.models.transformer import build_transformer
 from yieldrep.visualization.plotly_baselines import plot_baseline_metrics
 from yieldrep.visualization.plotly_cross_market import plot_cross_market_pca
@@ -221,6 +222,14 @@ def build_transformer_command(config: Path = Path("configs/default.yaml")) -> No
         typer.echo(output_path)
 
 
+@app.command("build-gnn")
+def build_gnn_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Build maturity-graph autoencoder reconstruction outputs."""
+    project_config = load_config(config)
+    for output_path in build_gnn(project_config):
+        typer.echo(output_path)
+
+
 @app.command("run-baselines")
 def run_baselines_command(config: Path = Path("configs/default.yaml")) -> None:
     """Run the full classical baseline research pipeline."""
@@ -327,6 +336,10 @@ def reconstruction_command(config: Path = Path("configs/default.yaml")) -> None:
         typer.echo(output_path)
     for output_path in build_transformer(project_config):
         typer.echo(output_path)
+    for output_path in build_maturity_graph_dataset(project_config):
+        typer.echo(output_path)
+    for output_path in build_gnn(project_config):
+        typer.echo(output_path)
     for output_path in evaluate_reconstruction(project_config):
         typer.echo(output_path)
     for output_path in plot_reconstruction(project_config):
@@ -376,6 +389,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_curve_features(project_config))
     output_paths.append(build_carry_roll_features(project_config))
     output_paths.extend(build_maturity_graph_dataset(project_config))
+    output_paths.extend(build_gnn(project_config))
     output_paths.append(build_residual_features(project_config))
     if project_config.policy_rates:
         output_paths.append(build_policy_rates(project_config))
@@ -413,6 +427,9 @@ def train_learned_model_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.extend(build_autoencoder(project_config))
     typer.echo("training maturity Transformer models")
     output_paths.extend(build_transformer(project_config))
+    typer.echo("training maturity graph autoencoder models")
+    output_paths.extend(build_maturity_graph_dataset(project_config))
+    output_paths.extend(build_gnn(project_config))
     typer.echo("evaluating reconstruction")
     output_paths.extend(evaluate_reconstruction(project_config))
     output_paths.extend(plot_reconstruction(project_config))

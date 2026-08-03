@@ -7,7 +7,7 @@ Current evaluation covers:
 - US, Canada, and euro-area zero-coupon yield curves
 - PCA and Nelson-Siegel curve representations
 - engineered curve-shape, lagged, carry, roll-down, residual, policy, volatility, and macro features
-- denoising autoencoder and maturity Transformer reconstruction baselines
+- denoising autoencoder, maturity Transformer, and maturity-graph reconstruction baselines
 - maturity-graph node and edge datasets
 - residual relative-value diagnostics
 - market and macro regime conditioning
@@ -19,7 +19,7 @@ Current evaluation covers:
 | Scenario | Current result |
 | --- | --- |
 | Clean curve reconstruction | PCA-5 is the strongest benchmark across US, Canada, and euro-area curves. |
-| Masked maturity reconstruction | The masked autoencoder is stronger than the current maturity Transformer. |
+| Masked maturity reconstruction | The maturity-graph autoencoder leads US and euro-area masked reconstruction; the MLP autoencoder remains stronger for Canada. |
 | Outright yield-change forecasting | Results are noisy and remain secondary to RV and regime tasks. |
 | Residual relative value | Evidence is positive but modest at short horizons, with stronger 20-day results in selected markets. |
 | Macro/market RV regimes | High inflation and high MOVE regimes show stronger residual RV mean-reversion in several country/horizon pairs. |
