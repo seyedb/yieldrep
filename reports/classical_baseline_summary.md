@@ -23,7 +23,7 @@ Current evaluation covers:
 | Outright yield-change forecasting | Results are noisy and remain secondary to RV and regime tasks. |
 | Residual relative value | Evidence is positive but modest at short horizons, with stronger 20-day results in selected markets. |
 | Macro/market RV regimes | High inflation and high MOVE regimes show stronger residual RV mean-reversion in several country/horizon pairs. |
-| Volatility regimes | Realized curve volatility and policy features remain main hurdles; AE embeddings currently lead CA 20-day classification. |
+| Volatility regimes | Realized curve volatility and policy features remain main hurdles; AE leads CA 20-day classification and graph AE leads US 1-day classification. |
 
 ## Core Outputs
 

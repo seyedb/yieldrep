@@ -161,6 +161,10 @@ def _read_transformer_embeddings(config: ProjectConfig) -> pd.DataFrame:
     return _read_learned_embeddings(config.transformer_dir, "TE")
 
 
+def _read_graph_autoencoder_embeddings(config: ProjectConfig) -> pd.DataFrame:
+    return _read_learned_embeddings(config.gnn_dir, "GE")
+
+
 def _read_learned_embeddings(model_dir: Path, prefix: str) -> pd.DataFrame:
     if not model_dir.exists():
         return pd.DataFrame()
@@ -288,6 +292,7 @@ def _build_curve_level_target_family(
         ("policy", _read_policy_features(config)),
         ("autoencoder", _read_autoencoder_embeddings(config)),
         ("transformer", _read_transformer_embeddings(config)),
+        ("graph_autoencoder", _read_graph_autoencoder_embeddings(config)),
     ]:
         if features.empty:
             continue

@@ -289,7 +289,13 @@ def overlap_sensitivity_table(
         report["non_overlapping_rank"] - report["overlapping_rank"]
     )
     return report.sort_values(
-        [*RANK_GROUP_COLUMNS, "non_overlapping_rank", "overlapping_rank", "representation", "model"],
+        [
+            *RANK_GROUP_COLUMNS,
+            "non_overlapping_rank",
+            "overlapping_rank",
+            "representation",
+            "model",
+        ],
         na_position="last",
     ).reset_index(drop=True)
 
@@ -370,11 +376,7 @@ def summarize_metrics(
     if "rank_ic_dates" in metrics.columns:
         aggregations["rank_ic_dates"] = ("rank_ic_dates", "sum")
 
-    summary = (
-        metrics.groupby(groups, sort=True)
-        .agg(**aggregations)
-        .reset_index()
-    )
+    summary = metrics.groupby(groups, sort=True).agg(**aggregations).reset_index()
     return summary.sort_values([*groups, "mean_rmse"]).reset_index(drop=True)
 
 
@@ -516,10 +518,12 @@ def volatility_regime_benchmark_summary(summary: pd.DataFrame) -> pd.DataFrame:
         "curve_balanced_accuracy",
         "autoencoder_balanced_accuracy",
         "transformer_balanced_accuracy",
+        "graph_autoencoder_balanced_accuracy",
         "policy_beats_curve_vol",
         "curve_beats_curve_vol",
         "autoencoder_beats_curve_vol",
         "transformer_beats_curve_vol",
+        "graph_autoencoder_beats_curve_vol",
     ]
     if summary.empty:
         return pd.DataFrame(columns=columns)
@@ -551,6 +555,7 @@ def volatility_regime_benchmark_summary(summary: pd.DataFrame) -> pd.DataFrame:
                 "curve_balanced_accuracy": scores.get("curve"),
                 "autoencoder_balanced_accuracy": scores.get("autoencoder"),
                 "transformer_balanced_accuracy": scores.get("transformer"),
+                "graph_autoencoder_balanced_accuracy": scores.get("graph_autoencoder"),
                 "policy_beats_curve_vol": _beats_hurdle(scores.get("policy"), curve_vol_score),
                 "curve_beats_curve_vol": _beats_hurdle(scores.get("curve"), curve_vol_score),
                 "autoencoder_beats_curve_vol": _beats_hurdle(
@@ -559,6 +564,10 @@ def volatility_regime_benchmark_summary(summary: pd.DataFrame) -> pd.DataFrame:
                 ),
                 "transformer_beats_curve_vol": _beats_hurdle(
                     scores.get("transformer"),
+                    curve_vol_score,
+                ),
+                "graph_autoencoder_beats_curve_vol": _beats_hurdle(
+                    scores.get("graph_autoencoder"),
                     curve_vol_score,
                 ),
             }
@@ -588,7 +597,10 @@ def ae_classical_factor_correlation_summary(config: ProjectConfig) -> pd.DataFra
     for country, ae_frame in ae_frames.items():
         classical_frames = [
             ("curve", _read_country_factor_frame(config.curve_features_path, country=country)),
-            ("pca", _read_country_factor_frame(config.pca_dir / f"{country.lower()}_scores.parquet")),
+            (
+                "pca",
+                _read_country_factor_frame(config.pca_dir / f"{country.lower()}_scores.parquet"),
+            ),
             (
                 "nelson_siegel",
                 _read_country_factor_frame(
@@ -609,9 +621,9 @@ def ae_classical_factor_correlation_summary(config: ProjectConfig) -> pd.DataFra
         method="min",
         ascending=False,
     )
-    summary["family_match_rank"] = summary.groupby(
-        ["country", "ae_feature", "classical_family"]
-    )["abs_correlation"].rank(
+    summary["family_match_rank"] = summary.groupby(["country", "ae_feature", "classical_family"])[
+        "abs_correlation"
+    ].rank(
         method="min",
         ascending=False,
     )
@@ -863,9 +875,10 @@ def _residual_rv_conclusion(benchmark: pd.DataFrame) -> dict[str, object]:
 
     spread_winner = _mode_label(benchmark["best_by_spread"])
     rank_ic_winner = _mode_label(benchmark["best_by_rank_ic"])
-    learned_best = benchmark["best_by_spread"].astype(str).str.contains("autoencoder").any() or benchmark[
-        "best_by_rank_ic"
-    ].astype(str).str.contains("autoencoder").any()
+    learned_best = (
+        benchmark["best_by_spread"].astype(str).str.contains("autoencoder").any()
+        or benchmark["best_by_rank_ic"].astype(str).str.contains("autoencoder").any()
+    )
     return _conclusion_row(
         research_question="residual_relative_value",
         current_best_baseline=f"spread={spread_winner}; rank_ic={rank_ic_winner}",
@@ -1071,7 +1084,9 @@ def residual_relative_value_benchmark_summary(
     key_frame = pd.concat(
         [
             spread_summary.loc[:, keys] if not spread_summary.empty else pd.DataFrame(columns=keys),
-            rank_ic_summary.loc[:, keys] if not rank_ic_summary.empty else pd.DataFrame(columns=keys),
+            rank_ic_summary.loc[:, keys]
+            if not rank_ic_summary.empty
+            else pd.DataFrame(columns=keys),
         ],
         ignore_index=True,
     ).drop_duplicates()
@@ -1134,11 +1149,7 @@ def residual_relative_value_overview(
         if column not in overview.columns:
             overview[column] = pd.NA
     overview["evidence_label"] = overview.apply(_residual_rv_evidence_label, axis=1)
-    return (
-        overview.loc[:, columns]
-        .sort_values(["country", "horizon_days"])
-        .reset_index(drop=True)
-    )
+    return overview.loc[:, columns].sort_values(["country", "horizon_days"]).reset_index(drop=True)
 
 
 def residual_relative_value_scorecard(overview: pd.DataFrame) -> pd.DataFrame:
@@ -1176,8 +1187,7 @@ def residual_relative_value_scorecard(overview: pd.DataFrame) -> pd.DataFrame:
 
 def _mean_reversion_overview(mean_reversion: pd.DataFrame) -> pd.DataFrame:
     focused = mean_reversion.loc[
-        (mean_reversion["sample"] == "abs_z_ge_1")
-        & (mean_reversion["signal"] == "residual_z_252")
+        (mean_reversion["sample"] == "abs_z_ge_1") & (mean_reversion["signal"] == "residual_z_252")
     ].copy()
     if focused.empty:
         return pd.DataFrame(

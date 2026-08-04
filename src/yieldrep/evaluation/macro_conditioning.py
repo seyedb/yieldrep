@@ -42,19 +42,24 @@ def macro_conditioned_representation_summary(config: ProjectConfig) -> pd.DataFr
     non_empty = [row for row in rows if not row.empty]
     if not non_empty:
         return pd.DataFrame(columns=SUMMARY_COLUMNS)
-    return pd.concat(non_empty, ignore_index=True).loc[:, SUMMARY_COLUMNS].sort_values(
-        [
-            "evidence_type",
-            "country",
-            "representation",
-            "regime_type",
-            "indicator",
-            "horizon_days",
-            "regime",
-            "metric",
-        ],
-        na_position="last",
-    ).reset_index(drop=True)
+    return (
+        pd.concat(non_empty, ignore_index=True)
+        .loc[:, SUMMARY_COLUMNS]
+        .sort_values(
+            [
+                "evidence_type",
+                "country",
+                "representation",
+                "regime_type",
+                "indicator",
+                "horizon_days",
+                "regime",
+                "metric",
+            ],
+            na_position="last",
+        )
+        .reset_index(drop=True)
+    )
 
 
 def _reconstruction_by_regime(config: ProjectConfig) -> pd.DataFrame:
@@ -121,14 +126,20 @@ def _keep_best_reconstruction_specs(errors: pd.DataFrame, config: ProjectConfig)
         return errors
 
     comparison = pd.read_csv(config.reconstruction_oos_comparison_table_path)
-    best = comparison.sort_values(
-        ["reconstruction_task", "country", "representation", "rmse", "n_components"]
-    ).groupby(["reconstruction_task", "country", "representation"], as_index=False).first()
+    best = (
+        comparison.sort_values(
+            ["reconstruction_task", "country", "representation", "rmse", "n_components"]
+        )
+        .groupby(["reconstruction_task", "country", "representation"], as_index=False)
+        .first()
+    )
     keys = best.loc[
         :,
         ["reconstruction_task", "country", "representation", "n_components"],
     ]
-    return errors.merge(keys, on=["reconstruction_task", "country", "representation", "n_components"])
+    return errors.merge(
+        keys, on=["reconstruction_task", "country", "representation", "n_components"]
+    )
 
 
 def _residual_rv_by_regime(config: ProjectConfig) -> pd.DataFrame:
@@ -186,6 +197,7 @@ def _volatility_classification_summary(config: ProjectConfig) -> pd.DataFrame:
         "curve": "curve_balanced_accuracy",
         "autoencoder": "autoencoder_balanced_accuracy",
         "transformer": "transformer_balanced_accuracy",
+        "graph_autoencoder": "graph_autoencoder_balanced_accuracy",
     }
     for representation, column in metric_map.items():
         if column not in frame.columns:

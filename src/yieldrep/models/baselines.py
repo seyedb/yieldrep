@@ -544,6 +544,14 @@ def _classification_specs(config: ProjectConfig) -> list[EvaluationSpec]:
             features=_transformer_features(config),
             base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
         ),
+        EvaluationSpec(
+            target="curve_vol_regime",
+            target_column="future_curve_move_rms",
+            representation="graph_autoencoder",
+            path=config.modeling_dir / "graph_autoencoder_curve_vol_regime_targets.parquet",
+            features=_graph_autoencoder_features(config),
+            base_columns=tuple(CURVE_LEVEL_EVALUATION_COLUMNS),
+        ),
     ]
     return specs
 
@@ -554,6 +562,10 @@ def _autoencoder_features(config: ProjectConfig) -> list[str]:
 
 def _transformer_features(config: ProjectConfig) -> list[str]:
     return [f"TE{i}" for i in range(1, config.transformer.latent_dim + 1)]
+
+
+def _graph_autoencoder_features(config: ProjectConfig) -> list[str]:
+    return [f"GE{i}" for i in range(1, config.gnn.latent_dim + 1)]
 
 
 def maturity_bucket(maturity_years: pd.Series) -> pd.Series:
@@ -889,7 +901,9 @@ def _classification_metrics(
     support = confusion.sum(axis=1)
     predicted = confusion.sum(axis=0)
     diagonal = np.diag(confusion)
-    recall = np.divide(diagonal, support, out=np.zeros_like(diagonal, dtype=float), where=support > 0)
+    recall = np.divide(
+        diagonal, support, out=np.zeros_like(diagonal, dtype=float), where=support > 0
+    )
     precision = np.divide(
         diagonal,
         predicted,
