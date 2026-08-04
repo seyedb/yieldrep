@@ -23,6 +23,7 @@ RANK_GROUP_COLUMNS = ["target", "country", "horizon_days"]
 class FeatureSet:
     representation: str
     columns: list[str]
+    target_names: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -125,6 +126,8 @@ def supervised_forecast_frames_from_data(
     for target_spec in target_specs:
         data = target_spec.data
         for feature_set in feature_sets:
+            if not _feature_set_applies(feature_set, target_spec.target):
+                continue
             columns = [column for column in feature_set.columns if column in data.columns]
             if not columns:
                 continue
@@ -211,6 +214,8 @@ def supervised_forecast_frames_from_unsplit_data(
     for target_spec in target_specs:
         data = target_spec.data
         for feature_set in feature_sets:
+            if not _feature_set_applies(feature_set, target_spec.target):
+                continue
             columns = [column for column in feature_set.columns if column in data.columns]
             if not columns:
                 continue
@@ -397,7 +402,27 @@ def _feature_sets(config: ProjectConfig) -> list[FeatureSet]:
         ),
         FeatureSet("autoencoder", [f"AE{i}" for i in range(1, config.autoencoder.latent_dim + 1)]),
         FeatureSet("transformer", [f"TE{i}" for i in range(1, config.transformer.latent_dim + 1)]),
+        FeatureSet(
+            "graph_autoencoder",
+            _graph_autoencoder_residual_features(config),
+            target_names=("residual_change",),
+        ),
     ]
+
+
+def _graph_autoencoder_residual_features(config: ProjectConfig) -> list[str]:
+    graph_features = [f"GE{i}" for i in range(1, config.gnn.latent_dim + 1)]
+    maturity_features = ["maturity", "maturity_squared", "log_maturity"]
+    interaction_features = [
+        f"{graph_feature}_x_{maturity_feature}"
+        for graph_feature in graph_features
+        for maturity_feature in maturity_features
+    ]
+    return [*graph_features, *maturity_features, *interaction_features]
+
+
+def _feature_set_applies(feature_set: FeatureSet, target_name: str) -> bool:
+    return feature_set.target_names is None or target_name in feature_set.target_names
 
 
 def feature_sets(config: ProjectConfig) -> list[FeatureSet]:
@@ -501,7 +526,9 @@ def _metric_rows(
         train_dates=train_dates,
         test_dates=test_dates,
     )
-    return [{**common, **_error_metrics(result.model, y_true, result.y_pred)} for result in predictions]
+    return [
+        {**common, **_error_metrics(result.model, y_true, result.y_pred)} for result in predictions
+    ]
 
 
 def _bucket_metric_rows(

@@ -78,6 +78,13 @@ def make_supervised_residual_change_dataset(
 ) -> pd.DataFrame:
     """Build the canonical supervised panel for residual-change forecasting."""
     dataset = make_supervised_feature_dataset(config, targets, curves)
+    graph_embeddings = _read_graph_autoencoder_embeddings(config)
+    if not graph_embeddings.empty:
+        dataset = _merge_features(dataset, graph_embeddings, ["date", "country"])
+        dataset = _add_state_maturity_features(
+            dataset,
+            _graph_autoencoder_feature_columns(config),
+        )
     dataset = _attach_evaluation_splits(dataset, config)
     return _sort_supervised_dataset(dataset)
 
@@ -163,6 +170,10 @@ def _read_transformer_embeddings(config: ProjectConfig) -> pd.DataFrame:
 
 def _read_graph_autoencoder_embeddings(config: ProjectConfig) -> pd.DataFrame:
     return _read_learned_embeddings(config.gnn_dir, "GE")
+
+
+def _graph_autoencoder_feature_columns(config: ProjectConfig) -> list[str]:
+    return [f"GE{i}" for i in range(1, config.gnn.latent_dim + 1)]
 
 
 def _read_learned_embeddings(model_dir: Path, prefix: str) -> pd.DataFrame:
@@ -264,15 +275,26 @@ def _build_target_family(
         carry_roll_targets.to_parquet(carry_roll_path, index=False)
         output_paths.append(carry_roll_path)
 
-    for representation, features in [
+    learned_feature_sets = [
         ("autoencoder", _read_autoencoder_embeddings(config)),
         ("transformer", _read_transformer_embeddings(config)),
-    ]:
+    ]
+    if suffix == "_residual":
+        learned_feature_sets.append(
+            ("graph_autoencoder", _read_graph_autoencoder_embeddings(config))
+        )
+
+    for representation, features in learned_feature_sets:
         if features.empty:
             continue
         learned_targets = targets.merge(features, on=["date", "country"], how="inner")
         if learned_targets.empty:
             continue
+        if representation == "graph_autoencoder":
+            learned_targets = _add_state_maturity_features(
+                learned_targets,
+                _graph_autoencoder_feature_columns(config),
+            )
         learned_path = config.modeling_dir / f"{representation}{suffix}_targets.parquet"
         learned_targets.to_parquet(learned_path, index=False)
         output_paths.append(learned_path)

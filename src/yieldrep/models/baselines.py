@@ -497,6 +497,14 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                         features=_state_maturity_features(CURVE_FEATURES),
                         required_features=tuple(MATURITY_BASIS_FEATURES),
                     ),
+                    EvaluationSpec(
+                        target=target,
+                        target_column=target_column,
+                        representation="graph_autoencoder",
+                        path=config.modeling_dir / f"graph_autoencoder{suffix}_targets.parquet",
+                        features=_state_maturity_features(_graph_autoencoder_features(config)),
+                        required_features=tuple(MATURITY_BASIS_FEATURES),
+                    ),
                 ]
             )
     return specs
