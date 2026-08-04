@@ -465,7 +465,7 @@ forecast targets use non-overlapping test windows by default.
 
 | Task | Valid methods | Primary metrics |
 | --- | --- | --- |
-| Clean reconstruction | PCA, Nelson-Siegel, autoencoder, Transformer | RMSE, MAE |
+| Clean reconstruction | PCA, Nelson-Siegel, autoencoder, Transformer, maturity-graph autoencoder | RMSE, MAE |
 | Masked maturity reconstruction | masked autoencoder, maturity Transformer, maturity-graph autoencoder | masked RMSE, masked MAE |
 | Residual relative value | Nelson-Siegel residual diagnostics, maturity-aware curve features | spread score, hit rate, rank IC |
 | Outright yield forecasting | lagged moves, curve-shape features, carry/roll-down proxies | RMSE, MAE |
@@ -642,10 +642,9 @@ Implemented scope:
 - engineered curve, carry, roll-down, residual, policy, volatility, and macro features
 - residual RV diagnostics
 - market and macro regime conditioning
-- autoencoder and maturity Transformer reconstruction baselines
+- autoencoder, maturity Transformer, and maturity-graph autoencoder reconstruction baselines
 - learned-state regime diagnostics
 - maturity-graph node and edge datasets
-- maturity-graph autoencoder masked reconstruction baseline
 - Plotly figures and CSV scorecards
 
 Planned next phase:

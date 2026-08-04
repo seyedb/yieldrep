@@ -51,10 +51,10 @@ Classical curve representations remain strong reconstruction benchmarks. PCA is
 the main clean-reconstruction hurdle, while Nelson-Siegel residuals provide the
 relative-value object.
 
-The autoencoder is the strongest learned reconstruction baseline currently in
-the project. The maturity Transformer has a more appropriate token-based
-architecture; under the current protocol its masked-reconstruction error remains
-above the autoencoder benchmark.
+The autoencoder and graph autoencoder are the strongest learned reconstruction
+baselines currently in the project. The graph model leads masked reconstruction
+for US and euro-area curves, while the MLP autoencoder remains stronger for
+Canada. The current maturity Transformer remains weaker under this protocol.
 
 AE and maturity-Transformer embeddings are now evaluated as standalone
 downstream feature sets against the same yield-change, residual-change,

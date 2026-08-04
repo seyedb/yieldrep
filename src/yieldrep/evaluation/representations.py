@@ -48,9 +48,11 @@ def representation_comparison_table(config: ProjectConfig) -> pd.DataFrame:
     comparison = _attach_masked_reconstruction(comparison, config)
     comparison = _attach_pca_variance(comparison, config)
     comparison = _attach_regime_separation(comparison, config)
-    return comparison.loc[:, COMPARISON_COLUMNS].sort_values(
-        ["country", "representation_family", "representation"]
-    ).reset_index(drop=True)
+    return (
+        comparison.loc[:, COMPARISON_COLUMNS]
+        .sort_values(["country", "representation_family", "representation"])
+        .reset_index(drop=True)
+    )
 
 
 def _reconstruction_rows(config: ProjectConfig) -> pd.DataFrame:
@@ -213,10 +215,14 @@ def _attach_regime_separation(comparison: pd.DataFrame, config: ProjectConfig) -
     if regimes.empty:
         return comparison
 
-    best = regimes.sort_values(
-        ["country", "representation", "separation_ratio"],
-        ascending=[True, True, False],
-    ).groupby(["country", "representation"], as_index=False).first()
+    best = (
+        regimes.sort_values(
+            ["country", "representation", "separation_ratio"],
+            ascending=[True, True, False],
+        )
+        .groupby(["country", "representation"], as_index=False)
+        .first()
+    )
     best = best.loc[
         :,
         ["country", "representation", "regime_type", "indicator", "separation_ratio"],
@@ -242,7 +248,7 @@ def _representation_family(representation: str) -> str:
         return "linear_factor"
     if representation == "nelson_siegel":
         return "parametric_curve"
-    if representation in {"autoencoder", "transformer"}:
+    if representation in {"autoencoder", "transformer", "graph_autoencoder"}:
         return "learned_reconstruction"
     return "other"
 

@@ -8,7 +8,7 @@ import pandas as pd
 from yieldrep.config import ProjectConfig
 
 
-LEARNED_REPRESENTATIONS = {"autoencoder", "transformer"}
+LEARNED_REPRESENTATIONS = {"autoencoder", "transformer", "graph_autoencoder"}
 RMSE_MATERIAL_RELATIVE_GAP = 0.005
 CLASSIFICATION_MATERIAL_GAP = 0.02
 SCORECARD_COLUMNS = [
@@ -375,7 +375,9 @@ def _best_learned(
 
 def _best_classical(data: pd.DataFrame, metric: str, ascending: bool) -> dict[str, object]:
     classical = data.loc[~data["representation"].isin(LEARNED_REPRESENTATIONS)].copy()
-    classical = classical.loc[classical["model"] != "train_mean"] if "model" in classical else classical
+    classical = (
+        classical.loc[classical["model"] != "train_mean"] if "model" in classical else classical
+    )
     if classical.empty:
         return _empty_classical()
 
