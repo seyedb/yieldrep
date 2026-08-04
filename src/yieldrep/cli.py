@@ -17,7 +17,10 @@ from yieldrep.evaluation.datasets import build_modeling_datasets
 from yieldrep.evaluation.cross_market import build_cross_market_report
 from yieldrep.evaluation.diagnostics import diagnose_lagged_baseline
 from yieldrep.evaluation.learned_states import build_learned_state_regime_diagnostics
-from yieldrep.evaluation.learned_models import build_learned_model_comparison
+from yieldrep.evaluation.learned_models import (
+    build_learned_model_comparison,
+    build_learned_reconstruction_leaderboard,
+)
 from yieldrep.evaluation.macro_conditioning import build_macro_conditioned_representation_summary
 from yieldrep.evaluation.reports import (
     build_overlap_sensitivity_report,
@@ -315,9 +318,10 @@ def scorecard_command(config: Path = Path("configs/default.yaml")) -> None:
 
 @app.command("compare-learned-models")
 def compare_learned_models_command(config: Path = Path("configs/default.yaml")) -> None:
-    """Write AE/Transformer training and reconstruction comparison."""
+    """Write learned-model reconstruction comparison tables."""
     project_config = load_config(config)
     typer.echo(build_learned_model_comparison(project_config))
+    typer.echo(build_learned_reconstruction_leaderboard(project_config))
 
 
 @app.command("train-learned-models")
@@ -412,6 +416,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.extend(build_learned_state_regime_diagnostics(project_config))
     output_paths.extend(plot_learned_state_regimes(project_config))
     output_paths.append(build_learned_model_comparison(project_config))
+    output_paths.append(build_learned_reconstruction_leaderboard(project_config))
     output_paths.append(build_representation_comparison(project_config))
     output_paths.append(build_macro_conditioned_representation_summary(project_config))
     output_paths.append(build_representation_task_scorecard(project_config))
@@ -438,6 +443,7 @@ def train_learned_model_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.extend(plot_learned_state_regimes(project_config))
     typer.echo("refreshing comparison summaries")
     output_paths.append(build_learned_model_comparison(project_config))
+    output_paths.append(build_learned_reconstruction_leaderboard(project_config))
     output_paths.append(build_representation_comparison(project_config))
     output_paths.append(build_macro_conditioned_representation_summary(project_config))
     output_paths.append(build_representation_task_scorecard(project_config))

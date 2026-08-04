@@ -425,6 +425,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "learned_model_comparison.csv"
 
     @property
+    def learned_reconstruction_leaderboard_table_path(self) -> Path:
+        return self.tables_dir / "learned_reconstruction_leaderboard.csv"
+
+    @property
     def representation_task_scorecard_table_path(self) -> Path:
         return self.tables_dir / "representation_task_scorecard.csv"
 

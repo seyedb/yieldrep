@@ -33,6 +33,7 @@ Current evaluation covers:
 | Scenario-method map | `reports/tables/scenario_method_comparison.csv` |
 | Representation task scorecard | `reports/tables/representation_task_scorecard.csv` |
 | Learned model comparison | `reports/tables/learned_model_comparison.csv` |
+| Learned reconstruction leaderboard | `reports/tables/learned_reconstruction_leaderboard.csv` |
 | Representation comparison | `reports/tables/representation_comparison.csv` |
 | Maturity graph nodes | `data/processed/graph/maturity_graph_nodes.parquet` |
 | Maturity graph edges | `data/processed/graph/maturity_graph_edges.parquet` |

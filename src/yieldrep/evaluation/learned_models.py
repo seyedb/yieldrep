@@ -33,6 +33,28 @@ COMPARISON_COLUMNS = [
     "training_protocol",
 ]
 
+LEARNED_RECONSTRUCTION_REPRESENTATIONS = {
+    "autoencoder",
+    "transformer",
+    "graph_autoencoder",
+    "masked_autoencoder",
+    "masked_transformer",
+    "masked_graph_autoencoder",
+}
+
+LEADERBOARD_COLUMNS = [
+    "country",
+    "best_clean_model",
+    "best_clean_rmse",
+    "best_masked_model",
+    "best_masked_rmse",
+    "autoencoder_masked_rmse",
+    "graph_autoencoder_masked_rmse",
+    "transformer_masked_rmse",
+    "graph_beats_autoencoder",
+    "graph_beats_transformer",
+]
+
 
 def build_learned_model_comparison(config: ProjectConfig) -> Path:
     """Write a compact learned-model training and reconstruction comparison."""
@@ -40,6 +62,14 @@ def build_learned_model_comparison(config: ProjectConfig) -> Path:
     table = learned_model_comparison_table(config)
     table.to_csv(config.learned_model_comparison_table_path, index=False)
     return config.learned_model_comparison_table_path
+
+
+def build_learned_reconstruction_leaderboard(config: ProjectConfig) -> Path:
+    """Write one-row-per-country learned reconstruction winners from existing metrics."""
+    config.tables_dir.mkdir(parents=True, exist_ok=True)
+    table = learned_reconstruction_leaderboard(config)
+    table.to_csv(config.learned_reconstruction_leaderboard_table_path, index=False)
+    return config.learned_reconstruction_leaderboard_table_path
 
 
 def learned_model_comparison_table(config: ProjectConfig) -> pd.DataFrame:
@@ -158,3 +188,66 @@ def _fit_train_dates(train_split_dates: int, max_train_dates: int | None) -> int
     if max_train_dates is None:
         return train_split_dates
     return min(train_split_dates, max_train_dates)
+
+
+def learned_reconstruction_leaderboard(config: ProjectConfig) -> pd.DataFrame:
+    if not config.reconstruction_oos_comparison_table_path.exists():
+        return pd.DataFrame(columns=LEADERBOARD_COLUMNS)
+
+    comparison = pd.read_csv(config.reconstruction_oos_comparison_table_path)
+    learned = comparison.loc[
+        comparison["representation"].isin(LEARNED_RECONSTRUCTION_REPRESENTATIONS)
+    ].copy()
+    if learned.empty:
+        return pd.DataFrame(columns=LEADERBOARD_COLUMNS)
+
+    rows = [
+        _country_leaderboard_row(country, group) for country, group in learned.groupby("country")
+    ]
+    return (
+        pd.DataFrame(rows, columns=LEADERBOARD_COLUMNS)
+        .sort_values("country")
+        .reset_index(drop=True)
+    )
+
+
+def _country_leaderboard_row(country: str, group: pd.DataFrame) -> dict[str, object]:
+    clean = group.loc[group["reconstruction_task"] == "clean_reconstruction"].copy()
+    masked = group.loc[group["reconstruction_task"] == "masked_maturity_reconstruction"].copy()
+    best_clean = _best_row(clean)
+    best_masked = _best_row(masked)
+    ae_masked_rmse = _masked_rmse(masked, "masked_autoencoder")
+    graph_masked_rmse = _masked_rmse(masked, "masked_graph_autoencoder")
+    transformer_masked_rmse = _masked_rmse(masked, "masked_transformer")
+    return {
+        "country": country,
+        "best_clean_model": best_clean.get("representation", ""),
+        "best_clean_rmse": best_clean.get("rmse", np.nan),
+        "best_masked_model": best_masked.get("representation", ""),
+        "best_masked_rmse": best_masked.get("rmse", np.nan),
+        "autoencoder_masked_rmse": ae_masked_rmse,
+        "graph_autoencoder_masked_rmse": graph_masked_rmse,
+        "transformer_masked_rmse": transformer_masked_rmse,
+        "graph_beats_autoencoder": _strictly_less(graph_masked_rmse, ae_masked_rmse),
+        "graph_beats_transformer": _strictly_less(graph_masked_rmse, transformer_masked_rmse),
+    }
+
+
+def _best_row(frame: pd.DataFrame) -> dict[str, object]:
+    if frame.empty:
+        return {}
+    row = frame.sort_values(["rmse", "mae", "representation"]).iloc[0]
+    return {"representation": row["representation"], "rmse": float(row["rmse"])}
+
+
+def _masked_rmse(masked: pd.DataFrame, representation: str) -> float:
+    selected = masked.loc[masked["representation"] == representation]
+    if selected.empty:
+        return float("nan")
+    return float(selected.sort_values(["rmse", "mae"]).iloc[0]["rmse"])
+
+
+def _strictly_less(left: float, right: float) -> bool:
+    if np.isnan(left) or np.isnan(right):
+        return False
+    return left < right

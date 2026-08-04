@@ -225,6 +225,11 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         cli, "build_learned_model_comparison", single_step("build_learned_model_comparison")
     )
     monkeypatch.setattr(
+        cli,
+        "build_learned_reconstruction_leaderboard",
+        single_step("build_learned_reconstruction_leaderboard"),
+    )
+    monkeypatch.setattr(
         cli, "build_representation_comparison", single_step("build_representation_comparison")
     )
     monkeypatch.setattr(
@@ -271,6 +276,7 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_learned_state_regime_diagnostics",
         "plot_learned_state_regimes",
         "build_learned_model_comparison",
+        "build_learned_reconstruction_leaderboard",
         "build_representation_comparison",
         "build_macro_conditioned_representation_summary",
         "build_representation_task_scorecard",
