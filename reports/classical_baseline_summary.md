@@ -65,9 +65,9 @@ The most relevant research direction is now residual relative value under macro
 and market regimes. This is the clearest bridge from classical rates structure
 to learned curve-state analysis.
 
-Initial learned-state diagnostics compare AE and Transformer latent states across
-macro and market regimes. The strongest current separations appear in Canada
-unemployment regimes and selected inflation/MOVE regimes.
+Learned-state diagnostics compare AE, Transformer, and graph-AE latent states
+across macro and market regimes. The strongest current separations appear in
+Canada unemployment regimes and selected inflation/MOVE regimes.
 
 The representation comparison table consolidates reconstruction quality,
 masked-maturity reconstruction, learned-state regime separation, and direct

@@ -131,6 +131,7 @@ def _read_learned_state_embeddings(config: ProjectConfig) -> pd.DataFrame:
     frames = [
         _read_embedding_dir(config.autoencoder_dir, "autoencoder", "AE"),
         _read_embedding_dir(config.transformer_dir, "transformer", "TE"),
+        _read_embedding_dir(config.gnn_dir, "graph_autoencoder", "GE"),
     ]
     non_empty = [frame for frame in frames if not frame.empty]
     return pd.concat(non_empty, ignore_index=True) if non_empty else pd.DataFrame()
@@ -218,7 +219,7 @@ def _latent_columns(frame: pd.DataFrame) -> list[str]:
     return [
         column
         for column in frame.columns
-        if column.startswith("AE") or column.startswith("TE")
+        if column.startswith("AE") or column.startswith("TE") or column.startswith("GE")
         if not frame[column].isna().all()
     ]
 

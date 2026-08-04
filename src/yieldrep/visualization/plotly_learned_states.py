@@ -94,7 +94,7 @@ def _state_space_frame(regimes: pd.DataFrame) -> pd.DataFrame:
         features = [
             column
             for column in group.columns
-            if column.startswith("AE") or column.startswith("TE")
+            if column.startswith("AE") or column.startswith("TE") or column.startswith("GE")
         ]
         if len(features) < 2:
             continue
