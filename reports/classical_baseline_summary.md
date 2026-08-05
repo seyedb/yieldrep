@@ -34,6 +34,7 @@ Current evaluation covers:
 | Representation task scorecard | `reports/tables/representation_task_scorecard.csv` |
 | Learned model comparison | `reports/tables/learned_model_comparison.csv` |
 | Learned reconstruction leaderboard | `reports/tables/learned_reconstruction_leaderboard.csv` |
+| Learned model findings | `reports/tables/learned_model_findings.csv` |
 | Representation comparison | `reports/tables/representation_comparison.csv` |
 | Maturity graph nodes | `data/processed/graph/maturity_graph_nodes.parquet` |
 | Maturity graph edges | `data/processed/graph/maturity_graph_edges.parquet` |
