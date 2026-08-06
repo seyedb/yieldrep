@@ -649,6 +649,8 @@ Implemented scope:
 
 Planned next phase:
 
-- learned curve-state diagnostics against macro and RV-friendly regimes
-- improved learned-representation training only where diagnostics justify it
-- graph learning on the maturity-graph dataset
+- consolidate graph-aware masked reconstruction as the main self-supervised task
+- evaluate learned states against residual RV and volatility-regime tasks without
+  using one model's outputs as another model's inputs or targets
+- keep macro and market conditioning focused on interpretable regimes such as
+  inflation, unemployment, VIX, and MOVE
