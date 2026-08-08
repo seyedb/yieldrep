@@ -17,26 +17,29 @@ The current task set is:
 | Macro and market regime conditioning | economic state dependence |
 | Curve-volatility regime classification | state-classification benchmark |
 
-## Current Evidence
+## Current Findings
 
-| Question | Current evidence |
+| Finding | Evidence |
 | --- | --- |
-| Clean reconstruction | PCA-5 remains the strongest benchmark. |
-| Masked maturity reconstruction | The maturity-graph autoencoder leads US and euro-area curves; the first edge ablation favors adjacent-only edges over adjacent+correlation edges in US and euro-area curves. |
-| Residual relative value | Raw Nelson-Siegel residuals remain the strongest overall RV feature, while graph-AE states show learned edges in selected EA/US 5-day and 20-day regime cells. |
-| Volatility regimes | Realized curve-volatility and policy features remain strong reference baselines; learned models are competitive only in selected cells. |
-| Learned state diagnostics | Transformer and graph-AE states separate some macro/market regimes, with the clearest current separation in Canada unemployment regimes. |
+| PCA remains the clean-reconstruction benchmark. | PCA-5 is the strongest clean reconstruction model; the adjacent-edge graph AE is the strongest learned clean reconstructor but ranks behind PCA. |
+| Masked maturity reconstruction is the strongest self-supervised result. | The adjacent-edge graph AE leads US and euro-area masked reconstruction; the MLP autoencoder leads Canada. |
+| Simple maturity adjacency is the preferred graph structure. | The edge ablation favors adjacent-only edges over adjacent+correlation edges in US and euro-area curves; correlation edges only slightly improve Canada. |
+| Nelson-Siegel residuals remain the main RV anchor. | In regime-conditioned residual RV, residual/ridge is best in 41 valid cells, graph_autoencoder/ridge in 29, and carry_roll/ridge in 24. |
+| Graph-AE states have conditional RV value, not a universal edge. | Learned representations beat classical features in 29 of 94 valid regime cells, with the strongest learned edge in EA 20-day medium-inflation residual RV. |
+| Volatility-regime evidence is secondary. | Realized curve-volatility and policy features remain strong reference baselines; learned models are competitive only in selected cells. |
 
 ## Main Interpretation
 
-The strongest result so far is not outright yield-change prediction. It is the
-masked maturity reconstruction task, where graph-aware structure provides a
-natural and testable advantage over plain curve-vector models.
+The strongest result so far is masked maturity reconstruction, not outright
+yield-change prediction. This is consistent with the project goal: learned
+representations should first show that they capture curve structure before being
+used in noisier forecasting tasks.
 
 PCA remains the clean-reconstruction benchmark. Nelson-Siegel remains the
-relative-value reference because it defines interpretable curve residuals.
-Learned models are therefore most useful at this stage as alternative curve-state
-representations, not as replacements for classical term-structure objects.
+relative-value reference because it defines interpretable curve residuals. The
+adjacent-edge graph AE is therefore best interpreted as a conditional curve-state
+representation: useful in selected reconstruction and residual-RV regimes, but
+not a replacement for classical term-structure objects.
 
 ## Core Outputs
 
