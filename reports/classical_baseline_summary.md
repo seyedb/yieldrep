@@ -23,7 +23,7 @@ The current task set is:
 | --- | --- |
 | Clean reconstruction | PCA-5 remains the strongest benchmark. |
 | Masked maturity reconstruction | The maturity-graph autoencoder leads US and euro-area curves; the first edge ablation favors adjacent-only edges over adjacent+correlation edges in US and euro-area curves. |
-| Residual relative value | Signal is more visible at 20-day horizons than at daily horizons, especially in selected macro/market regimes. |
+| Residual relative value | Raw Nelson-Siegel residuals remain the strongest overall RV feature, while graph-AE states show learned edges in selected EA/US 5-day and 20-day regime cells. |
 | Volatility regimes | Realized curve-volatility and policy features remain strong reference baselines; learned models are competitive only in selected cells. |
 | Learned state diagnostics | Transformer and graph-AE states separate some macro/market regimes, with the clearest current separation in Canada unemployment regimes. |
 
@@ -50,6 +50,7 @@ representations, not as replacements for classical term-structure objects.
 | Reconstruction comparison | `reports/tables/reconstruction_oos_comparison.csv` |
 | Residual RV scorecard | `reports/tables/residual_relative_value_scorecard.csv` |
 | RV regime scorecard | `reports/tables/residual_rv_regime_scorecard.csv` |
+| Representation RV regime scorecard | `reports/tables/residual_rv_representation_regime_scorecard.csv` |
 | Learned-state regime summary | `reports/tables/learned_state_regime_summary.csv` |
 | Maturity graph nodes | `data/processed/graph/maturity_graph_nodes.parquet` |
 | Maturity graph edges | `data/processed/graph/maturity_graph_edges.parquet` |

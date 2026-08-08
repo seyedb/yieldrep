@@ -600,6 +600,11 @@ reports/tables/residual_rv_regime_scorecard.csv
 reports/figures/residual_rv_regime_heatmap.html
 ```
 
+Representation-conditioned RV regime evaluation fits residual-change forecasts
+using each frozen feature set, then evaluates test predictions inside the same
+macro and market regimes. The main cross-sectional metrics are prediction rank
+IC and the realized top-minus-bottom residual-change spread.
+
 Learned-state regime diagnostics are reported in:
 
 ```text

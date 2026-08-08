@@ -214,6 +214,11 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         cli, "evaluate_supervised_forecasts", multi_step("evaluate_supervised_forecasts")
     )
     monkeypatch.setattr(cli, "summarize_baselines", multi_step("summarize_baselines"))
+    monkeypatch.setattr(
+        cli,
+        "build_residual_rv_representation_regime_report",
+        multi_step("build_residual_rv_representation_regime_report"),
+    )
     monkeypatch.setattr(cli, "plot_baseline_metrics", multi_step("plot_baseline_metrics"))
     monkeypatch.setattr(
         cli,
@@ -277,6 +282,7 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "evaluate_baselines",
         "evaluate_supervised_forecasts",
         "summarize_baselines",
+        "build_residual_rv_representation_regime_report",
         "plot_baseline_metrics",
         "build_learned_state_regime_diagnostics",
         "plot_learned_state_regimes",

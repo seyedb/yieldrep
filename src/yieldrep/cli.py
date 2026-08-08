@@ -31,6 +31,9 @@ from yieldrep.evaluation.reports import (
 from yieldrep.evaluation.representations import build_representation_comparison
 from yieldrep.evaluation.scorecard import build_representation_task_scorecard
 from yieldrep.evaluation.reconstruction import evaluate_reconstruction
+from yieldrep.evaluation.residual_rv_regimes import (
+    build_residual_rv_representation_regime_report,
+)
 from yieldrep.evaluation.targets import (
     build_residual_targets,
     build_standardized_targets,
@@ -317,6 +320,14 @@ def macro_conditioned_summary_command(config: Path = Path("configs/default.yaml"
     typer.echo(build_macro_conditioned_representation_summary(project_config))
 
 
+@app.command("residual-rv-regimes")
+def residual_rv_regimes_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Evaluate residual RV forecasts by macro and market regime."""
+    project_config = load_config(config)
+    for output_path in build_residual_rv_representation_regime_report(project_config):
+        typer.echo(output_path)
+
+
 @app.command("scorecard")
 def scorecard_command(config: Path = Path("configs/default.yaml")) -> None:
     """Write the task-level representation scorecard."""
@@ -421,6 +432,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(evaluate_baselines(project_config))
     output_paths.extend(evaluate_supervised_forecasts(project_config))
     output_paths.extend(summarize_baselines(project_config))
+    output_paths.extend(build_residual_rv_representation_regime_report(project_config))
     output_paths.extend(plot_baseline_metrics(project_config))
     output_paths.extend(build_learned_state_regime_diagnostics(project_config))
     output_paths.extend(plot_learned_state_regimes(project_config))

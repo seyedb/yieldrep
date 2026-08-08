@@ -128,6 +128,12 @@ def test_load_config_reads_project_paths() -> None:
     assert config.residual_rv_regime_scorecard_table_path == Path(
         "reports/tables/residual_rv_regime_scorecard.csv"
     )
+    assert config.residual_rv_representation_regime_table_path == Path(
+        "reports/tables/residual_rv_representation_regime.csv"
+    )
+    assert config.residual_rv_representation_regime_scorecard_table_path == Path(
+        "reports/tables/residual_rv_representation_regime_scorecard.csv"
+    )
     assert config.residual_mean_reversion_table_path == Path(
         "reports/tables/residual_mean_reversion.csv"
     )
