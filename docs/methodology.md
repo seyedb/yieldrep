@@ -605,6 +605,10 @@ using each frozen feature set, then evaluates test predictions inside the same
 macro and market regimes. The main cross-sectional metrics are prediction rank
 IC and the realized top-minus-bottom residual-change spread.
 
+Macro-enhanced RV benchmarks add backward-aligned public macro and market
+variables to the same residual-change forecast task, so macro information is
+tested as model input rather than only as a regime label.
+
 Learned-state regime diagnostics are reported in:
 
 ```text

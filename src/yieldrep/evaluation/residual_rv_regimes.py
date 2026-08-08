@@ -53,7 +53,26 @@ FINDINGS_COLUMNS = [
     "evidence_table",
 ]
 
-LEARNED_REPRESENTATIONS = {"autoencoder", "transformer", "graph_autoencoder"}
+AUDIT_COLUMNS = [
+    "audit_item",
+    "group",
+    "value",
+    "interpretation",
+    "evidence_table",
+]
+
+LEARNED_REPRESENTATIONS = {
+    "autoencoder",
+    "transformer",
+    "graph_autoencoder",
+    "graph_autoencoder_macro_market",
+}
+MACRO_MARKET_COLUMNS = [
+    "macro_inflation",
+    "macro_unemployment",
+    "market_MOVE",
+    "market_VIX",
+]
 
 
 @dataclass(frozen=True)
@@ -77,10 +96,13 @@ def build_residual_rv_representation_regime_report(config: ProjectConfig) -> lis
         config.residual_rv_representation_regime_findings_table_path,
         index=False,
     )
+    audit = residual_rv_macro_benchmark_audit(config, detail, scorecard)
+    audit.to_csv(config.residual_rv_macro_benchmark_audit_table_path, index=False)
     return [
         config.residual_rv_representation_regime_table_path,
         config.residual_rv_representation_regime_scorecard_table_path,
         config.residual_rv_representation_regime_findings_table_path,
+        config.residual_rv_macro_benchmark_audit_table_path,
     ]
 
 
@@ -89,7 +111,10 @@ def residual_rv_representation_regime_summary(config: ProjectConfig) -> pd.DataF
     if not config.supervised_residual_change_path.exists():
         return pd.DataFrame(columns=DETAIL_COLUMNS)
 
-    data = pd.read_parquet(config.supervised_residual_change_path)
+    data = _attach_macro_market_features(
+        pd.read_parquet(config.supervised_residual_change_path),
+        config,
+    )
     regimes = _regime_frames(config)
     if data.empty or not regimes:
         return pd.DataFrame(columns=DETAIL_COLUMNS)
@@ -199,7 +224,7 @@ def residual_rv_representation_regime_findings(
         {
             "finding": "best_overall_counts",
             "value": _format_counts(best_counts),
-            "interpretation": "Raw Nelson-Siegel residuals are the strongest overall RV feature, followed by graph-AE and carry/roll features.",
+            "interpretation": "Raw Nelson-Siegel residuals are the main RV feature; macro-enhanced rows show whether public macro/market variables add incremental information.",
             "evidence_table": str(config.residual_rv_representation_regime_scorecard_table_path),
         },
         {
@@ -210,12 +235,105 @@ def residual_rv_representation_regime_findings(
         },
         {
             "finding": "phase_conclusion",
-            "value": "classical_residuals_lead_overall_graph_ae_has_regime_pockets",
-            "interpretation": "The result supports graph-AE as a useful conditional representation, not a replacement for Nelson-Siegel residuals.",
+            "value": _phase_conclusion(valid),
+            "interpretation": "Macro-enhanced rows should be interpreted as incremental public-information benchmarks, not as new target definitions.",
             "evidence_table": str(config.residual_rv_representation_regime_scorecard_table_path),
         },
     ]
     return pd.DataFrame(rows, columns=FINDINGS_COLUMNS)
+
+
+def residual_rv_macro_benchmark_audit(
+    config: ProjectConfig,
+    detail: pd.DataFrame | None = None,
+    scorecard: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Audit feature coverage and winner patterns for macro-enhanced RV benchmarks."""
+    detail = _read_optional_csv(
+        detail,
+        config.residual_rv_representation_regime_table_path,
+        DETAIL_COLUMNS,
+    )
+    scorecard = _read_optional_csv(
+        scorecard,
+        config.residual_rv_representation_regime_scorecard_table_path,
+        SCORECARD_COLUMNS,
+    )
+    if detail.empty or scorecard.empty:
+        return pd.DataFrame(columns=AUDIT_COLUMNS)
+
+    evidence = str(config.residual_rv_representation_regime_scorecard_table_path)
+    valid_scorecard = scorecard.dropna(subset=["best_rank_ic"]).copy()
+    rows = [
+        {
+            "audit_item": "feature_sets_compared",
+            "group": "all",
+            "value": _format_counts(detail["representation"].value_counts().to_dict()),
+            "interpretation": "Counts are regime-summary rows by representation after macro/market feature attachment.",
+            "evidence_table": str(config.residual_rv_representation_regime_table_path),
+        },
+        {
+            "audit_item": "macro_feature_availability",
+            "group": "macro_market",
+            "value": _feature_count_by_country(detail, "macro_market"),
+            "interpretation": "CA and EA use inflation plus market variables; US uses inflation, unemployment, and market variables.",
+            "evidence_table": str(config.residual_rv_representation_regime_table_path),
+        },
+        {
+            "audit_item": "macro_feature_availability",
+            "group": "graph_autoencoder_macro_market",
+            "value": _feature_count_by_country(detail, "graph_autoencoder_macro_market"),
+            "interpretation": "Graph-AE macro rows use graph state, maturity interactions, and the available macro/market inputs by country.",
+            "evidence_table": str(config.residual_rv_representation_regime_table_path),
+        },
+        {
+            "audit_item": "valid_regime_cells",
+            "group": "all",
+            "value": f"{len(valid_scorecard)} of {len(scorecard)}",
+            "interpretation": "Valid cells have enough rank-IC dates after the scorecard coverage filter.",
+            "evidence_table": evidence,
+        },
+        {
+            "audit_item": "best_rank_ic_winner_counts",
+            "group": "all",
+            "value": _format_counts(valid_scorecard["best_by_rank_ic"].value_counts().to_dict()),
+            "interpretation": "Winner counts show whether macro-enhanced rows dominate or only improve selected cells.",
+            "evidence_table": evidence,
+        },
+        {
+            "audit_item": "macro_market_alone_wins",
+            "group": "macro_market",
+            "value": str(_winner_count(scorecard, "macro_market/ridge")),
+            "interpretation": "Macro/market variables alone are checked separately from curve and learned state features.",
+            "evidence_table": evidence,
+        },
+        {
+            "audit_item": "residual_macro_uplift",
+            "group": "residual_macro_market_vs_residual",
+            "value": _uplift_summary(detail, "residual_macro_market", "residual"),
+            "interpretation": "This checks whether macro inputs improve the raw Nelson-Siegel residual feature.",
+            "evidence_table": str(config.residual_rv_representation_regime_table_path),
+        },
+        {
+            "audit_item": "graph_macro_uplift",
+            "group": "graph_autoencoder_macro_market_vs_graph_autoencoder",
+            "value": _uplift_summary(
+                detail,
+                "graph_autoencoder_macro_market",
+                "graph_autoencoder",
+            ),
+            "interpretation": "This checks whether macro inputs improve graph-AE residual RV forecasts.",
+            "evidence_table": str(config.residual_rv_representation_regime_table_path),
+        },
+        {
+            "audit_item": "graph_macro_winner_cells",
+            "group": "graph_autoencoder_macro_market",
+            "value": _winner_cells(scorecard, "graph_autoencoder_macro_market/ridge"),
+            "interpretation": "These are the regime cells where graph-AE plus macro/market inputs is the best rank-IC model.",
+            "evidence_table": evidence,
+        },
+    ]
+    return pd.DataFrame(rows, columns=AUDIT_COLUMNS)
 
 
 def _residual_rv_feature_sets(config: ProjectConfig) -> list[ResidualRVFeatureSet]:
@@ -231,6 +349,8 @@ def _residual_rv_feature_sets(config: ProjectConfig) -> list[ResidualRVFeatureSe
             ],
         ),
         ResidualRVFeatureSet("residual", ["residual"]),
+        ResidualRVFeatureSet("macro_market", MACRO_MARKET_COLUMNS),
+        ResidualRVFeatureSet("residual_macro_market", ["residual", *MACRO_MARKET_COLUMNS]),
         ResidualRVFeatureSet(
             "carry_roll",
             [
@@ -254,7 +374,129 @@ def _residual_rv_feature_sets(config: ProjectConfig) -> list[ResidualRVFeatureSe
             "graph_autoencoder",
             _graph_autoencoder_residual_features(config),
         ),
+        ResidualRVFeatureSet(
+            "graph_autoencoder_macro_market",
+            [*_graph_autoencoder_residual_features(config), *MACRO_MARKET_COLUMNS],
+        ),
     ]
+
+
+def _read_optional_csv(
+    frame: pd.DataFrame | None,
+    path: Path,
+    columns: list[str],
+) -> pd.DataFrame:
+    if frame is not None:
+        return frame
+    return pd.read_csv(path) if path.exists() else pd.DataFrame(columns=columns)
+
+
+def _feature_count_by_country(detail: pd.DataFrame, representation: str) -> str:
+    selected = detail.loc[detail["representation"] == representation]
+    if selected.empty:
+        return ""
+    parts = []
+    for country, group in selected.groupby("country", sort=True):
+        counts = sorted(group["feature_count"].dropna().astype(int).unique())
+        parts.append(f"{country}: {','.join(str(count) for count in counts)}")
+    return "; ".join(parts)
+
+
+def _winner_count(scorecard: pd.DataFrame, label: str) -> int:
+    return int(scorecard["best_by_rank_ic"].eq(label).sum())
+
+
+def _winner_cells(scorecard: pd.DataFrame, label: str) -> str:
+    winners = scorecard.loc[scorecard["best_by_rank_ic"] == label].copy()
+    if winners.empty:
+        return "none"
+    return "; ".join(
+        f"{row.country} {int(row.horizon_days)}d {row.regime_type}:{row.indicator}={row.regime}"
+        for row in winners.itertuples(index=False)
+    )
+
+
+def _uplift_summary(detail: pd.DataFrame, enhanced: str, base: str) -> str:
+    group_columns = ["regime_type", "indicator", "regime", "country", "horizon_days"]
+    selected = detail.loc[detail["representation"].isin([enhanced, base])].copy()
+    selected = selected.loc[selected["rank_ic_dates"] >= 10]
+    if selected.empty:
+        return "0 of 0"
+
+    wide = selected.pivot_table(
+        index=group_columns,
+        columns="representation",
+        values="mean_rank_ic",
+        aggfunc="first",
+    ).dropna(subset=[enhanced, base])
+    if wide.empty:
+        return "0 of 0"
+
+    edge = wide[enhanced] - wide[base]
+    wins = int((edge > 0.0).sum())
+    return f"{wins} of {len(edge)}; mean_edge={float(edge.mean()):.3f}"
+
+
+def _attach_macro_market_features(data: pd.DataFrame, config: ProjectConfig) -> pd.DataFrame:
+    frame = data.copy()
+    frame["date"] = pd.to_datetime(frame["date"])
+    frame = _attach_macro_values(frame, config)
+    frame = _attach_market_values(frame, config)
+    return frame
+
+
+def _attach_macro_values(data: pd.DataFrame, config: ProjectConfig) -> pd.DataFrame:
+    if not config.macro_indicators_path.exists():
+        return data
+
+    macro = pd.read_parquet(config.macro_indicators_path)
+    if macro.empty:
+        return data
+
+    result = data.copy()
+    macro = macro.loc[:, ["date", "country", "indicator", "value"]].copy()
+    macro["date"] = pd.to_datetime(macro["date"])
+    for (country, indicator), group in macro.groupby(["country", "indicator"], sort=True):
+        feature_name = f"macro_{indicator}"
+        country_rows = result.loc[result["country"] == country].copy()
+        if country_rows.empty:
+            continue
+        aligned = pd.merge_asof(
+            country_rows.sort_values("date"),
+            group.sort_values("date").loc[:, ["date", "country", "value"]],
+            on="date",
+            by="country",
+            direction="backward",
+        ).rename(columns={"value": feature_name})
+        result = result.merge(
+            aligned.loc[:, ["date", "country", "maturity_years", "horizon_days", feature_name]],
+            on=["date", "country", "maturity_years", "horizon_days"],
+            how="left",
+        )
+    return result
+
+
+def _attach_market_values(data: pd.DataFrame, config: ProjectConfig) -> pd.DataFrame:
+    if not config.market_indicators_path.exists():
+        return data
+
+    market = pd.read_parquet(config.market_indicators_path)
+    if market.empty:
+        return data
+
+    result = data.copy()
+    market = market.loc[:, ["date", "indicator", "value"]].copy()
+    market["date"] = pd.to_datetime(market["date"])
+    for indicator, group in market.groupby("indicator", sort=True):
+        feature_name = f"market_{indicator}"
+        aligned = pd.merge_asof(
+            result.loc[:, ["date"]].drop_duplicates().sort_values("date"),
+            group.sort_values("date").loc[:, ["date", "value"]],
+            on="date",
+            direction="backward",
+        ).rename(columns={"value": feature_name})
+        result = result.merge(aligned, on="date", how="left")
+    return result
 
 
 def _strongest_learned_edge(scorecard: pd.DataFrame) -> pd.Series:
@@ -288,6 +530,25 @@ def _edge_label(row: pd.Series) -> str:
     )
 
 
+def _phase_conclusion(scorecard: pd.DataFrame) -> str:
+    if scorecard.empty:
+        return ""
+    best_counts = scorecard["best_by_rank_ic"].value_counts()
+    best_model = str(best_counts.index[0]) if not best_counts.empty else ""
+    macro_wins = int(
+        scorecard["best_by_rank_ic"].astype(str).str.contains("macro_market", regex=False).sum()
+    )
+    graph_wins = int(
+        scorecard["best_by_rank_ic"].astype(str).str.startswith("graph_autoencoder", na=False).sum()
+    )
+    if macro_wins:
+        return (
+            f"{best_model}_leads_overall_with_{macro_wins}_macro_enhanced_wins_"
+            f"and_{graph_wins}_graph_wins"
+        )
+    return f"{best_model}_leads_overall_with_{graph_wins}_graph_wins"
+
+
 def _graph_autoencoder_residual_features(config: ProjectConfig) -> list[str]:
     graph_features = [f"GE{i}" for i in range(1, config.gnn.latent_dim + 1)]
     maturity_features = ["maturity", "maturity_squared", "log_maturity"]
@@ -314,20 +575,23 @@ def _residual_change_predictions(
         "window_id",
         "split",
         "target_residual_change",
-        *columns,
     ]
-    sample = data.dropna(subset=required).loc[:, required].copy()
+    sample = data.dropna(subset=required).loc[:, [*required, *columns]].copy()
     rows: list[pd.DataFrame] = []
     group_columns = ["country", "horizon_days", "split_method", "window_id"]
     for group_values, group in sample.groupby(group_columns, sort=True):
+        local_columns = [column for column in columns if group[column].notna().any()]
+        if not local_columns:
+            continue
+        group = group.dropna(subset=local_columns)
         train = group.loc[group["split"] == "train"]
         test = group.loc[group["split"] == "test"]
         if train.empty or test.empty:
             continue
 
-        x_train = train[columns].to_numpy(dtype=float)
+        x_train = train[local_columns].to_numpy(dtype=float)
         y_train = train["target_residual_change"].to_numpy(dtype=float)
-        x_test = test[columns].to_numpy(dtype=float)
+        x_test = test[local_columns].to_numpy(dtype=float)
         model = make_pipeline(
             StandardScaler(),
             Ridge(alpha=config.evaluation.ridge_alpha),
@@ -345,7 +609,7 @@ def _residual_change_predictions(
                     "prediction": prediction,
                     "representation": feature_set.representation,
                     "model": "ridge",
-                    "feature_count": len(columns),
+                    "feature_count": len(local_columns),
                 }
             )
         )
