@@ -30,6 +30,7 @@ from yieldrep.evaluation.reports import (
 )
 from yieldrep.evaluation.representations import build_representation_comparison
 from yieldrep.evaluation.scorecard import build_representation_task_scorecard
+from yieldrep.evaluation.scorecard import build_research_checkpoint_scorecard
 from yieldrep.evaluation.reconstruction import evaluate_reconstruction
 from yieldrep.evaluation.residual_rv_regimes import (
     build_residual_rv_representation_regime_report,
@@ -330,9 +331,10 @@ def residual_rv_regimes_command(config: Path = Path("configs/default.yaml")) -> 
 
 @app.command("scorecard")
 def scorecard_command(config: Path = Path("configs/default.yaml")) -> None:
-    """Write the task-level representation scorecard."""
+    """Write task-level and checkpoint representation scorecards."""
     project_config = load_config(config)
     typer.echo(build_representation_task_scorecard(project_config))
+    typer.echo(build_research_checkpoint_scorecard(project_config))
 
 
 @app.command("compare-learned-models")
@@ -442,6 +444,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_representation_comparison(project_config))
     output_paths.append(build_macro_conditioned_representation_summary(project_config))
     output_paths.append(build_representation_task_scorecard(project_config))
+    output_paths.append(build_research_checkpoint_scorecard(project_config))
     output_paths.append(build_cross_market_report(project_config))
     output_paths.extend(plot_cross_market_pca(project_config))
     return output_paths
@@ -470,6 +473,7 @@ def train_learned_model_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_representation_comparison(project_config))
     output_paths.append(build_macro_conditioned_representation_summary(project_config))
     output_paths.append(build_representation_task_scorecard(project_config))
+    output_paths.append(build_research_checkpoint_scorecard(project_config))
     return output_paths
 
 

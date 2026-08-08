@@ -252,6 +252,11 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_representation_task_scorecard",
         single_step("build_representation_task_scorecard"),
     )
+    monkeypatch.setattr(
+        cli,
+        "build_research_checkpoint_scorecard",
+        single_step("build_research_checkpoint_scorecard"),
+    )
     monkeypatch.setattr(cli, "build_cross_market_report", single_step("build_cross_market_report"))
     monkeypatch.setattr(cli, "plot_cross_market_pca", multi_step("plot_cross_market_pca"))
 
@@ -292,6 +297,7 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_representation_comparison",
         "build_macro_conditioned_representation_summary",
         "build_representation_task_scorecard",
+        "build_research_checkpoint_scorecard",
         "build_cross_market_report",
         "plot_cross_market_pca",
     ]

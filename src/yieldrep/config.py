@@ -458,6 +458,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "representation_task_scorecard.csv"
 
     @property
+    def research_checkpoint_scorecard_table_path(self) -> Path:
+        return self.tables_dir / "research_checkpoint_scorecard.csv"
+
+    @property
     def baseline_by_maturity_point_top_table_path(self) -> Path:
         return self.tables_dir / "baseline_by_maturity_point_top.csv"
 

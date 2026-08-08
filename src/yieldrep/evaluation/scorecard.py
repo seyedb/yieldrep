@@ -32,6 +32,18 @@ SCORECARD_COLUMNS = [
     "evidence_table",
     "interpretation",
 ]
+RESEARCH_CHECKPOINT_COLUMNS = [
+    "task",
+    "target",
+    "primary_metric",
+    "best_classical",
+    "best_classical_value",
+    "best_learned",
+    "best_learned_value",
+    "result",
+    "conclusion",
+    "evidence_table",
+]
 
 
 def build_representation_task_scorecard(config: ProjectConfig) -> Path:
@@ -40,6 +52,14 @@ def build_representation_task_scorecard(config: ProjectConfig) -> Path:
     scorecard = representation_task_scorecard(config)
     scorecard.to_csv(config.representation_task_scorecard_table_path, index=False)
     return config.representation_task_scorecard_table_path
+
+
+def build_research_checkpoint_scorecard(config: ProjectConfig) -> Path:
+    """Write a compact research checkpoint table for the current project state."""
+    config.tables_dir.mkdir(parents=True, exist_ok=True)
+    scorecard = research_checkpoint_scorecard(config)
+    scorecard.to_csv(config.research_checkpoint_scorecard_table_path, index=False)
+    return config.research_checkpoint_scorecard_table_path
 
 
 def representation_task_scorecard(config: ProjectConfig) -> pd.DataFrame:
@@ -63,6 +83,33 @@ def representation_task_scorecard(config: ProjectConfig) -> pd.DataFrame:
     if not non_empty:
         return pd.DataFrame(columns=SCORECARD_COLUMNS)
     return pd.DataFrame(non_empty).loc[:, SCORECARD_COLUMNS]
+
+
+def research_checkpoint_scorecard(config: ProjectConfig) -> pd.DataFrame:
+    task_scorecard = _current_task_scorecard(config)
+    rows = [
+        _checkpoint_row_from_task(
+            task_scorecard,
+            scenario="clean_reconstruction",
+            task="Clean reconstruction",
+            target="Observed zero-coupon curve",
+        ),
+        _checkpoint_row_from_task(
+            task_scorecard,
+            scenario="masked_maturity_reconstruction",
+            task="Masked maturity reconstruction",
+            target="Held-out maturity yields",
+        ),
+        _residual_rv_checkpoint_row(config),
+        _checkpoint_row_from_task(
+            task_scorecard,
+            scenario="volatility_regime_classification",
+            task="Volatility regime classification",
+            target="Future curve-volatility regime",
+        ),
+        _macro_conditioned_rv_checkpoint_row(config),
+    ]
+    return pd.DataFrame(rows).loc[:, RESEARCH_CHECKPOINT_COLUMNS]
 
 
 def _reconstruction_row(config: ProjectConfig, task: str) -> dict[str, object]:
@@ -115,6 +162,171 @@ def _reconstruction_row(config: ProjectConfig, task: str) -> dict[str, object]:
             materiality_flag=materiality,
         ),
     }
+
+
+def _current_task_scorecard(config: ProjectConfig) -> pd.DataFrame:
+    if config.representation_task_scorecard_table_path.exists():
+        return pd.read_csv(config.representation_task_scorecard_table_path)
+    return representation_task_scorecard(config)
+
+
+def _checkpoint_row_from_task(
+    task_scorecard: pd.DataFrame,
+    scenario: str,
+    task: str,
+    target: str,
+) -> dict[str, object]:
+    if task_scorecard.empty:
+        return _empty_checkpoint_row(task, target, evidence_table="")
+
+    rows = task_scorecard.loc[task_scorecard["scenario"] == scenario]
+    if rows.empty:
+        return _empty_checkpoint_row(task, target, evidence_table="")
+
+    row = rows.iloc[0]
+    return {
+        "task": task,
+        "target": target,
+        "primary_metric": row["primary_metric"],
+        "best_classical": _method_label(
+            row.get("best_classical_representation"),
+            row.get("best_classical_model"),
+        ),
+        "best_classical_value": row.get("best_classical_value"),
+        "best_learned": _method_label(
+            row.get("best_learned_representation"),
+            row.get("best_learned_model"),
+        ),
+        "best_learned_value": row.get("best_learned_value"),
+        "result": _checkpoint_result(row),
+        "conclusion": row["interpretation"],
+        "evidence_table": row["evidence_table"],
+    }
+
+
+def _residual_rv_checkpoint_row(config: ProjectConfig) -> dict[str, object]:
+    task_scorecard = _current_task_scorecard(config)
+    base = _checkpoint_row_from_task(
+        task_scorecard,
+        scenario="residual_relative_value",
+        task="Residual relative value",
+        target="Nelson-Siegel residual convergence",
+    )
+    base["primary_metric"] = "spread_t_stat"
+    return base
+
+
+def _macro_conditioned_rv_checkpoint_row(config: ProjectConfig) -> dict[str, object]:
+    table = config.residual_rv_representation_regime_findings_table_path
+    if not table.exists():
+        return _empty_checkpoint_row(
+            task="Macro/market-conditioned residual RV",
+            target="Cross-sectional residual-change ranking by regime",
+            evidence_table=str(table),
+        )
+
+    findings = pd.read_csv(table)
+    value_by_finding = dict(zip(findings["finding"], findings["value"], strict=False))
+    interpretation_by_finding = dict(
+        zip(findings["finding"], findings["interpretation"], strict=False)
+    )
+    counts = _winner_counts(str(value_by_finding.get("best_overall_counts", "")))
+    best_classical = _best_count_method(
+        counts,
+        learned=False,
+    )
+    best_learned = _best_count_method(
+        counts,
+        learned=True,
+    )
+    learned_win_count = str(value_by_finding.get("learned_win_count", ""))
+    best_overall_counts = str(value_by_finding.get("best_overall_counts", ""))
+    strongest_edge = str(value_by_finding.get("strongest_learned_edge", ""))
+    conclusion = str(
+        interpretation_by_finding.get(
+            "best_overall_counts",
+            "Residual and engineered classical features remain the main benchmark.",
+        )
+    )
+    return {
+        "task": "Macro/market-conditioned residual RV",
+        "target": "Cross-sectional residual-change ranking by regime",
+        "primary_metric": "mean_rank_ic winner count",
+        "best_classical": best_classical[0],
+        "best_classical_value": best_classical[1],
+        "best_learned": best_learned[0],
+        "best_learned_value": best_learned[1],
+        "result": f"{learned_win_count}; {best_overall_counts}",
+        "conclusion": f"{conclusion} {strongest_edge}".strip(),
+        "evidence_table": str(table),
+    }
+
+
+def _empty_checkpoint_row(task: str, target: str, evidence_table: str) -> dict[str, object]:
+    return {
+        "task": task,
+        "target": target,
+        "primary_metric": np.nan,
+        "best_classical": np.nan,
+        "best_classical_value": np.nan,
+        "best_learned": np.nan,
+        "best_learned_value": np.nan,
+        "result": "Evidence table is unavailable or empty.",
+        "conclusion": "No checkpoint conclusion is available.",
+        "evidence_table": evidence_table,
+    }
+
+
+def _checkpoint_result(row: pd.Series) -> str:
+    best = _method_label(row.get("best_representation"), row.get("best_model"))
+    learned = _method_label(
+        row.get("best_learned_representation"),
+        row.get("best_learned_model"),
+    )
+    classical = _method_label(
+        row.get("best_classical_representation"),
+        row.get("best_classical_model"),
+    )
+    materiality = str(row.get("materiality_flag", ""))
+    if pd.isna(row.get("best_learned_value")):
+        return f"winner={best}; no learned comparison"
+    if pd.isna(row.get("best_classical_value")):
+        return f"winner={best}; best_learned={learned}; learned-only benchmark"
+    return f"winner={best}; best_classical={classical}; best_learned={learned}; {materiality}"
+
+
+def _method_label(representation: object, model: object) -> object:
+    if pd.isna(representation):
+        return np.nan
+    if pd.isna(model) or str(model) == "":
+        return str(representation)
+    return f"{representation}/{model}"
+
+
+def _winner_counts(value: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in value.split(";"):
+        if ":" not in item:
+            continue
+        method, count = item.rsplit(":", maxsplit=1)
+        method = method.strip()
+        try:
+            counts[method] = int(count.strip())
+        except ValueError:
+            continue
+    return counts
+
+
+def _best_count_method(counts: dict[str, int], learned: bool) -> tuple[object, object]:
+    filtered = {
+        method: count
+        for method, count in counts.items()
+        if (method.split("/", maxsplit=1)[0] in LEARNED_REPRESENTATIONS) == learned
+    }
+    if not filtered:
+        return np.nan, np.nan
+    method, count = sorted(filtered.items(), key=lambda item: (-item[1], item[0]))[0]
+    return method, count
 
 
 def _forecast_row(config: ProjectConfig, target: str, scenario: str) -> dict[str, object]:
