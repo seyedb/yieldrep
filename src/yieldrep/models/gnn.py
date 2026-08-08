@@ -290,6 +290,8 @@ def fit_gnn_panel(
 
     best_state: dict[str, Tensor] | None = None
     best_validation_loss = float("inf")
+    best_validation_masked_loss = float("inf")
+    best_validation_clean_loss = float("inf")
     best_epoch = 0
     epochs_without_improvement = 0
     final_train_loss = float("nan")
@@ -330,6 +332,8 @@ def fit_gnn_panel(
 
         final_train_loss = totals["loss"] / totals["rows"]
         final_validation_loss = float(validation_loss.detach().item())
+        final_validation_masked_loss = float(validation_masked_loss.detach().item())
+        final_validation_clean_loss = float(validation_clean_loss.detach().item())
         history_rows.append(
             {
                 "epoch": epoch,
@@ -337,13 +341,16 @@ def fit_gnn_panel(
                 "train_masked_loss": totals["masked_loss"] / totals["rows"],
                 "train_clean_loss": totals["clean_loss"] / totals["rows"],
                 "validation_loss": final_validation_loss,
-                "validation_masked_loss": float(validation_masked_loss.detach().item()),
-                "validation_clean_loss": float(validation_clean_loss.detach().item()),
+                "validation_masked_loss": final_validation_masked_loss,
+                "validation_clean_loss": final_validation_clean_loss,
+                "early_stopping_loss": final_validation_masked_loss,
             }
         )
 
-        if final_validation_loss < best_validation_loss - min_delta:
-            best_validation_loss = final_validation_loss
+        if final_validation_masked_loss < best_validation_loss - min_delta:
+            best_validation_loss = final_validation_masked_loss
+            best_validation_masked_loss = final_validation_masked_loss
+            best_validation_clean_loss = final_validation_clean_loss
             best_epoch = epoch
             best_state = {
                 name: parameter.detach().clone() for name, parameter in model.state_dict().items()
@@ -400,6 +407,8 @@ def fit_gnn_panel(
         clean_loss_weight=clean_loss_weight,
         epochs_trained=best_epoch,
         best_validation_loss=best_validation_loss,
+        best_validation_masked_loss=best_validation_masked_loss,
+        best_validation_clean_loss=best_validation_clean_loss,
         final_train_loss=final_train_loss,
         final_validation_loss=final_validation_loss,
     )
@@ -739,6 +748,8 @@ def _metrics_frame(
     clean_loss_weight: float,
     epochs_trained: int,
     best_validation_loss: float,
+    best_validation_masked_loss: float,
+    best_validation_clean_loss: float,
     final_train_loss: float,
     final_validation_loss: float,
 ) -> pd.DataFrame:
@@ -759,8 +770,11 @@ def _metrics_frame(
                 "weight_decay": weight_decay,
                 "mask_probability": mask_probability,
                 "clean_loss_weight": clean_loss_weight,
+                "early_stopping_metric": "validation_masked_loss",
                 "epochs_trained": epochs_trained,
                 "best_validation_loss": best_validation_loss,
+                "best_validation_masked_loss": best_validation_masked_loss,
+                "best_validation_clean_loss": best_validation_clean_loss,
                 "final_train_loss": final_train_loss,
                 "final_validation_loss": final_validation_loss,
                 "observations": len(group),

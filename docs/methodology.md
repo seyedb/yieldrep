@@ -361,6 +361,26 @@ The model is evaluated only on masked reconstruction at this stage. Its inputs
 are observed curve-derived node features, not PCA, Nelson-Siegel, autoencoder,
 or Transformer outputs.
 
+Training uses a chronological validation split. Early stopping is selected by
+masked validation loss:
+
+```math
+\mathcal{L}_{val}^{masked}
+=
+\frac{1}{|\mathcal{V}|}
+\sum_{t \in \mathcal{V}}
+\frac{1}{|\mathcal{M}_t|}
+\sum_{m \in \mathcal{M}_t}
+\left(
+y_t^{(c,m)}
+-
+\hat{y}_t^{(c,m)}
+\right)^2
+```
+
+Clean validation reconstruction is reported separately as a diagnostic, but it
+does not determine the selected checkpoint for the masked-reconstruction task.
+
 The graph-edge ablation compares the same model under two edge sets:
 adjacent-maturity edges only, and adjacent plus historical-correlation edges.
 The reported statistic is the masked test reconstruction error difference
