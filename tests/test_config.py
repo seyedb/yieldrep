@@ -149,6 +149,7 @@ def test_load_config_reads_project_paths() -> None:
     )
     assert config.graph_nodes_path == Path("data/processed/graph/maturity_graph_nodes.parquet")
     assert config.graph_edges_path == Path("data/processed/graph/maturity_graph_edges.parquet")
+    assert config.gnn.edge_mode == "adjacent"
     assert config.representation_comparison_table_path == Path(
         "reports/tables/representation_comparison.csv"
     )
@@ -164,6 +165,7 @@ def test_load_config_reads_project_paths() -> None:
     assert config.learned_model_findings_table_path == Path(
         "reports/tables/learned_model_findings.csv"
     )
+    assert config.gnn_edge_ablation_table_path == Path("reports/tables/gnn_edge_ablation.csv")
     assert config.representation_task_scorecard_table_path == Path(
         "reports/tables/representation_task_scorecard.csv"
     )

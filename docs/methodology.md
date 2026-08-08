@@ -313,8 +313,8 @@ w_{ij}^{dist}
 \frac{1}{1 + |m_i - m_j|}
 ```
 
-Correlation edges connect each maturity to its strongest historical
-yield-change peers:
+Correlation edges are retained as an ablation. They connect each maturity to
+its strongest historical yield-change peers:
 
 ```math
 \rho_{ij}^{(c)}
@@ -329,7 +329,7 @@ yield-change peers:
 These graph datasets are saved as node and edge parquet tables. They define the
 data object for graph-learning experiments.
 
-The first graph model uses this same maturity graph for masked maturity
+The canonical graph model uses the adjacent-maturity graph for masked maturity
 reconstruction. Given node-feature matrix \(H_t^{(0)}\), a graph convolution
 layer is:
 

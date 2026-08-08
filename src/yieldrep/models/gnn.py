@@ -109,7 +109,10 @@ def build_gnn(config: ProjectConfig) -> list[Path]:
         if len(train_panel) < config.gnn.min_train_dates:
             continue
 
-        country_edges = edges.loc[edges["country"] == country].copy()
+        country_edges = _filter_edges(
+            edges.loc[edges["country"] == country].copy(),
+            config.gnn.edge_mode,
+        )
         result = fit_gnn_panel(
             panel=panel,
             edges=country_edges,

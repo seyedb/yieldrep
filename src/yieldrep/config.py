@@ -97,6 +97,7 @@ class GraphConfig(BaseModel):
 
 
 class GNNConfig(BaseModel):
+    edge_mode: Literal["adjacent", "adjacent_correlation"] = "adjacent"
     latent_dim: int = 5
     hidden_dim: int = 64
     n_layers: int = 2

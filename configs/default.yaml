@@ -48,6 +48,7 @@ transformer:
   max_train_dates: 500
 
 gnn:
+  edge_mode: adjacent
   latent_dim: 5
   hidden_dim: 64
   n_layers: 2
