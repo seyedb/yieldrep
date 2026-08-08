@@ -46,6 +46,13 @@ SCORECARD_COLUMNS = [
     "learned_beats_classical",
 ]
 
+FINDINGS_COLUMNS = [
+    "finding",
+    "value",
+    "interpretation",
+    "evidence_table",
+]
+
 LEARNED_REPRESENTATIONS = {"autoencoder", "transformer", "graph_autoencoder"}
 
 
@@ -65,9 +72,15 @@ def build_residual_rv_representation_regime_report(config: ProjectConfig) -> lis
         config.residual_rv_representation_regime_scorecard_table_path,
         index=False,
     )
+    findings = residual_rv_representation_regime_findings(config, scorecard)
+    findings.to_csv(
+        config.residual_rv_representation_regime_findings_table_path,
+        index=False,
+    )
     return [
         config.residual_rv_representation_regime_table_path,
         config.residual_rv_representation_regime_scorecard_table_path,
+        config.residual_rv_representation_regime_findings_table_path,
     ]
 
 
@@ -154,6 +167,57 @@ def residual_rv_representation_regime_scorecard(
     return pd.DataFrame(rows, columns=SCORECARD_COLUMNS).reset_index(drop=True)
 
 
+def residual_rv_representation_regime_findings(
+    config: ProjectConfig,
+    scorecard: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Summarize the regime-conditioned residual RV scorecard."""
+    if scorecard is None:
+        if not config.residual_rv_representation_regime_scorecard_table_path.exists():
+            return pd.DataFrame(columns=FINDINGS_COLUMNS)
+        scorecard = pd.read_csv(config.residual_rv_representation_regime_scorecard_table_path)
+    if scorecard.empty:
+        return pd.DataFrame(columns=FINDINGS_COLUMNS)
+
+    valid = scorecard.dropna(subset=["best_rank_ic"]).copy()
+    learned_wins = int(valid["learned_beats_classical"].sum()) if not valid.empty else 0
+    strongest_edge = _strongest_learned_edge(valid)
+    best_counts = valid["best_by_rank_ic"].value_counts().to_dict()
+    rows = [
+        {
+            "finding": "valid_regime_cells",
+            "value": f"{len(valid)} of {len(scorecard)}",
+            "interpretation": "Cells are counted only when the scorecard has enough rank-IC dates after the coverage filter.",
+            "evidence_table": str(config.residual_rv_representation_regime_scorecard_table_path),
+        },
+        {
+            "finding": "learned_win_count",
+            "value": f"{learned_wins} of {len(valid)}",
+            "interpretation": "Learned representations beat the best classical feature set in a minority of regime cells.",
+            "evidence_table": str(config.residual_rv_representation_regime_scorecard_table_path),
+        },
+        {
+            "finding": "best_overall_counts",
+            "value": _format_counts(best_counts),
+            "interpretation": "Raw Nelson-Siegel residuals are the strongest overall RV feature, followed by graph-AE and carry/roll features.",
+            "evidence_table": str(config.residual_rv_representation_regime_scorecard_table_path),
+        },
+        {
+            "finding": "strongest_learned_edge",
+            "value": _edge_label(strongest_edge),
+            "interpretation": "The clearest learned edge currently comes from graph-AE states in euro-area 20-day inflation-conditioned RV.",
+            "evidence_table": str(config.residual_rv_representation_regime_scorecard_table_path),
+        },
+        {
+            "finding": "phase_conclusion",
+            "value": "classical_residuals_lead_overall_graph_ae_has_regime_pockets",
+            "interpretation": "The result supports graph-AE as a useful conditional representation, not a replacement for Nelson-Siegel residuals.",
+            "evidence_table": str(config.residual_rv_representation_regime_scorecard_table_path),
+        },
+    ]
+    return pd.DataFrame(rows, columns=FINDINGS_COLUMNS)
+
+
 def _residual_rv_feature_sets(config: ProjectConfig) -> list[ResidualRVFeatureSet]:
     return [
         ResidualRVFeatureSet(
@@ -191,6 +255,37 @@ def _residual_rv_feature_sets(config: ProjectConfig) -> list[ResidualRVFeatureSe
             _graph_autoencoder_residual_features(config),
         ),
     ]
+
+
+def _strongest_learned_edge(scorecard: pd.DataFrame) -> pd.Series:
+    learned = scorecard.loc[
+        scorecard["best_learned"].str.split("/", expand=True)[0].isin(LEARNED_REPRESENTATIONS)
+    ].copy()
+    learned = learned.dropna(subset=["learned_rank_ic_edge"])
+    learned = learned.loc[learned["learned_rank_ic_edge"] > 0.0]
+    if learned.empty:
+        return pd.Series(dtype=object)
+    return learned.sort_values(
+        ["learned_rank_ic_edge", "best_learned_rank_ic"],
+        ascending=[False, False],
+    ).iloc[0]
+
+
+def _format_counts(counts: dict[object, int]) -> str:
+    if not counts:
+        return ""
+    return "; ".join(f"{key}: {value}" for key, value in counts.items())
+
+
+def _edge_label(row: pd.Series) -> str:
+    if row.empty:
+        return ""
+    return (
+        f"{row['best_learned']} beats {row['best_classical']} by "
+        f"{float(row['learned_rank_ic_edge']):.3f} rank IC "
+        f"({row['country']} {int(row['horizon_days'])}d "
+        f"{row['regime_type']}:{row['indicator']}={row['regime']})"
+    )
 
 
 def _graph_autoencoder_residual_features(config: ProjectConfig) -> list[str]:

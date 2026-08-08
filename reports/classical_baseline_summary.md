@@ -51,6 +51,7 @@ representations, not as replacements for classical term-structure objects.
 | Residual RV scorecard | `reports/tables/residual_relative_value_scorecard.csv` |
 | RV regime scorecard | `reports/tables/residual_rv_regime_scorecard.csv` |
 | Representation RV regime scorecard | `reports/tables/residual_rv_representation_regime_scorecard.csv` |
+| Representation RV regime findings | `reports/tables/residual_rv_representation_regime_findings.csv` |
 | Learned-state regime summary | `reports/tables/learned_state_regime_summary.csv` |
 | Maturity graph nodes | `data/processed/graph/maturity_graph_nodes.parquet` |
 | Maturity graph edges | `data/processed/graph/maturity_graph_edges.parquet` |
