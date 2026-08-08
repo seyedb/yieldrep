@@ -296,7 +296,7 @@ def _clean_reconstruction_finding(config: ProjectConfig) -> dict[str, object]:
             _value(scorecard, "best_model"),
         ),
         "result": _metric_result("best learned rank", learned_rank),
-        "interpretation": "PCA remains the clean-reconstruction hurdle; graph AE is the strongest learned clean reconstructor in the current scorecard.",
+        "interpretation": "PCA remains the clean-reconstruction hurdle; the adjacent-edge graph AE is the strongest learned clean reconstructor in the current scorecard.",
         "evidence_table": str(config.representation_task_scorecard_table_path),
     }
 
@@ -311,7 +311,7 @@ def _masked_reconstruction_finding(config: ProjectConfig) -> dict[str, object]:
         graph_wins = int(winners.get("masked_graph_autoencoder", 0))
         ae_wins = int(winners.get("masked_autoencoder", 0))
         result = f"graph AE wins {graph_wins} markets; AE wins {ae_wins} markets"
-        interpretation = "Graph AE leads masked reconstruction for US and euro-area curves; the MLP autoencoder remains stronger for Canada."
+        interpretation = "The adjacent-edge graph AE leads masked reconstruction for US and euro-area curves; the MLP autoencoder remains stronger for Canada."
     return {
         "area": "masked_reconstruction",
         "question": "Which learned model infers hidden maturities most accurately?",

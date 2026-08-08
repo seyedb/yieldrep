@@ -344,9 +344,9 @@ W^{(\ell)}
 \right)
 ```
 
-where \(\tilde{A}^{(c)}\) is the row-normalized maturity adjacency matrix with
-self-loops, distance edges, and correlation edges. The decoder predicts each
-masked maturity yield from its graph-updated node state:
+where \(\tilde{A}^{(c)}\) is the row-normalized adjacent-maturity matrix with
+self-loops and distance-based edge weights. The decoder predicts each masked
+maturity yield from its graph-updated node state:
 
 ```math
 \hat{y}_t^{(c,m)}
