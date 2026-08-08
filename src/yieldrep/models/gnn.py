@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 import numpy as np
 import pandas as pd
@@ -21,6 +21,21 @@ NODE_FEATURE_COLUMNS = [
     "realized_vol",
     *CARRY_ROLL_FEATURE_COLUMNS,
 ]
+
+GNN_EDGE_ABLATION_COLUMNS = [
+    "country",
+    "edge_mode",
+    "edge_count",
+    "masked_test_rmse",
+    "masked_test_mae",
+    "clean_test_rmse",
+    "clean_test_mae",
+    "epochs_trained",
+    "best_validation_loss",
+    "masked_rmse_vs_adjacent_only",
+]
+
+EdgeMode = Literal["adjacent", "adjacent_correlation"]
 
 
 class MaturityGraphAutoencoder(nn.Module):
@@ -132,6 +147,67 @@ def build_gnn(config: ProjectConfig) -> list[Path]:
         )
 
     return output_paths
+
+
+def build_gnn_edge_ablation(config: ProjectConfig) -> Path:
+    """Compare adjacent-only and adjacent+correlation graph edges.
+
+    This ablation tests whether the extra correlation edges improve the
+    self-supervised masked maturity reconstruction task. It writes only a
+    summary table and does not overwrite the canonical graph-AE artifacts.
+    """
+    if not config.graph_nodes_path.exists() or not config.graph_edges_path.exists():
+        build_maturity_graph_dataset(config)
+
+    nodes = pd.read_parquet(config.graph_nodes_path)
+    edges = pd.read_parquet(config.graph_edges_path)
+    rows: list[dict[str, object]] = []
+
+    for country in sorted(nodes["country"].dropna().unique()):
+        country_nodes = nodes.loc[nodes["country"] == country].copy()
+        panel = _feature_panel(country_nodes)
+        if panel.shape[1] < config.pca.min_maturities:
+            continue
+        split = _date_ordered_split(panel, config.evaluation.test_fraction)
+        if split is None:
+            continue
+        train_panel, _ = split
+        if len(train_panel) < config.gnn.min_train_dates:
+            continue
+
+        country_edges = edges.loc[edges["country"] == country].copy()
+        edge_modes: list[EdgeMode] = ["adjacent", "adjacent_correlation"]
+        for edge_mode in edge_modes:
+            mode_edges = _filter_edges(country_edges, edge_mode)
+            result = fit_gnn_panel(
+                panel=panel,
+                edges=mode_edges,
+                test_fraction=config.evaluation.test_fraction,
+                latent_dim=config.gnn.latent_dim,
+                hidden_dim=config.gnn.hidden_dim,
+                n_layers=config.gnn.n_layers,
+                dropout=config.gnn.dropout,
+                epochs=config.gnn.epochs,
+                batch_size=config.gnn.batch_size,
+                learning_rate=config.gnn.learning_rate,
+                weight_decay=config.gnn.weight_decay,
+                validation_fraction=config.gnn.validation_fraction,
+                mask_probability=config.gnn.mask_probability,
+                clean_loss_weight=config.gnn.clean_loss_weight,
+                early_stopping_patience=config.gnn.early_stopping_patience,
+                min_delta=config.gnn.min_delta,
+                random_seed=config.gnn.random_seed,
+                max_train_dates=config.gnn.max_train_dates,
+            )
+            rows.append(_gnn_ablation_row(str(country), edge_mode, mode_edges, result.metrics))
+
+    table = pd.DataFrame(rows, columns=GNN_EDGE_ABLATION_COLUMNS)
+    if not table.empty:
+        table = _add_adjacent_only_comparison(table)
+
+    config.tables_dir.mkdir(parents=True, exist_ok=True)
+    table.to_csv(config.gnn_edge_ablation_table_path, index=False)
+    return config.gnn_edge_ablation_table_path
 
 
 def fit_gnn_panel(
@@ -368,6 +444,64 @@ def gnn_reconstruction_errors(config: ProjectConfig) -> pd.DataFrame:
         rows.append(test)
 
     return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+
+
+def _filter_edges(edges: pd.DataFrame, edge_mode: EdgeMode) -> pd.DataFrame:
+    if edge_mode == "adjacent":
+        return edges.loc[edges["edge_type"] == "adjacent"].copy()
+    if edge_mode == "adjacent_correlation":
+        return edges.loc[edges["edge_type"].isin(["adjacent", "correlation"])].copy()
+    raise ValueError(f"Unsupported edge mode: {edge_mode}")
+
+
+def _gnn_ablation_row(
+    country: str,
+    edge_mode: EdgeMode,
+    edges: pd.DataFrame,
+    metrics: pd.DataFrame,
+) -> dict[str, object]:
+    masked_test = _metric_scope_split(metrics, "masked", "test")
+    clean_test = _metric_scope_split(metrics, "clean", "test")
+    metadata = metrics.iloc[0] if not metrics.empty else pd.Series(dtype=object)
+    return {
+        "country": country,
+        "edge_mode": edge_mode,
+        "edge_count": len(edges),
+        "masked_test_rmse": _metric_value(masked_test, "rmse"),
+        "masked_test_mae": _metric_value(masked_test, "mae"),
+        "clean_test_rmse": _metric_value(clean_test, "rmse"),
+        "clean_test_mae": _metric_value(clean_test, "mae"),
+        "epochs_trained": _metric_value(metadata, "epochs_trained"),
+        "best_validation_loss": _metric_value(metadata, "best_validation_loss"),
+        "masked_rmse_vs_adjacent_only": np.nan,
+    }
+
+
+def _metric_scope_split(metrics: pd.DataFrame, metric_scope: str, split: str) -> pd.Series:
+    selected = metrics.loc[(metrics["metric_scope"] == metric_scope) & (metrics["split"] == split)]
+    return selected.iloc[0] if not selected.empty else pd.Series(dtype=object)
+
+
+def _metric_value(row: pd.Series, column: str) -> float:
+    return float(row[column]) if column in row.index and pd.notna(row[column]) else float("nan")
+
+
+def _add_adjacent_only_comparison(table: pd.DataFrame) -> pd.DataFrame:
+    frame = table.copy()
+    adjacent = (
+        frame.loc[frame["edge_mode"] == "adjacent", ["country", "masked_test_rmse"]]
+        .rename(columns={"masked_test_rmse": "adjacent_only_masked_test_rmse"})
+        .copy()
+    )
+    frame = frame.merge(adjacent, on="country", how="left")
+    frame["masked_rmse_vs_adjacent_only"] = (
+        frame["masked_test_rmse"] - frame["adjacent_only_masked_test_rmse"]
+    )
+    return (
+        frame.loc[:, GNN_EDGE_ABLATION_COLUMNS]
+        .sort_values(["country", "edge_mode"])
+        .reset_index(drop=True)
+    )
 
 
 def _feature_panel(nodes: pd.DataFrame) -> pd.DataFrame:

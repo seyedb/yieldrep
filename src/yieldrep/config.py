@@ -433,6 +433,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "learned_model_findings.csv"
 
     @property
+    def gnn_edge_ablation_table_path(self) -> Path:
+        return self.tables_dir / "gnn_edge_ablation.csv"
+
+    @property
     def representation_task_scorecard_table_path(self) -> Path:
         return self.tables_dir / "representation_task_scorecard.csv"
 

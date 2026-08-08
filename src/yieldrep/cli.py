@@ -47,7 +47,7 @@ from yieldrep.graph.dataset import build_maturity_graph_dataset
 from yieldrep.models.baselines import evaluate_baselines
 from yieldrep.models.autoencoder import build_autoencoder
 from yieldrep.models.forecasting import evaluate_supervised_forecasts
-from yieldrep.models.gnn import build_gnn
+from yieldrep.models.gnn import build_gnn, build_gnn_edge_ablation
 from yieldrep.models.transformer import build_transformer
 from yieldrep.visualization.plotly_baselines import plot_baseline_metrics
 from yieldrep.visualization.plotly_cross_market import plot_cross_market_pca
@@ -232,6 +232,13 @@ def build_gnn_command(config: Path = Path("configs/default.yaml")) -> None:
     project_config = load_config(config)
     for output_path in build_gnn(project_config):
         typer.echo(output_path)
+
+
+@app.command("gnn-edge-ablation")
+def gnn_edge_ablation_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Compare adjacent-only and adjacent+correlation graph autoencoders."""
+    project_config = load_config(config)
+    typer.echo(build_gnn_edge_ablation(project_config))
 
 
 @app.command("run-baselines")

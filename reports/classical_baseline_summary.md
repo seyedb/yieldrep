@@ -22,7 +22,7 @@ The current task set is:
 | Question | Current evidence |
 | --- | --- |
 | Clean reconstruction | PCA-5 remains the strongest benchmark. |
-| Masked maturity reconstruction | The maturity-graph autoencoder leads US and euro-area curves; the MLP autoencoder leads Canada. |
+| Masked maturity reconstruction | The maturity-graph autoencoder leads US and euro-area curves; the first edge ablation favors adjacent-only edges over adjacent+correlation edges in US and euro-area curves. |
 | Residual relative value | Signal is more visible at 20-day horizons than at daily horizons, especially in selected macro/market regimes. |
 | Volatility regimes | Realized curve-volatility and policy features remain strong reference baselines; learned models are competitive only in selected cells. |
 | Learned state diagnostics | Transformer and graph-AE states separate some macro/market regimes, with the clearest current separation in Canada unemployment regimes. |
@@ -46,6 +46,7 @@ representations, not as replacements for classical term-structure objects.
 | Representation task scorecard | `reports/tables/representation_task_scorecard.csv` |
 | Learned model findings | `reports/tables/learned_model_findings.csv` |
 | Learned reconstruction leaderboard | `reports/tables/learned_reconstruction_leaderboard.csv` |
+| GNN edge ablation | `reports/tables/gnn_edge_ablation.csv` |
 | Reconstruction comparison | `reports/tables/reconstruction_oos_comparison.csv` |
 | Residual RV scorecard | `reports/tables/residual_relative_value_scorecard.csv` |
 | RV regime scorecard | `reports/tables/residual_rv_regime_scorecard.csv` |

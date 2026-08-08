@@ -361,6 +361,11 @@ The model is evaluated only on masked reconstruction at this stage. Its inputs
 are observed curve-derived node features, not PCA, Nelson-Siegel, autoencoder,
 or Transformer outputs.
 
+The graph-edge ablation compares the same model under two edge sets:
+adjacent-maturity edges only, and adjacent plus historical-correlation edges.
+The reported statistic is the masked test reconstruction error difference
+relative to the adjacent-only graph.
+
 ## Targets
 
 ### Yield Change
