@@ -213,6 +213,14 @@ def _residual_rv_checkpoint_row(config: ProjectConfig) -> dict[str, object]:
         target="Nelson-Siegel residual convergence",
     )
     base["primary_metric"] = "spread_t_stat"
+    best_classical = base.get("best_classical")
+    if not pd.isna(best_classical):
+        base["best_classical"] = _residual_method_label(str(best_classical))
+    result = str(base.get("result", ""))
+    if "winner=" in result:
+        base["result"] = result.replace(
+            str(best_classical), _residual_method_label(str(best_classical)), 1
+        )
     return base
 
 
@@ -252,7 +260,9 @@ def _macro_conditioned_rv_checkpoint_row(config: ProjectConfig) -> dict[str, obj
         "task": "Macro/market-conditioned residual RV",
         "target": "Cross-sectional residual-change ranking by regime",
         "primary_metric": "mean_rank_ic winner count",
-        "best_classical": best_classical[0],
+        "best_classical": _residual_method_label(str(best_classical[0]))
+        if not pd.isna(best_classical[0])
+        else best_classical[0],
         "best_classical_value": best_classical[1],
         "best_learned": best_learned[0],
         "best_learned_value": best_learned[1],
@@ -297,10 +307,22 @@ def _checkpoint_result(row: pd.Series) -> str:
 
 def _method_label(representation: object, model: object) -> object:
     if pd.isna(representation):
-        return np.nan
+        return "not_applicable"
     if pd.isna(model) or str(model) == "":
         return str(representation)
     return f"{representation}/{model}"
+
+
+def _residual_method_label(method: str) -> str:
+    if method == "not_applicable":
+        return method
+    if method.startswith("nelson_siegel_residual/"):
+        return method.replace("/lagged/ridge", "/lagged_ridge")
+    if method == "residual/ridge":
+        return "nelson_siegel_residual/ridge"
+    if method == "lagged/ridge":
+        return "nelson_siegel_residual/lagged_ridge"
+    return method
 
 
 def _winner_counts(value: str) -> dict[str, int]:
