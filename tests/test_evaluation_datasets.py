@@ -55,6 +55,22 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
             "date": dates,
             "country": ["US", "US"],
             "maturity_years": [2.0, 2.0],
+            "residual": [0.01, 0.03],
+            "residual_z_60": [0.2, 0.4],
+            "residual_z_252": [0.1, 0.3],
+            "residual_change_1": [0.01, 0.02],
+            "residual_change_5": [0.01, 0.02],
+            "residual_vol_20": [0.01, 0.01],
+            "residual_local_slope": [0.0, 0.0],
+            "residual_local_curvature": [0.0, 0.0],
+            "residual_butterfly": [0.0, 0.0],
+        }
+    ).to_parquet(processed_dir / "residual_features.parquet", index=False)
+    pd.DataFrame(
+        {
+            "date": dates,
+            "country": ["US", "US"],
+            "maturity_years": [2.0, 2.0],
             "horizon_days": [1, 1],
             "realized_vol": [0.01, 0.02],
             "future_realized_vol": [0.02, 0.03],
@@ -109,6 +125,7 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         {
             processed_dir / "modeling" / "supervised_yield_change.parquet",
             processed_dir / "modeling" / "supervised_residual_change.parquet",
+            processed_dir / "modeling" / "residual_residual_targets.parquet",
             processed_dir / "modeling" / "supervised_vol_change.parquet",
             processed_dir / "modeling" / "lagged_targets.parquet",
             processed_dir / "modeling" / "curve_targets.parquet",
@@ -124,6 +141,9 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     lagged_targets = pd.read_parquet(processed_dir / "modeling" / "lagged_targets.parquet")
     curve_targets = pd.read_parquet(processed_dir / "modeling" / "curve_targets.parquet")
     carry_roll_targets = pd.read_parquet(processed_dir / "modeling" / "carry_roll_targets.parquet")
+    residual_targets = pd.read_parquet(
+        processed_dir / "modeling" / "residual_residual_targets.parquet"
+    )
     curve_vol_regime_targets = pd.read_parquet(
         processed_dir / "modeling" / "curve_vol_curve_vol_regime_targets.parquet"
     )
@@ -138,7 +158,13 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
         "target_yield_change",
     }.issubset(supervised.columns)
     assert set(supervised["split"]) == {"train", "test"}
-    assert {"target_residual_change", "level", "carry_3m"}.issubset(supervised_residual.columns)
+    assert {
+        "target_residual_change",
+        "level",
+        "carry_3m",
+        "residual_z_252",
+        "residual_local_slope",
+    }.issubset(supervised_residual.columns)
     assert set(supervised_residual["split"]) == {"train", "test"}
     assert {"target_vol_change", "future_vol_regime", "level", "carry_3m"}.issubset(
         supervised_vol.columns
@@ -148,10 +174,12 @@ def test_build_modeling_datasets_joins_features_to_targets(tmp_path: Path) -> No
     assert len(lagged_targets) == 1
     assert {"level", "slope_10y_2y", "target_yield_change"}.issubset(curve_targets.columns)
     assert len(curve_targets) == 2
-    assert {"carry_3m", "roll_down_3m", "target_yield_change"}.issubset(
-        carry_roll_targets.columns
-    )
+    assert {"carry_3m", "roll_down_3m", "target_yield_change"}.issubset(carry_roll_targets.columns)
     assert len(carry_roll_targets) == 2
+    assert {"residual_z_252", "residual_butterfly", "target_residual_change"}.issubset(
+        residual_targets.columns
+    )
+    assert len(residual_targets) == 2
     assert {"realized_curve_vol", "future_curve_move_rms"}.issubset(
         curve_vol_regime_targets.columns
     )

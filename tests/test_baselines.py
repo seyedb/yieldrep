@@ -48,7 +48,9 @@ def test_evaluate_baselines_writes_metrics(tmp_path: Path) -> None:
         / "baseline_metrics_by_maturity_point.parquet"
     )
 
-    assert output_path == tmp_path / "data" / "processed" / "evaluation" / "baseline_metrics.parquet"
+    assert (
+        output_path == tmp_path / "data" / "processed" / "evaluation" / "baseline_metrics.parquet"
+    )
     assert set(metrics["target"]) == {"yield_change"}
     expected_representations = {"lagged", "curve", "carry_roll"}
     assert set(metrics["representation"]) == expected_representations
@@ -145,9 +147,7 @@ def test_evaluate_baselines_supports_vol_targets(tmp_path: Path) -> None:
     output_path = evaluate_baselines(config)
     metrics = pd.read_parquet(output_path)
     classification_metrics = pd.read_parquet(config.baseline_classification_metrics_path)
-    classification_coefficients = pd.read_parquet(
-        config.baseline_classification_coefficients_path
-    )
+    classification_coefficients = pd.read_parquet(config.baseline_classification_coefficients_path)
 
     assert set(metrics["target"]) == {"vol_change"}
     assert set(metrics["representation"]) == {"curve"}
@@ -171,9 +171,9 @@ def test_evaluate_supervised_forecasts_writes_metrics_and_tables(tmp_path: Path)
         window_id=0,
     )
     data.to_parquet(modeling_dir / "supervised_yield_change.parquet", index=False)
-    residual_data = data.rename(
-        columns={"target_yield_change": "target_residual_change"}
-    ).assign(residual=0.01)
+    residual_data = data.rename(columns={"target_yield_change": "target_residual_change"}).assign(
+        residual=0.01
+    )
     residual_data.to_parquet(modeling_dir / "supervised_residual_change.parquet", index=False)
     vol_data = data.rename(columns={"target_yield_change": "target_vol_change"}).assign(
         future_vol_regime="medium"
@@ -201,7 +201,7 @@ def test_evaluate_supervised_forecasts_writes_metrics_and_tables(tmp_path: Path)
         config.supervised_forecast_by_maturity_bucket_table_path,
         config.supervised_forecast_coefficients_table_path,
     ]
-    assert set(metrics["representation"]) == {"curve", "lagged", "carry_roll"}
+    assert set(metrics["representation"]) == {"curve", "lagged", "carry_roll", "residual"}
     assert set(metrics["target"]) == {"yield_change", "residual_change", "vol_change"}
     assert set(metrics["model"]) == {"train_mean", "ridge", "elastic_net"}
     assert {
@@ -215,7 +215,7 @@ def test_evaluate_supervised_forecasts_writes_metrics_and_tables(tmp_path: Path)
     assert set(coefficients["model"]) == {"ridge", "elastic_net"}
     assert set(coefficients["target"]) == {"yield_change", "residual_change", "vol_change"}
     assert {"feature", "coefficient", "abs_coefficient"}.issubset(coefficients.columns)
-    assert set(summary["representation"]) == {"curve", "lagged", "carry_roll"}
+    assert set(summary["representation"]) == {"curve", "lagged", "carry_roll", "residual"}
 
 
 def test_date_ordered_split_keeps_dates_disjoint() -> None:

@@ -19,6 +19,7 @@ from yieldrep.evaluation.splits import (
     evaluation_splits,
     walk_forward_splits,
 )
+from yieldrep.factors.residual import RESIDUAL_FEATURE_COLUMNS
 
 GROUP_COLUMNS = ["country", "horizon_days"]
 MATURITY_GROUP_COLUMNS = ["country", "horizon_days", "maturity_bucket"]
@@ -496,6 +497,13 @@ def _evaluation_specs(config: ProjectConfig) -> list[EvaluationSpec]:
                         path=config.modeling_dir / f"curve{suffix}_targets.parquet",
                         features=_state_maturity_features(CURVE_FEATURES),
                         required_features=tuple(MATURITY_BASIS_FEATURES),
+                    ),
+                    EvaluationSpec(
+                        target=target,
+                        target_column=target_column,
+                        representation="residual",
+                        path=config.modeling_dir / f"residual{suffix}_targets.parquet",
+                        features=RESIDUAL_FEATURE_COLUMNS,
                     ),
                     EvaluationSpec(
                         target=target,

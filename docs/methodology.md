@@ -113,6 +113,7 @@ Engineered baselines include:
 - curvature
 - maturity-specific curve interactions
 - lagged yield and residual changes
+- residual z-scores, local residual slope, local residual curvature, and butterfly residuals
 - carry and roll-down proxies
 - policy-rate levels and changes
 - realized curve volatility
@@ -430,6 +431,13 @@ r_t^{(c,m)}
 
 Residuals define the relative-value object: rich or cheap maturities relative to
 the fitted curve.
+
+The classical residual RV feature set uses the residual level, rolling residual
+z-scores, residual momentum and volatility, and local cross-maturity residual
+shape features. Local slope and curvature are finite-difference derivatives of
+the residual curve across maturities; the butterfly residual is the current
+maturity residual minus the linearly interpolated residual implied by adjacent
+maturities.
 
 ### Volatility Regimes
 

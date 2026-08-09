@@ -17,8 +17,12 @@ def test_make_residual_features_builds_dynamic_features() -> None:
         "residual_change_1",
         "residual_change_5",
         "residual_vol_20",
+        "residual_local_slope",
+        "residual_local_curvature",
+        "residual_butterfly",
     }.issubset(features.columns)
     assert features["residual_z_252"].notna().all()
+    assert features["residual_local_slope"].notna().all()
 
 
 def test_residual_mean_reversion_summary_measures_convergence() -> None:
@@ -43,9 +47,7 @@ def test_residual_mean_reversion_summary_measures_convergence() -> None:
 
     summary = residual_mean_reversion_summary(features, targets)
 
-    all_residual = summary.loc[
-        (summary["sample"] == "all") & (summary["signal"] == "residual")
-    ]
+    all_residual = summary.loc[(summary["sample"] == "all") & (summary["signal"] == "residual")]
     assert not all_residual.empty
     assert all_residual["convergence_hit_rate"].eq(1.0).all()
     assert all_residual["mean_convergence_score"].gt(0.0).all()

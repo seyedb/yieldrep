@@ -13,6 +13,7 @@ from sklearn.preprocessing import StandardScaler
 from yieldrep.config import ProjectConfig
 from yieldrep.evaluation.metrics import directional_accuracy, mae, rmse
 from yieldrep.evaluation.splits import evaluation_splits
+from yieldrep.factors.residual import RESIDUAL_FEATURE_COLUMNS
 
 GROUP_COLUMNS = ["country", "horizon_days", "split_method", "window_id"]
 METRIC_GROUP_COLUMNS = ["target", "representation", "model"]
@@ -400,6 +401,7 @@ def _feature_sets(config: ProjectConfig) -> list[FeatureSet]:
                 "roll_down_12m",
             ],
         ),
+        FeatureSet("residual", RESIDUAL_FEATURE_COLUMNS, target_names=("residual_change",)),
         FeatureSet("autoencoder", [f"AE{i}" for i in range(1, config.autoencoder.latent_dim + 1)]),
         FeatureSet("transformer", [f"TE{i}" for i in range(1, config.transformer.latent_dim + 1)]),
         FeatureSet(

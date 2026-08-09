@@ -10,6 +10,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from yieldrep.config import ProjectConfig
+from yieldrep.factors.residual import RESIDUAL_FEATURE_COLUMNS
 
 DETAIL_COLUMNS = [
     "regime_type",
@@ -348,9 +349,12 @@ def _residual_rv_feature_sets(config: ProjectConfig) -> list[ResidualRVFeatureSe
                 "long_slope_30y_10y",
             ],
         ),
-        ResidualRVFeatureSet("residual", ["residual"]),
+        ResidualRVFeatureSet("residual", RESIDUAL_FEATURE_COLUMNS),
         ResidualRVFeatureSet("macro_market", MACRO_MARKET_COLUMNS),
-        ResidualRVFeatureSet("residual_macro_market", ["residual", *MACRO_MARKET_COLUMNS]),
+        ResidualRVFeatureSet(
+            "residual_macro_market",
+            [*RESIDUAL_FEATURE_COLUMNS, *MACRO_MARKET_COLUMNS],
+        ),
         ResidualRVFeatureSet(
             "carry_roll",
             [

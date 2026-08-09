@@ -78,6 +78,13 @@ def make_supervised_residual_change_dataset(
 ) -> pd.DataFrame:
     """Build the canonical supervised panel for residual-change forecasting."""
     dataset = make_supervised_feature_dataset(config, targets, curves)
+    residual_features = _read_residual_features(config)
+    if not residual_features.empty:
+        dataset = _merge_features(
+            dataset,
+            residual_features,
+            ["date", "country", "maturity_years"],
+        )
     graph_embeddings = _read_graph_autoencoder_embeddings(config)
     if not graph_embeddings.empty:
         dataset = _merge_features(dataset, graph_embeddings, ["date", "country"])
@@ -152,6 +159,12 @@ def _read_carry_roll_features(config: ProjectConfig) -> pd.DataFrame:
     if not config.carry_roll_features_path.exists():
         return pd.DataFrame()
     return pd.read_parquet(config.carry_roll_features_path)
+
+
+def _read_residual_features(config: ProjectConfig) -> pd.DataFrame:
+    if not config.residual_features_path.exists():
+        return pd.DataFrame()
+    return pd.read_parquet(config.residual_features_path)
 
 
 def _read_policy_features(config: ProjectConfig) -> pd.DataFrame:
@@ -275,6 +288,13 @@ def _build_target_family(
         carry_roll_targets.to_parquet(carry_roll_path, index=False)
         output_paths.append(carry_roll_path)
 
+    if suffix == "_residual":
+        residual_feature_targets = _join_residual_feature_targets(config, targets)
+        if not residual_feature_targets.empty:
+            residual_path = config.modeling_dir / f"residual{suffix}_targets.parquet"
+            residual_feature_targets.to_parquet(residual_path, index=False)
+            output_paths.append(residual_path)
+
     learned_feature_sets = [
         ("autoencoder", _read_autoencoder_embeddings(config)),
         ("transformer", _read_transformer_embeddings(config)),
@@ -365,6 +385,13 @@ def _join_carry_roll_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd
         return pd.DataFrame()
 
     features = pd.read_parquet(config.carry_roll_features_path)
+    return targets.merge(features, on=["date", "country", "maturity_years"], how="inner")
+
+
+def _join_residual_feature_targets(config: ProjectConfig, targets: pd.DataFrame) -> pd.DataFrame:
+    features = _read_residual_features(config)
+    if features.empty:
+        return pd.DataFrame()
     return targets.merge(features, on=["date", "country", "maturity_years"], how="inner")
 
 
