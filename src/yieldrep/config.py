@@ -434,20 +434,12 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "representation_comparison.csv"
 
     @property
-    def macro_conditioned_representation_summary_table_path(self) -> Path:
-        return self.tables_dir / "macro_conditioned_representation_summary.csv"
-
-    @property
     def learned_model_comparison_table_path(self) -> Path:
         return self.tables_dir / "learned_model_comparison.csv"
 
     @property
     def learned_reconstruction_leaderboard_table_path(self) -> Path:
         return self.tables_dir / "learned_reconstruction_leaderboard.csv"
-
-    @property
-    def learned_model_findings_table_path(self) -> Path:
-        return self.tables_dir / "learned_model_findings.csv"
 
     @property
     def gnn_edge_ablation_table_path(self) -> Path:

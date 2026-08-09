@@ -18,11 +18,9 @@ from yieldrep.evaluation.cross_market import build_cross_market_report
 from yieldrep.evaluation.diagnostics import diagnose_lagged_baseline
 from yieldrep.evaluation.learned_states import build_learned_state_regime_diagnostics
 from yieldrep.evaluation.learned_models import (
-    build_learned_model_findings,
     build_learned_model_comparison,
     build_learned_reconstruction_leaderboard,
 )
-from yieldrep.evaluation.macro_conditioning import build_macro_conditioned_representation_summary
 from yieldrep.evaluation.reports import (
     build_overlap_sensitivity_report,
     build_supervised_walk_forward_report,
@@ -314,13 +312,6 @@ def compare_representations_command(config: Path = Path("configs/default.yaml"))
     typer.echo(build_representation_comparison(project_config))
 
 
-@app.command("macro-conditioned-summary")
-def macro_conditioned_summary_command(config: Path = Path("configs/default.yaml")) -> None:
-    """Write macro- and market-conditioned representation diagnostics."""
-    project_config = load_config(config)
-    typer.echo(build_macro_conditioned_representation_summary(project_config))
-
-
 @app.command("residual-rv-regimes")
 def residual_rv_regimes_command(config: Path = Path("configs/default.yaml")) -> None:
     """Evaluate residual RV forecasts by macro and market regime."""
@@ -343,7 +334,6 @@ def compare_learned_models_command(config: Path = Path("configs/default.yaml")) 
     project_config = load_config(config)
     typer.echo(build_learned_model_comparison(project_config))
     typer.echo(build_learned_reconstruction_leaderboard(project_config))
-    typer.echo(build_learned_model_findings(project_config))
 
 
 @app.command("train-learned-models")
@@ -440,9 +430,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.extend(plot_learned_state_regimes(project_config))
     output_paths.append(build_learned_model_comparison(project_config))
     output_paths.append(build_learned_reconstruction_leaderboard(project_config))
-    output_paths.append(build_learned_model_findings(project_config))
     output_paths.append(build_representation_comparison(project_config))
-    output_paths.append(build_macro_conditioned_representation_summary(project_config))
     output_paths.append(build_representation_task_scorecard(project_config))
     output_paths.append(build_research_checkpoint_scorecard(project_config))
     output_paths.append(build_cross_market_report(project_config))
@@ -469,9 +457,7 @@ def train_learned_model_pipeline(project_config: ProjectConfig) -> list[Path]:
     typer.echo("refreshing comparison summaries")
     output_paths.append(build_learned_model_comparison(project_config))
     output_paths.append(build_learned_reconstruction_leaderboard(project_config))
-    output_paths.append(build_learned_model_findings(project_config))
     output_paths.append(build_representation_comparison(project_config))
-    output_paths.append(build_macro_conditioned_representation_summary(project_config))
     output_paths.append(build_representation_task_scorecard(project_config))
     output_paths.append(build_research_checkpoint_scorecard(project_config))
     return output_paths

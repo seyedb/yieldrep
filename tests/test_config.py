@@ -165,17 +165,11 @@ def test_load_config_reads_project_paths() -> None:
     assert config.representation_comparison_table_path == Path(
         "reports/tables/representation_comparison.csv"
     )
-    assert config.macro_conditioned_representation_summary_table_path == Path(
-        "reports/tables/macro_conditioned_representation_summary.csv"
-    )
     assert config.learned_model_comparison_table_path == Path(
         "reports/tables/learned_model_comparison.csv"
     )
     assert config.learned_reconstruction_leaderboard_table_path == Path(
         "reports/tables/learned_reconstruction_leaderboard.csv"
-    )
-    assert config.learned_model_findings_table_path == Path(
-        "reports/tables/learned_model_findings.csv"
     )
     assert config.gnn_edge_ablation_table_path == Path("reports/tables/gnn_edge_ablation.csv")
     assert config.representation_task_scorecard_table_path == Path(

@@ -497,16 +497,10 @@ forecast targets use non-overlapping test windows by default.
 | Volatility-regime classification | curve-shape, policy-rate, realized-volatility features | balanced accuracy, macro F1 |
 | Macro/market RV regimes | residual RV diagnostics by regime | high-minus-low hit rate, high-minus-low rank IC |
 
-The generated scenario map is:
+The canonical task-level summary is:
 
 ```text
-reports/tables/scenario_method_comparison.csv
-```
-
-The current scenario-level audit is:
-
-```text
-reports/tables/baseline_audit.csv
+reports/tables/research_checkpoint_scorecard.csv
 ```
 
 ### Reconstruction Metrics
@@ -629,15 +623,8 @@ Macro-enhanced RV benchmarks add backward-aligned public macro and market
 variables to the same residual-change forecast task, so macro information is
 tested as model input rather than only as a regime label.
 
-Learned-state regime diagnostics are reported in:
-
-```text
-data/processed/learned_states/regime_states.parquet
-reports/tables/learned_state_regime_summary.csv
-reports/tables/learned_state_regime_means.csv
-reports/figures/learned_state_regime_heatmap.html
-reports/figures/learned_state_space_regimes.html
-```
+Learned-state regime diagnostics are secondary diagnostics. The main
+representation comparison is the checkpoint scorecard.
 
 ### Classification Metrics
 
@@ -681,10 +668,8 @@ Implemented scope:
 - maturity-graph node and edge datasets
 - Plotly figures and CSV scorecards
 
-Planned next phase:
-
-- consolidate graph-aware masked reconstruction as the main self-supervised task
-- evaluate learned states against residual RV and volatility-regime tasks without
-  using one model's outputs as another model's inputs or targets
-- keep macro and market conditioning focused on interpretable regimes such as
-  inflation, unemployment, VIX, and MOVE
+This version should be read as a first research milestone, not an exhaustive
+model search or a trading strategy. The current conclusion is that PCA remains
+the clean-reconstruction benchmark, Nelson-Siegel residuals remain the main
+relative-value anchor, and learned representations are most useful for masked
+maturity reconstruction and selected regime-conditioned diagnostics.
