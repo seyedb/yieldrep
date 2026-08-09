@@ -451,6 +451,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "learned_reconstruction_leaderboard.csv"
 
     @property
+    def learned_reconstruction_results_table_path(self) -> Path:
+        return self.tables_dir / "learned_reconstruction_results.csv"
+
+    @property
     def graph_edge_ablation_table_path(self) -> Path:
         return self.tables_dir / "graph_edge_ablation.csv"
 
@@ -461,6 +465,18 @@ class ProjectConfig(BaseModel):
     @property
     def research_checkpoint_scorecard_table_path(self) -> Path:
         return self.tables_dir / "research_checkpoint_scorecard.csv"
+
+    @property
+    def representation_results_table_path(self) -> Path:
+        return self.tables_dir / "representation_results.csv"
+
+    @property
+    def research_summary_table_path(self) -> Path:
+        return self.tables_dir / "research_summary.csv"
+
+    @property
+    def residual_rv_results_table_path(self) -> Path:
+        return self.tables_dir / "residual_rv_results.csv"
 
     @property
     def baseline_by_maturity_point_top_table_path(self) -> Path:

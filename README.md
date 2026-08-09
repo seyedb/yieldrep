@@ -39,14 +39,14 @@ yieldrep/
   factors/         PCA, Nelson-Siegel, curve, carry, residual, policy features
   models/          forecasting baselines and learned reconstruction models
   graph/           maturity-graph dataset construction
-  evaluation/      targets, reconstruction, residual RV, regimes, scorecards
+  evaluation/      targets, reconstruction, residual RV, regimes, summaries
   visualization/   Plotly figures
 ```
 
 The canonical project summary is:
 
 ```text
-reports/tables/research_checkpoint_scorecard.csv
+reports/tables/research_summary.csv
 ```
 
 The residual relative-value protocol is defined in:
@@ -61,7 +61,7 @@ reports/tables/residual_rv_protocol.csv
 | --- | --- |
 | Clean reconstruction | PCA remains the strongest benchmark; the graph autoencoder is the best learned clean reconstructor but does not beat PCA. |
 | Masked maturity reconstruction | The maturity-graph autoencoder is the strongest learned model for the current masked reconstruction benchmark. |
-| Residual relative value | Nelson-Siegel residual convergence has positive but modest evidence; the current best specification is residual lagged-ridge. |
+| Residual relative value | Nelson-Siegel residuals define the relative-value object; maturity-aware residual features are the main classical benchmark. |
 | Volatility regimes | Realized curve-volatility features remain the strongest classifier; autoencoder states are close but not clearly better. |
 | Macro/market-conditioned residual RV | Nelson-Siegel residual features lead overall, while graph-autoencoder states are useful in selected regime cells. |
 
@@ -77,7 +77,7 @@ PYTHONPATH=src python -m yieldrep.cli plot-curves --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli plot-pca --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli run-baselines --config configs/default.yaml
 PYTHONPATH=src python -m yieldrep.cli train-learned-models --config configs/learned_heavy.yaml
-PYTHONPATH=src python -m yieldrep.cli scorecard --config configs/default.yaml
+PYTHONPATH=src python -m yieldrep.cli research-summary --config configs/default.yaml
 ```
 
 Generated data is written under `data/`; generated tables and figures are
@@ -90,10 +90,9 @@ data, a common curve schema, classical term-structure baselines, learned
 reconstruction baselines, graph-based masked reconstruction, and task-level
 evaluation diagnostics.
 
-The empirical conclusion is deliberately modest: PCA remains the clean
-reconstruction benchmark, Nelson-Siegel residuals remain the main relative-value
-anchor, and learned models are most useful in masked maturity reconstruction and
-selected regime-conditioned tasks.
+Current results are summarized in `reports/tables/research_summary.csv`,
+`reports/tables/representation_results.csv`, and
+`reports/tables/residual_rv_results.csv`.
 
 **Development Note**
 

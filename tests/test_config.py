@@ -172,10 +172,18 @@ def test_load_config_reads_project_paths() -> None:
     assert config.learned_reconstruction_leaderboard_table_path == Path(
         "reports/tables/learned_reconstruction_leaderboard.csv"
     )
+    assert config.learned_reconstruction_results_table_path == Path(
+        "reports/tables/learned_reconstruction_results.csv"
+    )
     assert config.graph_edge_ablation_table_path == Path("reports/tables/graph_edge_ablation.csv")
     assert config.representation_task_scorecard_table_path == Path(
         "reports/tables/representation_task_scorecard.csv"
     )
+    assert config.representation_results_table_path == Path(
+        "reports/tables/representation_results.csv"
+    )
+    assert config.research_summary_table_path == Path("reports/tables/research_summary.csv")
+    assert config.residual_rv_results_table_path == Path("reports/tables/residual_rv_results.csv")
     assert config.overlap_sensitivity_table_path == Path("reports/tables/overlap_sensitivity.csv")
     assert config.benchmark_conclusions_table_path == Path(
         "reports/tables/benchmark_conclusions.csv"

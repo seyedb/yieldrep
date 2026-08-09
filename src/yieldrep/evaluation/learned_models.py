@@ -71,8 +71,9 @@ def build_learned_reconstruction_leaderboard(config: ProjectConfig) -> Path:
     """Write one-row-per-country learned reconstruction winners from existing metrics."""
     config.tables_dir.mkdir(parents=True, exist_ok=True)
     table = learned_reconstruction_leaderboard(config)
+    table.to_csv(config.learned_reconstruction_results_table_path, index=False)
     table.to_csv(config.learned_reconstruction_leaderboard_table_path, index=False)
-    return config.learned_reconstruction_leaderboard_table_path
+    return config.learned_reconstruction_results_table_path
 
 
 def learned_model_comparison_table(config: ProjectConfig) -> pd.DataFrame:

@@ -27,8 +27,9 @@ from yieldrep.evaluation.reports import (
     summarize_baselines,
 )
 from yieldrep.evaluation.representations import build_representation_comparison
-from yieldrep.evaluation.scorecard import build_representation_task_scorecard
-from yieldrep.evaluation.scorecard import build_research_checkpoint_scorecard
+from yieldrep.evaluation.scorecard import build_representation_results
+from yieldrep.evaluation.scorecard import build_research_summary
+from yieldrep.evaluation.scorecard import build_residual_rv_results
 from yieldrep.evaluation.reconstruction import evaluate_reconstruction
 from yieldrep.evaluation.residual_rv import build_residual_rv_protocol
 from yieldrep.evaluation.residual_rv_regimes import (
@@ -326,11 +327,18 @@ def residual_rv_regimes_command(config: Path = Path("configs/default.yaml")) -> 
 
 @app.command("scorecard")
 def scorecard_command(config: Path = Path("configs/default.yaml")) -> None:
-    """Write task-level and checkpoint representation scorecards."""
+    """Legacy alias for research-summary."""
+    research_summary_command(config)
+
+
+@app.command("research-summary")
+def research_summary_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Write compact research summary tables."""
     project_config = load_config(config)
     typer.echo(build_residual_rv_protocol(project_config))
-    typer.echo(build_representation_task_scorecard(project_config))
-    typer.echo(build_research_checkpoint_scorecard(project_config))
+    typer.echo(build_residual_rv_results(project_config))
+    typer.echo(build_representation_results(project_config))
+    typer.echo(build_research_summary(project_config))
 
 
 @app.command("compare-learned-models")
@@ -437,8 +445,9 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_learned_reconstruction_leaderboard(project_config))
     output_paths.append(build_representation_comparison(project_config))
     output_paths.append(build_residual_rv_protocol(project_config))
-    output_paths.append(build_representation_task_scorecard(project_config))
-    output_paths.append(build_research_checkpoint_scorecard(project_config))
+    output_paths.append(build_residual_rv_results(project_config))
+    output_paths.append(build_representation_results(project_config))
+    output_paths.append(build_research_summary(project_config))
     output_paths.append(build_cross_market_report(project_config))
     output_paths.extend(plot_cross_market_pca(project_config))
     return output_paths
@@ -464,8 +473,9 @@ def train_learned_model_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_learned_model_comparison(project_config))
     output_paths.append(build_learned_reconstruction_leaderboard(project_config))
     output_paths.append(build_representation_comparison(project_config))
-    output_paths.append(build_representation_task_scorecard(project_config))
-    output_paths.append(build_research_checkpoint_scorecard(project_config))
+    output_paths.append(build_residual_rv_results(project_config))
+    output_paths.append(build_representation_results(project_config))
+    output_paths.append(build_research_summary(project_config))
     return output_paths
 
 

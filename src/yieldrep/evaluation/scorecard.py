@@ -44,22 +44,56 @@ RESEARCH_CHECKPOINT_COLUMNS = [
     "conclusion",
     "evidence_table",
 ]
+RESIDUAL_RV_RESULT_COLUMNS = [
+    "country",
+    "horizon_days",
+    "forecast_method",
+    "forecast_rmse",
+    "forecast_mae",
+    "regime_rank_ic_method",
+    "regime_rank_ic",
+    "regime_spread_method",
+    "regime_top_bottom_spread",
+    "evidence_tables",
+]
 
 
 def build_representation_task_scorecard(config: ProjectConfig) -> Path:
     """Write a task-level scorecard across classical and learned representations."""
-    config.tables_dir.mkdir(parents=True, exist_ok=True)
-    scorecard = representation_task_scorecard(config)
-    scorecard.to_csv(config.representation_task_scorecard_table_path, index=False)
+    build_representation_results(config)
     return config.representation_task_scorecard_table_path
 
 
 def build_research_checkpoint_scorecard(config: ProjectConfig) -> Path:
     """Write a compact research checkpoint table for the current project state."""
-    config.tables_dir.mkdir(parents=True, exist_ok=True)
-    scorecard = research_checkpoint_scorecard(config)
-    scorecard.to_csv(config.research_checkpoint_scorecard_table_path, index=False)
+    build_research_summary(config)
     return config.research_checkpoint_scorecard_table_path
+
+
+def build_representation_results(config: ProjectConfig) -> Path:
+    """Write task-level representation results across the current research tasks."""
+    config.tables_dir.mkdir(parents=True, exist_ok=True)
+    results = representation_task_scorecard(config)
+    results.to_csv(config.representation_results_table_path, index=False)
+    results.to_csv(config.representation_task_scorecard_table_path, index=False)
+    return config.representation_results_table_path
+
+
+def build_research_summary(config: ProjectConfig) -> Path:
+    """Write the compact project-level research summary."""
+    config.tables_dir.mkdir(parents=True, exist_ok=True)
+    summary = research_checkpoint_scorecard(config)
+    summary.to_csv(config.research_summary_table_path, index=False)
+    summary.to_csv(config.research_checkpoint_scorecard_table_path, index=False)
+    return config.research_summary_table_path
+
+
+def build_residual_rv_results(config: ProjectConfig) -> Path:
+    """Write a compact country/horizon summary for residual relative-value results."""
+    config.tables_dir.mkdir(parents=True, exist_ok=True)
+    results = residual_rv_results(config)
+    results.to_csv(config.residual_rv_results_table_path, index=False)
+    return config.residual_rv_results_table_path
 
 
 def representation_task_scorecard(config: ProjectConfig) -> pd.DataFrame:
@@ -110,6 +144,146 @@ def research_checkpoint_scorecard(config: ProjectConfig) -> pd.DataFrame:
         _macro_conditioned_rv_checkpoint_row(config),
     ]
     return pd.DataFrame(rows).loc[:, RESEARCH_CHECKPOINT_COLUMNS]
+
+
+def residual_rv_results(config: ProjectConfig) -> pd.DataFrame:
+    keys = _residual_rv_result_keys(config)
+    if keys.empty:
+        return pd.DataFrame(columns=RESIDUAL_RV_RESULT_COLUMNS)
+
+    forecast = _residual_forecast_results(config)
+    rank_ic = _residual_regime_rank_ic_results(config)
+    spread = _residual_regime_spread_results(config)
+
+    results = keys.merge(forecast, on=["country", "horizon_days"], how="left")
+    results = results.merge(rank_ic, on=["country", "horizon_days"], how="left")
+    results = results.merge(spread, on=["country", "horizon_days"], how="left")
+    evidence_tables = [
+        str(path)
+        for path in [
+            config.supervised_forecast_rank_table_path,
+            config.residual_rv_representation_regime_scorecard_table_path,
+        ]
+        if path.exists()
+    ]
+    results["evidence_tables"] = "; ".join(evidence_tables)
+    return results.loc[:, RESIDUAL_RV_RESULT_COLUMNS].sort_values(["country", "horizon_days"])
+
+
+def _residual_rv_result_keys(config: ProjectConfig) -> pd.DataFrame:
+    frames = []
+    if config.supervised_forecast_rank_table_path.exists():
+        forecast = pd.read_csv(config.supervised_forecast_rank_table_path)
+        if {"target", "country", "horizon_days"}.issubset(forecast.columns):
+            frames.append(
+                forecast.loc[
+                    forecast["target"] == "residual_change",
+                    ["country", "horizon_days"],
+                ]
+            )
+    if config.residual_rv_representation_regime_scorecard_table_path.exists():
+        regime = pd.read_csv(config.residual_rv_representation_regime_scorecard_table_path)
+        if {"country", "horizon_days"}.issubset(regime.columns):
+            frames.append(regime.loc[:, ["country", "horizon_days"]])
+    if not frames:
+        return pd.DataFrame(columns=["country", "horizon_days"])
+    keys = pd.concat(frames, ignore_index=True).drop_duplicates()
+    return keys.sort_values(["country", "horizon_days"]).reset_index(drop=True)
+
+
+def _residual_forecast_results(config: ProjectConfig) -> pd.DataFrame:
+    table = config.supervised_forecast_rank_table_path
+    columns = ["country", "horizon_days", "forecast_method", "forecast_rmse", "forecast_mae"]
+    if not table.exists():
+        return pd.DataFrame(columns=columns)
+    data = pd.read_csv(table)
+    required = {
+        "target",
+        "country",
+        "horizon_days",
+        "representation",
+        "model",
+        "mean_rmse",
+        "mean_mae",
+    }
+    if not required.issubset(data.columns):
+        return pd.DataFrame(columns=columns)
+    residual = data.loc[data["target"] == "residual_change"].copy()
+    if residual.empty:
+        return pd.DataFrame(columns=columns)
+    residual = residual.sort_values(
+        ["country", "horizon_days", "mean_rmse", "mean_mae", "representation", "model"]
+    )
+    best = residual.groupby(["country", "horizon_days"], as_index=False).first()
+    best["forecast_method"] = best.apply(
+        lambda row: _method_label(row["representation"], row["model"]),
+        axis=1,
+    )
+    return best.rename(columns={"mean_rmse": "forecast_rmse", "mean_mae": "forecast_mae"}).loc[
+        :, columns
+    ]
+
+
+def _residual_regime_rank_ic_results(config: ProjectConfig) -> pd.DataFrame:
+    table = config.residual_rv_representation_regime_scorecard_table_path
+    columns = ["country", "horizon_days", "regime_rank_ic_method", "regime_rank_ic"]
+    if not table.exists():
+        return pd.DataFrame(columns=columns)
+    data = pd.read_csv(table)
+    required = {"country", "horizon_days", "best_by_rank_ic", "best_rank_ic"}
+    if not required.issubset(data.columns):
+        return pd.DataFrame(columns=columns)
+    data = data.dropna(subset=["best_rank_ic"]).copy()
+    if data.empty:
+        return pd.DataFrame(columns=columns)
+    grouped = (
+        data.groupby(["country", "horizon_days", "best_by_rank_ic"], as_index=False)["best_rank_ic"]
+        .mean()
+        .sort_values(["country", "horizon_days", "best_rank_ic"], ascending=[True, True, False])
+    )
+    best = grouped.groupby(["country", "horizon_days"], as_index=False).first()
+    return best.rename(
+        columns={
+            "best_by_rank_ic": "regime_rank_ic_method",
+            "best_rank_ic": "regime_rank_ic",
+        }
+    ).loc[:, columns]
+
+
+def _residual_regime_spread_results(config: ProjectConfig) -> pd.DataFrame:
+    table = config.residual_rv_representation_regime_scorecard_table_path
+    columns = [
+        "country",
+        "horizon_days",
+        "regime_spread_method",
+        "regime_top_bottom_spread",
+    ]
+    if not table.exists():
+        return pd.DataFrame(columns=columns)
+    data = pd.read_csv(table)
+    required = {"country", "horizon_days", "best_by_spread", "best_top_bottom_spread"}
+    if not required.issubset(data.columns):
+        return pd.DataFrame(columns=columns)
+    data = data.dropna(subset=["best_top_bottom_spread"]).copy()
+    if data.empty:
+        return pd.DataFrame(columns=columns)
+    grouped = (
+        data.groupby(["country", "horizon_days", "best_by_spread"], as_index=False)[
+            "best_top_bottom_spread"
+        ]
+        .mean()
+        .sort_values(
+            ["country", "horizon_days", "best_top_bottom_spread"],
+            ascending=[True, True, False],
+        )
+    )
+    best = grouped.groupby(["country", "horizon_days"], as_index=False).first()
+    return best.rename(
+        columns={
+            "best_by_spread": "regime_spread_method",
+            "best_top_bottom_spread": "regime_top_bottom_spread",
+        }
+    ).loc[:, columns]
 
 
 def _reconstruction_row(config: ProjectConfig, task: str) -> dict[str, object]:
@@ -217,7 +391,7 @@ def _residual_rv_checkpoint_row(config: ProjectConfig) -> dict[str, object]:
     if not pd.isna(best_classical):
         base["best_classical"] = _residual_method_label(str(best_classical))
     result = str(base.get("result", ""))
-    if "winner=" in result:
+    if "selected=" in result:
         base["result"] = result.replace(
             str(best_classical), _residual_method_label(str(best_classical)), 1
         )
@@ -259,7 +433,7 @@ def _macro_conditioned_rv_checkpoint_row(config: ProjectConfig) -> dict[str, obj
     return {
         "task": "Macro/market-conditioned residual RV",
         "target": "Cross-sectional residual-change ranking by regime",
-        "primary_metric": "mean_rank_ic winner count",
+        "primary_metric": "mean_rank_ic selection count",
         "best_classical": _residual_method_label(str(best_classical[0]))
         if not pd.isna(best_classical[0])
         else best_classical[0],
@@ -299,10 +473,10 @@ def _checkpoint_result(row: pd.Series) -> str:
     )
     materiality = str(row.get("materiality_flag", ""))
     if pd.isna(row.get("best_learned_value")):
-        return f"winner={best}; no learned comparison"
+        return f"selected={best}; no learned comparison"
     if pd.isna(row.get("best_classical_value")):
-        return f"winner={best}; best_learned={learned}; learned-only benchmark"
-    return f"winner={best}; best_classical={classical}; best_learned={learned}; {materiality}"
+        return f"selected={best}; best_learned={learned}; learned-only benchmark"
+    return f"selected={best}; best_classical={classical}; best_learned={learned}; {materiality}"
 
 
 def _method_label(representation: object, model: object) -> object:

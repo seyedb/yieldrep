@@ -512,7 +512,7 @@ forecast targets use non-overlapping test windows by default.
 The canonical task-level summary is:
 
 ```text
-reports/tables/research_checkpoint_scorecard.csv
+reports/tables/research_summary.csv
 ```
 
 ### Reconstruction Metrics
@@ -602,7 +602,7 @@ H
 \right]
 ```
 
-The RV regime scorecard compares residual mean-reversion diagnostics across
+The RV regime summary compares residual mean-reversion diagnostics across
 high and low macro/market regimes:
 
 ```math
@@ -636,7 +636,7 @@ variables to the same residual-change forecast task, so macro information is
 tested as model input rather than only as a regime label.
 
 Learned-state regime diagnostics are secondary diagnostics. The main
-representation comparison is the checkpoint scorecard.
+representation comparison is the project research summary.
 
 ### Classification Metrics
 
@@ -678,7 +678,7 @@ Implemented scope:
 - autoencoder, maturity Transformer, and maturity-graph autoencoder reconstruction baselines
 - learned-state regime diagnostics
 - maturity-graph node and edge datasets
-- Plotly figures and CSV scorecards
+- Plotly figures and CSV summaries
 
 This version should be read as a first research milestone, not an exhaustive
 model search or a trading strategy. The current conclusion is that PCA remains

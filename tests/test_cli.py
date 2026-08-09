@@ -240,16 +240,11 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr(
         cli, "build_residual_rv_protocol", single_step("build_residual_rv_protocol")
     )
+    monkeypatch.setattr(cli, "build_residual_rv_results", single_step("build_residual_rv_results"))
     monkeypatch.setattr(
-        cli,
-        "build_representation_task_scorecard",
-        single_step("build_representation_task_scorecard"),
+        cli, "build_representation_results", single_step("build_representation_results")
     )
-    monkeypatch.setattr(
-        cli,
-        "build_research_checkpoint_scorecard",
-        single_step("build_research_checkpoint_scorecard"),
-    )
+    monkeypatch.setattr(cli, "build_research_summary", single_step("build_research_summary"))
     monkeypatch.setattr(cli, "build_cross_market_report", single_step("build_cross_market_report"))
     monkeypatch.setattr(cli, "plot_cross_market_pca", multi_step("plot_cross_market_pca"))
 
@@ -288,8 +283,9 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_learned_reconstruction_leaderboard",
         "build_representation_comparison",
         "build_residual_rv_protocol",
-        "build_representation_task_scorecard",
-        "build_research_checkpoint_scorecard",
+        "build_residual_rv_results",
+        "build_representation_results",
+        "build_research_summary",
         "build_cross_market_report",
         "plot_cross_market_pca",
     ]
