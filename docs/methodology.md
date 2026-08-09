@@ -414,7 +414,11 @@ y_t^{(c,m)}
 \hat{y}_t^{(c,m)}
 ```
 
-Residual change is:
+For relative value, Nelson-Siegel is used as the reference curve, not as an
+assumption that the fitted curve is true fair value. The residual is the
+interpretable deviation from a smooth parametric curve.
+
+Residual change is the forward RV target:
 
 ```math
 \Delta r_{t,h}^{(c,m)}
@@ -545,9 +549,9 @@ x_{t,j}-\hat{x}_{t,j}
 
 ### Residual RV Metrics
 
-For each date, country, and horizon, maturities are ranked by predicted residual
-change. The spread score is the realized average target of the top-ranked group
-minus the bottom-ranked group:
+For each date, country, and horizon, maturities are ranked by predicted future
+residual change \(\hat{\Delta r}_{t,h}^{(c,m)}\). The spread score is the
+realized average target of the top-ranked group minus the bottom-ranked group:
 
 ```math
 S_{t,h}^{(c)}
@@ -569,8 +573,8 @@ IC_t
 =
 \mathrm{corr}
 \left(
-\mathrm{rank}(\hat{y}_t^{(m)}),
-\mathrm{rank}(y_t^{(m)})
+\mathrm{rank}(\hat{\Delta r}_{t,h}^{(c,m)}),
+\mathrm{rank}(\Delta r_{t,h}^{(c,m)})
 \right)
 ```
 

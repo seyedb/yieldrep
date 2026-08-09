@@ -238,6 +238,9 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         cli, "build_representation_comparison", single_step("build_representation_comparison")
     )
     monkeypatch.setattr(
+        cli, "build_residual_rv_protocol", single_step("build_residual_rv_protocol")
+    )
+    monkeypatch.setattr(
         cli,
         "build_representation_task_scorecard",
         single_step("build_representation_task_scorecard"),
@@ -284,6 +287,7 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_learned_model_comparison",
         "build_learned_reconstruction_leaderboard",
         "build_representation_comparison",
+        "build_residual_rv_protocol",
         "build_representation_task_scorecard",
         "build_research_checkpoint_scorecard",
         "build_cross_market_report",

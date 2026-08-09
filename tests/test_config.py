@@ -116,6 +116,7 @@ def test_load_config_reads_project_paths() -> None:
     assert config.residual_relative_value_scorecard_table_path == Path(
         "reports/tables/residual_relative_value_scorecard.csv"
     )
+    assert config.residual_rv_protocol_table_path == Path("reports/tables/residual_rv_protocol.csv")
     assert config.residual_rv_by_market_regime_table_path == Path(
         "reports/tables/residual_rv_by_market_regime.csv"
     )

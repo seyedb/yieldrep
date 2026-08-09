@@ -375,6 +375,10 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "residual_relative_value_scorecard.csv"
 
     @property
+    def residual_rv_protocol_table_path(self) -> Path:
+        return self.tables_dir / "residual_rv_protocol.csv"
+
+    @property
     def residual_rv_by_market_regime_table_path(self) -> Path:
         return self.tables_dir / "residual_rv_by_market_regime.csv"
 

@@ -49,6 +49,12 @@ The canonical project summary is:
 reports/tables/research_checkpoint_scorecard.csv
 ```
 
+The residual relative-value protocol is defined in:
+
+```text
+reports/tables/residual_rv_protocol.csv
+```
+
 ## Current Findings
 
 | Task | Current result |

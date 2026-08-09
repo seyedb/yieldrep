@@ -47,6 +47,77 @@ MACRO_REGIME_SUMMARY_COLUMNS = [
     "mean_rank_ic",
     "rank_ic_dates",
 ]
+PROTOCOL_COLUMNS = [
+    "step",
+    "object",
+    "definition",
+    "formula",
+    "role",
+]
+
+
+def build_residual_rv_protocol(config: ProjectConfig) -> Path:
+    """Write the canonical Nelson-Siegel residual-RV protocol table."""
+    config.tables_dir.mkdir(parents=True, exist_ok=True)
+    protocol = residual_rv_protocol_table()
+    protocol.to_csv(config.residual_rv_protocol_table_path, index=False)
+    return config.residual_rv_protocol_table_path
+
+
+def residual_rv_protocol_table() -> pd.DataFrame:
+    """Define the residual relative-value task around a Nelson-Siegel reference curve."""
+    rows = [
+        {
+            "step": "reference_curve",
+            "object": "Nelson-Siegel fitted yield",
+            "definition": "Smooth parametric curve fitted separately by country and date.",
+            "formula": "y_hat_NS_t(m)",
+            "role": "Defines the interpretable curve-fair-value reference.",
+        },
+        {
+            "step": "rv_state",
+            "object": "Nelson-Siegel residual",
+            "definition": "Observed yield minus fitted Nelson-Siegel yield at the same maturity.",
+            "formula": "r_t(m) = y_t(m) - y_hat_NS_t(m)",
+            "role": "Defines rich/cheap maturity deviations relative to the smooth curve.",
+        },
+        {
+            "step": "target",
+            "object": "future residual change",
+            "definition": "Forward change in the Nelson-Siegel residual over horizon h.",
+            "formula": "Delta r_{t,h}(m) = r_{t+h}(m) - r_t(m)",
+            "role": "Common RV target used by classical and learned feature sets.",
+        },
+        {
+            "step": "direct_convergence_signal",
+            "object": "negative residual or residual z-score",
+            "definition": "A mean-reversion signal points against the current residual sign.",
+            "formula": "s_t(m) = -r_t(m) or -z_t(m)",
+            "role": "Baseline signal for direct residual convergence diagnostics.",
+        },
+        {
+            "step": "ranking_metric",
+            "object": "cross-sectional rank IC",
+            "definition": "Date-level Spearman correlation between predicted and realized residual changes across maturities.",
+            "formula": "IC_t = corr(rank(y_pred_t(m)), rank(Delta r_{t,h}(m)))",
+            "role": "Primary metric for relative-value ranking quality.",
+        },
+        {
+            "step": "spread_metric",
+            "object": "top-minus-bottom residual-change spread",
+            "definition": "Realized residual change of top-ranked maturities minus bottom-ranked maturities.",
+            "formula": "S_t = mean_{m in top}(Delta r_{t,h}(m)) - mean_{m in bottom}(Delta r_{t,h}(m))",
+            "role": "Portfolio-style diagnostic for whether rankings order residual convergence.",
+        },
+        {
+            "step": "conditioning",
+            "object": "macro and market regimes",
+            "definition": "Backward-aligned public macro/market regimes such as inflation, unemployment, VIX, and MOVE.",
+            "formula": "regime_t in {low, medium, high}",
+            "role": "Evaluates when each representation works without redefining the RV target.",
+        },
+    ]
+    return pd.DataFrame(rows, columns=PROTOCOL_COLUMNS)
 
 
 def build_residual_mean_reversion_report(config: ProjectConfig) -> Path:
