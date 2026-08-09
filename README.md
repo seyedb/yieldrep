@@ -49,6 +49,16 @@ The canonical project summary is:
 reports/tables/research_checkpoint_scorecard.csv
 ```
 
+## Current Findings
+
+| Task | Current result |
+| --- | --- |
+| Clean reconstruction | PCA remains the strongest benchmark; the graph autoencoder is the best learned clean reconstructor but does not beat PCA. |
+| Masked maturity reconstruction | The maturity-graph autoencoder is the strongest learned model for the current masked reconstruction benchmark. |
+| Residual relative value | Nelson-Siegel residual convergence has positive but modest evidence; the current best specification is residual lagged-ridge. |
+| Volatility regimes | Realized curve-volatility features remain the strongest classifier; autoencoder states are close but not clearly better. |
+| Macro/market-conditioned residual RV | Nelson-Siegel residual features lead overall, while graph-autoencoder states are useful in selected regime cells. |
+
 ## Usage
 
 Run commands from the project root. In PyCharm, use the project conda
@@ -67,7 +77,7 @@ PYTHONPATH=src python -m yieldrep.cli scorecard --config configs/default.yaml
 Generated data is written under `data/`; generated tables and figures are
 written under `reports/`.
 
-## Status
+## Milestone Status
 
 This version completes the first research milestone: public sovereign curve
 data, a common curve schema, classical term-structure baselines, learned
