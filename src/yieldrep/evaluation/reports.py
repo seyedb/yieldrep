@@ -763,9 +763,9 @@ def _audit_evidence_quality(scenario: str, residual_rv_scorecard: pd.DataFrame) 
     if scenario == "curve_reconstruction":
         return "strong classical hurdle; learned models evaluated but not best"
     if scenario == "masked_maturity_reconstruction":
-        return "AE is current learned hurdle; Transformer remains weak"
+        return "AE is current learned hurdle; Transformer requires further tuning"
     if scenario == "outright_yield_forecasting":
-        return "weak and noisy; not the central win condition"
+        return "noisy target; not the central win condition"
     if scenario == "residual_relative_value":
         if residual_rv_scorecard.empty:
             return "not_evaluated"
@@ -773,7 +773,7 @@ def _audit_evidence_quality(scenario: str, residual_rv_scorecard: pd.DataFrame) 
         if any(label.startswith("moderate_positive") for label in labels):
             return "moderate at selected 20d horizons; modest at shorter horizons"
         if "weak_positive" in labels:
-            return "weak positive"
+            return "positive with limited magnitude"
         return "mixed"
     if scenario == "volatility_regime_classification":
         return "useful benchmark task; current hurdle is curve volatility and policy features"
@@ -1261,7 +1261,7 @@ def _residual_rv_takeaway(row: pd.Series) -> str:
     if label == "weak_positive":
         return f"Positive but modest residual-RV evidence at {horizon}d."
     if label == "ranking_positive":
-        return f"Ranking evidence is positive, but direct mean reversion is weaker at {horizon}d."
+        return f"Ranking evidence is positive; direct mean reversion is less clear at {horizon}d."
     return f"Mixed residual-RV evidence at {horizon}d."
 
 

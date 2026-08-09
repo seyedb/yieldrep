@@ -20,14 +20,19 @@ def plot_residual_zscores(config: ProjectConfig) -> list[Path]:
     return [config.residual_zscores_figure_path]
 
 
-def plot_residual_rv_regime_scorecard(config: ProjectConfig) -> list[Path]:
-    """Plot RV regime scorecard high-minus-low hit-rate as a heatmap."""
+def plot_residual_rv_regime_summary(config: ProjectConfig) -> list[Path]:
+    """Plot RV regime high-minus-low hit-rate as a heatmap."""
     config.figures_dir.mkdir(parents=True, exist_ok=True)
 
-    scorecard = pd.read_csv(config.residual_rv_regime_scorecard_table_path)
-    figure = _plot_residual_rv_regime_heatmap(scorecard)
+    summary = pd.read_csv(config.residual_rv_regime_scorecard_table_path)
+    figure = _plot_residual_rv_regime_heatmap(summary)
     figure.write_html(config.residual_rv_regime_heatmap_figure_path)
     return [config.residual_rv_regime_heatmap_figure_path]
+
+
+def plot_residual_rv_regime_scorecard(config: ProjectConfig) -> list[Path]:
+    """Compatibility wrapper for the older plotting function name."""
+    return plot_residual_rv_regime_summary(config)
 
 
 def _plot_residual_zscores(features: pd.DataFrame, selected_maturities: list[float]) -> Any:
@@ -53,11 +58,11 @@ def _plot_residual_zscores(features: pd.DataFrame, selected_maturities: list[flo
     )
 
 
-def _plot_residual_rv_regime_heatmap(scorecard: pd.DataFrame) -> Any:
-    if scorecard.empty:
+def _plot_residual_rv_regime_heatmap(summary: pd.DataFrame) -> Any:
+    if summary.empty:
         return go.Figure()
 
-    frame = scorecard.copy()
+    frame = summary.copy()
     frame["row"] = frame["country"].astype(str) + " " + frame["horizon_days"].astype(str) + "d"
     frame["column"] = frame["regime_type"].astype(str) + ": " + frame["indicator"].astype(str)
     frame = frame.sort_values(["country", "horizon_days", "regime_type", "indicator"])
@@ -88,7 +93,7 @@ def _plot_residual_rv_regime_heatmap(scorecard: pd.DataFrame) -> Any:
         )
     )
     figure.update_layout(
-        title="Residual RV regime scorecard",
+        title="Residual RV regime summary",
         xaxis_title="Regime indicator",
         yaxis_title="Country / horizon",
     )

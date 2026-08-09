@@ -7,7 +7,7 @@ import pandas as pd
 import plotly.express as px
 
 from yieldrep.config import ProjectConfig
-from yieldrep.visualization.plotly_residual_rv import plot_residual_rv_regime_scorecard
+from yieldrep.visualization.plotly_residual_rv import plot_residual_rv_regime_summary
 from yieldrep.visualization.plotly_residual_rv import plot_residual_zscores
 
 
@@ -32,7 +32,7 @@ def plot_baseline_metrics(config: ProjectConfig) -> list[Path]:
     if config.residual_features_path.exists():
         output_paths.extend(plot_residual_zscores(config))
     if config.residual_rv_regime_scorecard_table_path.exists():
-        output_paths.extend(plot_residual_rv_regime_scorecard(config))
+        output_paths.extend(plot_residual_rv_regime_summary(config))
     return output_paths
 
 

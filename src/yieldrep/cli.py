@@ -19,7 +19,7 @@ from yieldrep.evaluation.diagnostics import diagnose_lagged_baseline
 from yieldrep.evaluation.learned_states import build_learned_state_regime_diagnostics
 from yieldrep.evaluation.learned_models import (
     build_learned_model_comparison,
-    build_learned_reconstruction_leaderboard,
+    build_learned_reconstruction_results,
 )
 from yieldrep.evaluation.reports import (
     build_overlap_sensitivity_report,
@@ -346,7 +346,7 @@ def compare_learned_models_command(config: Path = Path("configs/default.yaml")) 
     """Write learned-model reconstruction comparison tables."""
     project_config = load_config(config)
     typer.echo(build_learned_model_comparison(project_config))
-    typer.echo(build_learned_reconstruction_leaderboard(project_config))
+    typer.echo(build_learned_reconstruction_results(project_config))
 
 
 @app.command("train-learned-models")
@@ -442,7 +442,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.extend(build_learned_state_regime_diagnostics(project_config))
     output_paths.extend(plot_learned_state_regimes(project_config))
     output_paths.append(build_learned_model_comparison(project_config))
-    output_paths.append(build_learned_reconstruction_leaderboard(project_config))
+    output_paths.append(build_learned_reconstruction_results(project_config))
     output_paths.append(build_representation_comparison(project_config))
     output_paths.append(build_residual_rv_protocol(project_config))
     output_paths.append(build_residual_rv_results(project_config))
@@ -471,7 +471,7 @@ def train_learned_model_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.extend(plot_learned_state_regimes(project_config))
     typer.echo("refreshing comparison summaries")
     output_paths.append(build_learned_model_comparison(project_config))
-    output_paths.append(build_learned_reconstruction_leaderboard(project_config))
+    output_paths.append(build_learned_reconstruction_results(project_config))
     output_paths.append(build_representation_comparison(project_config))
     output_paths.append(build_residual_rv_results(project_config))
     output_paths.append(build_representation_results(project_config))

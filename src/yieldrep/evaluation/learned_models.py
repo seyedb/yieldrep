@@ -45,7 +45,7 @@ LEARNED_RECONSTRUCTION_REPRESENTATIONS = {
     "masked_graph_autoencoder",
 }
 
-LEADERBOARD_COLUMNS = [
+LEARNED_RECONSTRUCTION_RESULT_COLUMNS = [
     "country",
     "best_clean_model",
     "best_clean_rmse",
@@ -67,13 +67,18 @@ def build_learned_model_comparison(config: ProjectConfig) -> Path:
     return config.learned_model_comparison_table_path
 
 
-def build_learned_reconstruction_leaderboard(config: ProjectConfig) -> Path:
-    """Write one-row-per-country learned reconstruction winners from existing metrics."""
+def build_learned_reconstruction_results(config: ProjectConfig) -> Path:
+    """Write one-row-per-country learned reconstruction results from existing metrics."""
     config.tables_dir.mkdir(parents=True, exist_ok=True)
-    table = learned_reconstruction_leaderboard(config)
+    table = learned_reconstruction_results(config)
     table.to_csv(config.learned_reconstruction_results_table_path, index=False)
     table.to_csv(config.learned_reconstruction_leaderboard_table_path, index=False)
     return config.learned_reconstruction_results_table_path
+
+
+def build_learned_reconstruction_leaderboard(config: ProjectConfig) -> Path:
+    """Compatibility wrapper for the older learned reconstruction table name."""
+    return build_learned_reconstruction_results(config)
 
 
 def learned_model_comparison_table(config: ProjectConfig) -> pd.DataFrame:
@@ -197,28 +202,31 @@ def _fit_train_dates(train_split_dates: int, max_train_dates: int | None) -> int
     return min(train_split_dates, max_train_dates)
 
 
-def learned_reconstruction_leaderboard(config: ProjectConfig) -> pd.DataFrame:
+def learned_reconstruction_results(config: ProjectConfig) -> pd.DataFrame:
     if not config.reconstruction_oos_comparison_table_path.exists():
-        return pd.DataFrame(columns=LEADERBOARD_COLUMNS)
+        return pd.DataFrame(columns=LEARNED_RECONSTRUCTION_RESULT_COLUMNS)
 
     comparison = pd.read_csv(config.reconstruction_oos_comparison_table_path)
     learned = comparison.loc[
         comparison["representation"].isin(LEARNED_RECONSTRUCTION_REPRESENTATIONS)
     ].copy()
     if learned.empty:
-        return pd.DataFrame(columns=LEADERBOARD_COLUMNS)
+        return pd.DataFrame(columns=LEARNED_RECONSTRUCTION_RESULT_COLUMNS)
 
-    rows = [
-        _country_leaderboard_row(country, group) for country, group in learned.groupby("country")
-    ]
+    rows = [_country_result_row(country, group) for country, group in learned.groupby("country")]
     return (
-        pd.DataFrame(rows, columns=LEADERBOARD_COLUMNS)
+        pd.DataFrame(rows, columns=LEARNED_RECONSTRUCTION_RESULT_COLUMNS)
         .sort_values("country")
         .reset_index(drop=True)
     )
 
 
-def _country_leaderboard_row(country: str, group: pd.DataFrame) -> dict[str, object]:
+def learned_reconstruction_leaderboard(config: ProjectConfig) -> pd.DataFrame:
+    """Compatibility wrapper for the older learned reconstruction table name."""
+    return learned_reconstruction_results(config)
+
+
+def _country_result_row(country: str, group: pd.DataFrame) -> dict[str, object]:
     clean = group.loc[group["reconstruction_task"] == "clean_reconstruction"].copy()
     masked = group.loc[group["reconstruction_task"] == "masked_maturity_reconstruction"].copy()
     best_clean = _best_row(clean)
