@@ -96,7 +96,7 @@ class GraphConfig(BaseModel):
     correlation_top_k: int = 3
 
 
-class GNNConfig(BaseModel):
+class GraphAutoencoderConfig(BaseModel):
     edge_mode: Literal["adjacent", "adjacent_correlation"] = "adjacent"
     latent_dim: int = 5
     hidden_dim: int = 64
@@ -131,7 +131,7 @@ class ProjectConfig(BaseModel):
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     plots: PlotConfig = Field(default_factory=PlotConfig)
     graph: GraphConfig = Field(default_factory=GraphConfig)
-    gnn: GNNConfig = Field(default_factory=GNNConfig)
+    graph_autoencoder: GraphAutoencoderConfig = Field(default_factory=GraphAutoencoderConfig)
 
     @property
     def raw_dir(self) -> Path:
@@ -198,8 +198,13 @@ class ProjectConfig(BaseModel):
         return self.processed_dir / "transformer"
 
     @property
-    def gnn_dir(self) -> Path:
+    def graph_autoencoder_dir(self) -> Path:
+        # Existing generated artifacts live under the historical directory name.
         return self.processed_dir / "gnn"
+
+    @property
+    def gnn_dir(self) -> Path:
+        return self.graph_autoencoder_dir
 
     @property
     def learned_states_dir(self) -> Path:
@@ -442,8 +447,8 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "learned_reconstruction_leaderboard.csv"
 
     @property
-    def gnn_edge_ablation_table_path(self) -> Path:
-        return self.tables_dir / "gnn_edge_ablation.csv"
+    def graph_edge_ablation_table_path(self) -> Path:
+        return self.tables_dir / "graph_edge_ablation.csv"
 
     @property
     def representation_task_scorecard_table_path(self) -> Path:

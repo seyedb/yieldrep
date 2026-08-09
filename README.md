@@ -31,6 +31,18 @@ Current model families:
 - maturity Transformer
 - maturity-graph autoencoder
 
+Package layout:
+
+```text
+yieldrep/
+  data/            public-source loaders, normalization, schema checks
+  factors/         PCA, Nelson-Siegel, curve, carry, residual, policy features
+  models/          forecasting baselines and learned reconstruction models
+  graph/           maturity-graph dataset construction
+  evaluation/      targets, reconstruction, residual RV, regimes, scorecards
+  visualization/   Plotly figures
+```
+
 The canonical project summary is:
 
 ```text

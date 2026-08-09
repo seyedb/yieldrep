@@ -411,7 +411,7 @@ def _feature_sets(config: ProjectConfig) -> list[FeatureSet]:
 
 
 def _graph_autoencoder_residual_features(config: ProjectConfig) -> list[str]:
-    graph_features = [f"GE{i}" for i in range(1, config.gnn.latent_dim + 1)]
+    graph_features = [f"GE{i}" for i in range(1, config.graph_autoencoder.latent_dim + 1)]
     maturity_features = ["maturity", "maturity_squared", "log_maturity"]
     interaction_features = [
         f"{graph_feature}_x_{maturity_feature}"

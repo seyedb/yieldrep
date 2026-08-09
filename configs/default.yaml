@@ -47,7 +47,7 @@ transformer:
   min_train_dates: 252
   max_train_dates: 500
 
-gnn:
+graph_autoencoder:
   edge_mode: adjacent
   latent_dim: 5
   hidden_dim: 64

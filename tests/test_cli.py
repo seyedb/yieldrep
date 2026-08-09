@@ -189,7 +189,7 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr(cli, "build_nelson_siegel", multi_step("build_nelson_siegel"))
     monkeypatch.setattr(cli, "build_autoencoder", multi_step("build_autoencoder"))
     monkeypatch.setattr(cli, "build_transformer", multi_step("build_transformer"))
-    monkeypatch.setattr(cli, "build_gnn", multi_step("build_gnn"))
+    monkeypatch.setattr(cli, "build_graph_autoencoder", multi_step("build_graph_autoencoder"))
     monkeypatch.setattr(cli, "build_curve_features", single_step("build_curve_features"))
     monkeypatch.setattr(cli, "build_carry_roll_features", single_step("build_carry_roll_features"))
     monkeypatch.setattr(
@@ -261,7 +261,7 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_curve_features",
         "build_carry_roll_features",
         "build_maturity_graph_dataset",
-        "build_gnn",
+        "build_graph_autoencoder",
         "build_residual_features",
         "build_policy_rates",
         "build_policy_features",

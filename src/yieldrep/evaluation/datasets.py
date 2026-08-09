@@ -169,11 +169,11 @@ def _read_transformer_embeddings(config: ProjectConfig) -> pd.DataFrame:
 
 
 def _read_graph_autoencoder_embeddings(config: ProjectConfig) -> pd.DataFrame:
-    return _read_learned_embeddings(config.gnn_dir, "GE")
+    return _read_learned_embeddings(config.graph_autoencoder_dir, "GE")
 
 
 def _graph_autoencoder_feature_columns(config: ProjectConfig) -> list[str]:
-    return [f"GE{i}" for i in range(1, config.gnn.latent_dim + 1)]
+    return [f"GE{i}" for i in range(1, config.graph_autoencoder.latent_dim + 1)]
 
 
 def _read_learned_embeddings(model_dir: Path, prefix: str) -> pd.DataFrame:

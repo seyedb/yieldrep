@@ -22,7 +22,7 @@ NODE_FEATURE_COLUMNS = [
     *CARRY_ROLL_FEATURE_COLUMNS,
 ]
 
-GNN_EDGE_ABLATION_COLUMNS = [
+GRAPH_EDGE_ABLATION_COLUMNS = [
     "country",
     "edge_mode",
     "edge_count",
@@ -71,7 +71,7 @@ class MaturityGraphAutoencoder(nn.Module):
         return reconstructed, latent
 
 
-class GNNResult:
+class GraphAutoencoderResult:
     def __init__(
         self,
         embeddings: pd.DataFrame,
@@ -87,7 +87,7 @@ class GNNResult:
         self.training_history = training_history
 
 
-def build_gnn(config: ProjectConfig) -> list[Path]:
+def build_graph_autoencoder(config: ProjectConfig) -> list[Path]:
     """Train per-country maturity-graph autoencoders and write reconstruction artifacts."""
     if not config.graph_nodes_path.exists() or not config.graph_edges_path.exists():
         build_maturity_graph_dataset(config)
@@ -95,7 +95,7 @@ def build_gnn(config: ProjectConfig) -> list[Path]:
     nodes = pd.read_parquet(config.graph_nodes_path)
     edges = pd.read_parquet(config.graph_edges_path)
     output_paths: list[Path] = []
-    config.gnn_dir.mkdir(parents=True, exist_ok=True)
+    config.graph_autoencoder_dir.mkdir(parents=True, exist_ok=True)
 
     for country in sorted(nodes["country"].dropna().unique()):
         country_nodes = nodes.loc[nodes["country"] == country].copy()
@@ -106,40 +106,40 @@ def build_gnn(config: ProjectConfig) -> list[Path]:
         if split is None:
             continue
         train_panel, _ = split
-        if len(train_panel) < config.gnn.min_train_dates:
+        if len(train_panel) < config.graph_autoencoder.min_train_dates:
             continue
 
         country_edges = _filter_edges(
             edges.loc[edges["country"] == country].copy(),
-            config.gnn.edge_mode,
+            config.graph_autoencoder.edge_mode,
         )
-        result = fit_gnn_panel(
+        result = fit_graph_autoencoder_panel(
             panel=panel,
             edges=country_edges,
             test_fraction=config.evaluation.test_fraction,
-            latent_dim=config.gnn.latent_dim,
-            hidden_dim=config.gnn.hidden_dim,
-            n_layers=config.gnn.n_layers,
-            dropout=config.gnn.dropout,
-            epochs=config.gnn.epochs,
-            batch_size=config.gnn.batch_size,
-            learning_rate=config.gnn.learning_rate,
-            weight_decay=config.gnn.weight_decay,
-            validation_fraction=config.gnn.validation_fraction,
-            mask_probability=config.gnn.mask_probability,
-            clean_loss_weight=config.gnn.clean_loss_weight,
-            early_stopping_patience=config.gnn.early_stopping_patience,
-            min_delta=config.gnn.min_delta,
-            random_seed=config.gnn.random_seed,
-            max_train_dates=config.gnn.max_train_dates,
+            latent_dim=config.graph_autoencoder.latent_dim,
+            hidden_dim=config.graph_autoencoder.hidden_dim,
+            n_layers=config.graph_autoencoder.n_layers,
+            dropout=config.graph_autoencoder.dropout,
+            epochs=config.graph_autoencoder.epochs,
+            batch_size=config.graph_autoencoder.batch_size,
+            learning_rate=config.graph_autoencoder.learning_rate,
+            weight_decay=config.graph_autoencoder.weight_decay,
+            validation_fraction=config.graph_autoencoder.validation_fraction,
+            mask_probability=config.graph_autoencoder.mask_probability,
+            clean_loss_weight=config.graph_autoencoder.clean_loss_weight,
+            early_stopping_patience=config.graph_autoencoder.early_stopping_patience,
+            min_delta=config.graph_autoencoder.min_delta,
+            random_seed=config.graph_autoencoder.random_seed,
+            max_train_dates=config.graph_autoencoder.max_train_dates,
         )
 
         country_key = str(country).lower()
-        embeddings_path = config.gnn_dir / f"{country_key}_embeddings.parquet"
-        reconstruction_path = config.gnn_dir / f"{country_key}_reconstruction.parquet"
-        masked_path = config.gnn_dir / f"{country_key}_masked_reconstruction.parquet"
-        metrics_path = config.gnn_dir / f"{country_key}_metrics.parquet"
-        history_path = config.gnn_dir / f"{country_key}_training_history.parquet"
+        embeddings_path = config.graph_autoencoder_dir / f"{country_key}_embeddings.parquet"
+        reconstruction_path = config.graph_autoencoder_dir / f"{country_key}_reconstruction.parquet"
+        masked_path = config.graph_autoencoder_dir / f"{country_key}_masked_reconstruction.parquet"
+        metrics_path = config.graph_autoencoder_dir / f"{country_key}_metrics.parquet"
+        history_path = config.graph_autoencoder_dir / f"{country_key}_training_history.parquet"
         result.embeddings.to_parquet(embeddings_path, index=False)
         result.reconstruction.to_parquet(reconstruction_path, index=False)
         result.masked_reconstruction.to_parquet(masked_path, index=False)
@@ -152,7 +152,7 @@ def build_gnn(config: ProjectConfig) -> list[Path]:
     return output_paths
 
 
-def build_gnn_edge_ablation(config: ProjectConfig) -> Path:
+def build_graph_edge_ablation(config: ProjectConfig) -> Path:
     """Compare adjacent-only and adjacent+correlation graph edges.
 
     This ablation tests whether the extra correlation edges improve the
@@ -175,45 +175,45 @@ def build_gnn_edge_ablation(config: ProjectConfig) -> Path:
         if split is None:
             continue
         train_panel, _ = split
-        if len(train_panel) < config.gnn.min_train_dates:
+        if len(train_panel) < config.graph_autoencoder.min_train_dates:
             continue
 
         country_edges = edges.loc[edges["country"] == country].copy()
         edge_modes: list[EdgeMode] = ["adjacent", "adjacent_correlation"]
         for edge_mode in edge_modes:
             mode_edges = _filter_edges(country_edges, edge_mode)
-            result = fit_gnn_panel(
+            result = fit_graph_autoencoder_panel(
                 panel=panel,
                 edges=mode_edges,
                 test_fraction=config.evaluation.test_fraction,
-                latent_dim=config.gnn.latent_dim,
-                hidden_dim=config.gnn.hidden_dim,
-                n_layers=config.gnn.n_layers,
-                dropout=config.gnn.dropout,
-                epochs=config.gnn.epochs,
-                batch_size=config.gnn.batch_size,
-                learning_rate=config.gnn.learning_rate,
-                weight_decay=config.gnn.weight_decay,
-                validation_fraction=config.gnn.validation_fraction,
-                mask_probability=config.gnn.mask_probability,
-                clean_loss_weight=config.gnn.clean_loss_weight,
-                early_stopping_patience=config.gnn.early_stopping_patience,
-                min_delta=config.gnn.min_delta,
-                random_seed=config.gnn.random_seed,
-                max_train_dates=config.gnn.max_train_dates,
+                latent_dim=config.graph_autoencoder.latent_dim,
+                hidden_dim=config.graph_autoencoder.hidden_dim,
+                n_layers=config.graph_autoencoder.n_layers,
+                dropout=config.graph_autoencoder.dropout,
+                epochs=config.graph_autoencoder.epochs,
+                batch_size=config.graph_autoencoder.batch_size,
+                learning_rate=config.graph_autoencoder.learning_rate,
+                weight_decay=config.graph_autoencoder.weight_decay,
+                validation_fraction=config.graph_autoencoder.validation_fraction,
+                mask_probability=config.graph_autoencoder.mask_probability,
+                clean_loss_weight=config.graph_autoencoder.clean_loss_weight,
+                early_stopping_patience=config.graph_autoencoder.early_stopping_patience,
+                min_delta=config.graph_autoencoder.min_delta,
+                random_seed=config.graph_autoencoder.random_seed,
+                max_train_dates=config.graph_autoencoder.max_train_dates,
             )
-            rows.append(_gnn_ablation_row(str(country), edge_mode, mode_edges, result.metrics))
+            rows.append(_graph_ablation_row(str(country), edge_mode, mode_edges, result.metrics))
 
-    table = pd.DataFrame(rows, columns=GNN_EDGE_ABLATION_COLUMNS)
+    table = pd.DataFrame(rows, columns=GRAPH_EDGE_ABLATION_COLUMNS)
     if not table.empty:
         table = _add_adjacent_only_comparison(table)
 
     config.tables_dir.mkdir(parents=True, exist_ok=True)
-    table.to_csv(config.gnn_edge_ablation_table_path, index=False)
-    return config.gnn_edge_ablation_table_path
+    table.to_csv(config.graph_edge_ablation_table_path, index=False)
+    return config.graph_edge_ablation_table_path
 
 
-def fit_gnn_panel(
+def fit_graph_autoencoder_panel(
     panel: pd.DataFrame,
     edges: pd.DataFrame,
     test_fraction: float,
@@ -232,7 +232,7 @@ def fit_gnn_panel(
     min_delta: float,
     random_seed: int,
     max_train_dates: int | None,
-) -> GNNResult:
+) -> GraphAutoencoderResult:
     _validate_hyperparameters(
         latent_dim=latent_dim,
         hidden_dim=hidden_dim,
@@ -412,7 +412,7 @@ def fit_gnn_panel(
         final_train_loss=final_train_loss,
         final_validation_loss=final_validation_loss,
     )
-    return GNNResult(
+    return GraphAutoencoderResult(
         embeddings=_embedding_frame(
             panel.index, str(panel.attrs.get("country", "")), encoded.numpy(), split_labels
         ),
@@ -425,13 +425,13 @@ def fit_gnn_panel(
     )
 
 
-def gnn_reconstruction_errors(config: ProjectConfig) -> pd.DataFrame:
+def graph_autoencoder_reconstruction_errors(config: ProjectConfig) -> pd.DataFrame:
     """Read graph autoencoder reconstructions as reconstruction-error rows."""
-    if not config.gnn_dir.exists():
+    if not config.graph_autoencoder_dir.exists():
         return pd.DataFrame()
 
     rows: list[pd.DataFrame] = []
-    for path in sorted(config.gnn_dir.glob("*_reconstruction.parquet")):
+    for path in sorted(config.graph_autoencoder_dir.glob("*_reconstruction.parquet")):
         if path.name.endswith("_masked_reconstruction.parquet"):
             continue
         frame = pd.read_parquet(path)
@@ -440,18 +440,18 @@ def gnn_reconstruction_errors(config: ProjectConfig) -> pd.DataFrame:
             continue
         test["reconstruction_task"] = "clean_reconstruction"
         test["representation"] = "graph_autoencoder"
-        test["n_components"] = config.gnn.latent_dim
+        test["n_components"] = config.graph_autoencoder.latent_dim
         test["error"] = test["yield"] - test["fitted_yield"]
         rows.append(test)
 
-    for path in sorted(config.gnn_dir.glob("*_masked_reconstruction.parquet")):
+    for path in sorted(config.graph_autoencoder_dir.glob("*_masked_reconstruction.parquet")):
         frame = pd.read_parquet(path)
         test = frame.loc[frame["split"] == "test"].copy()
         if test.empty:
             continue
         test["reconstruction_task"] = "masked_maturity_reconstruction"
         test["representation"] = "masked_graph_autoencoder"
-        test["n_components"] = config.gnn.latent_dim
+        test["n_components"] = config.graph_autoencoder.latent_dim
         test["error"] = test["yield"] - test["fitted_yield"]
         rows.append(test)
 
@@ -466,7 +466,7 @@ def _filter_edges(edges: pd.DataFrame, edge_mode: EdgeMode) -> pd.DataFrame:
     raise ValueError(f"Unsupported edge mode: {edge_mode}")
 
 
-def _gnn_ablation_row(
+def _graph_ablation_row(
     country: str,
     edge_mode: EdgeMode,
     edges: pd.DataFrame,
@@ -510,7 +510,7 @@ def _add_adjacent_only_comparison(table: pd.DataFrame) -> pd.DataFrame:
         frame["masked_test_rmse"] - frame["adjacent_only_masked_test_rmse"]
     )
     return (
-        frame.loc[:, GNN_EDGE_ABLATION_COLUMNS]
+        frame.loc[:, GRAPH_EDGE_ABLATION_COLUMNS]
         .sort_values(["country", "edge_mode"])
         .reset_index(drop=True)
     )
@@ -834,7 +834,7 @@ def _validate_hyperparameters(
     max_train_dates: int | None,
 ) -> None:
     if latent_dim <= 0 or hidden_dim <= 0 or n_layers <= 0:
-        raise ValueError("GNN dimensions must be positive")
+        raise ValueError("Graph autoencoder dimensions must be positive")
     if not 0 <= dropout < 1:
         raise ValueError("dropout must be in [0, 1)")
     if epochs <= 0 or batch_size <= 0:

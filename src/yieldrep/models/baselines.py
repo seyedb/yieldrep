@@ -573,7 +573,7 @@ def _transformer_features(config: ProjectConfig) -> list[str]:
 
 
 def _graph_autoencoder_features(config: ProjectConfig) -> list[str]:
-    return [f"GE{i}" for i in range(1, config.gnn.latent_dim + 1)]
+    return [f"GE{i}" for i in range(1, config.graph_autoencoder.latent_dim + 1)]
 
 
 def maturity_bucket(maturity_years: pd.Series) -> pd.Series:

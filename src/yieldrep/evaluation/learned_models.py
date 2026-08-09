@@ -85,8 +85,8 @@ def learned_model_comparison_table(config: ProjectConfig) -> pd.DataFrame:
         ),
         _model_rows(
             "graph_autoencoder",
-            config.gnn_dir,
-            max_train_dates=config.gnn.max_train_dates,
+            config.graph_autoencoder_dir,
+            max_train_dates=config.graph_autoencoder.max_train_dates,
         ),
     ]
     non_empty = [row for row in rows if not row.empty]

@@ -20,7 +20,7 @@ def test_load_config_reads_project_paths() -> None:
     assert config.nelson_siegel_dir == Path("data/processed/nelson_siegel")
     assert config.autoencoder_dir == Path("data/processed/autoencoder")
     assert config.transformer_dir == Path("data/processed/transformer")
-    assert config.gnn_dir == Path("data/processed/gnn")
+    assert config.graph_autoencoder_dir == Path("data/processed/gnn")
     assert config.learned_states_dir == Path("data/processed/learned_states")
     assert config.learned_state_regimes_path == Path(
         "data/processed/learned_states/regime_states.parquet"
@@ -161,7 +161,7 @@ def test_load_config_reads_project_paths() -> None:
     )
     assert config.graph_nodes_path == Path("data/processed/graph/maturity_graph_nodes.parquet")
     assert config.graph_edges_path == Path("data/processed/graph/maturity_graph_edges.parquet")
-    assert config.gnn.edge_mode == "adjacent"
+    assert config.graph_autoencoder.edge_mode == "adjacent"
     assert config.representation_comparison_table_path == Path(
         "reports/tables/representation_comparison.csv"
     )
@@ -171,7 +171,7 @@ def test_load_config_reads_project_paths() -> None:
     assert config.learned_reconstruction_leaderboard_table_path == Path(
         "reports/tables/learned_reconstruction_leaderboard.csv"
     )
-    assert config.gnn_edge_ablation_table_path == Path("reports/tables/gnn_edge_ablation.csv")
+    assert config.graph_edge_ablation_table_path == Path("reports/tables/graph_edge_ablation.csv")
     assert config.representation_task_scorecard_table_path == Path(
         "reports/tables/representation_task_scorecard.csv"
     )

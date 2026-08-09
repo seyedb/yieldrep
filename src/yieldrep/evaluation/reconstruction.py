@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from yieldrep.config import ProjectConfig
 from yieldrep.factors.curve import curve_panel
 from yieldrep.models.autoencoder import autoencoder_reconstruction_errors
-from yieldrep.models.gnn import gnn_reconstruction_errors
+from yieldrep.models.graph_autoencoder import graph_autoencoder_reconstruction_errors
 from yieldrep.models.transformer import transformer_reconstruction_errors
 
 
@@ -133,9 +133,9 @@ def _out_of_sample_reconstruction_errors(
     transformer = transformer_reconstruction_errors(config)
     if not transformer.empty:
         rows.append(_format_errors(transformer))
-    gnn = gnn_reconstruction_errors(config)
-    if not gnn.empty:
-        rows.append(_format_errors(gnn))
+    graph_autoencoder = graph_autoencoder_reconstruction_errors(config)
+    if not graph_autoencoder.empty:
+        rows.append(_format_errors(graph_autoencoder))
 
     return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
 
