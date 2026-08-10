@@ -163,6 +163,9 @@ def residual_rv_results(config: ProjectConfig) -> pd.DataFrame:
         for path in [
             config.supervised_forecast_rank_table_path,
             config.residual_rv_representation_regime_scorecard_table_path,
+            config.residual_rv_subperiod_results_table_path,
+            config.residual_rv_maturity_bucket_results_table_path,
+            config.residual_rv_feature_importance_table_path,
         ]
         if path.exists()
     ]

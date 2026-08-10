@@ -479,6 +479,18 @@ class ProjectConfig(BaseModel):
         return self.tables_dir / "residual_rv_results.csv"
 
     @property
+    def residual_rv_subperiod_results_table_path(self) -> Path:
+        return self.tables_dir / "residual_rv_subperiod_results.csv"
+
+    @property
+    def residual_rv_maturity_bucket_results_table_path(self) -> Path:
+        return self.tables_dir / "residual_rv_maturity_bucket_results.csv"
+
+    @property
+    def residual_rv_feature_importance_table_path(self) -> Path:
+        return self.tables_dir / "residual_rv_feature_importance.csv"
+
+    @property
     def baseline_by_maturity_point_top_table_path(self) -> Path:
         return self.tables_dir / "baseline_by_maturity_point_top.csv"
 

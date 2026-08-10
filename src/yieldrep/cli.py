@@ -35,6 +35,7 @@ from yieldrep.evaluation.residual_rv import build_residual_rv_protocol
 from yieldrep.evaluation.residual_rv_regimes import (
     build_residual_rv_representation_regime_report,
 )
+from yieldrep.evaluation.residual_rv_validation import build_residual_rv_validation_report
 from yieldrep.evaluation.targets import (
     build_residual_targets,
     build_standardized_targets,
@@ -325,6 +326,14 @@ def residual_rv_regimes_command(config: Path = Path("configs/default.yaml")) -> 
         typer.echo(output_path)
 
 
+@app.command("residual-rv-validation")
+def residual_rv_validation_command(config: Path = Path("configs/default.yaml")) -> None:
+    """Validate residual RV robustness by subperiod, maturity bucket, and feature importance."""
+    project_config = load_config(config)
+    for output_path in build_residual_rv_validation_report(project_config):
+        typer.echo(output_path)
+
+
 @app.command("scorecard")
 def scorecard_command(config: Path = Path("configs/default.yaml")) -> None:
     """Legacy alias for research-summary."""
@@ -337,6 +346,8 @@ def research_summary_command(config: Path = Path("configs/default.yaml")) -> Non
     project_config = load_config(config)
     typer.echo(build_residual_rv_protocol(project_config))
     typer.echo(build_residual_rv_results(project_config))
+    for output_path in build_residual_rv_validation_report(project_config):
+        typer.echo(output_path)
     typer.echo(build_representation_results(project_config))
     typer.echo(build_research_summary(project_config))
 
@@ -446,6 +457,7 @@ def run_baseline_pipeline(project_config: ProjectConfig) -> list[Path]:
     output_paths.append(build_representation_comparison(project_config))
     output_paths.append(build_residual_rv_protocol(project_config))
     output_paths.append(build_residual_rv_results(project_config))
+    output_paths.extend(build_residual_rv_validation_report(project_config))
     output_paths.append(build_representation_results(project_config))
     output_paths.append(build_research_summary(project_config))
     output_paths.append(build_cross_market_report(project_config))

@@ -92,7 +92,10 @@ evaluation diagnostics.
 
 Current results are summarized in `reports/tables/research_summary.csv`,
 `reports/tables/representation_results.csv`, and
-`reports/tables/residual_rv_results.csv`.
+`reports/tables/residual_rv_results.csv`. Residual relative-value robustness is
+reported in `reports/tables/residual_rv_subperiod_results.csv`,
+`reports/tables/residual_rv_maturity_bucket_results.csv`, and
+`reports/tables/residual_rv_feature_importance.csv`.
 
 **Development Note**
 

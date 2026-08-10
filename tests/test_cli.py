@@ -219,6 +219,11 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_residual_rv_representation_regime_report",
         multi_step("build_residual_rv_representation_regime_report"),
     )
+    monkeypatch.setattr(
+        cli,
+        "build_residual_rv_validation_report",
+        multi_step("build_residual_rv_validation_report"),
+    )
     monkeypatch.setattr(cli, "plot_baseline_metrics", multi_step("plot_baseline_metrics"))
     monkeypatch.setattr(
         cli,
@@ -284,6 +289,7 @@ def test_run_baseline_pipeline_orders_steps(monkeypatch, tmp_path: Path) -> None
         "build_representation_comparison",
         "build_residual_rv_protocol",
         "build_residual_rv_results",
+        "build_residual_rv_validation_report",
         "build_representation_results",
         "build_research_summary",
         "build_cross_market_report",

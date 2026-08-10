@@ -392,7 +392,9 @@ def _join_residual_feature_targets(config: ProjectConfig, targets: pd.DataFrame)
     features = _read_residual_features(config)
     if features.empty:
         return pd.DataFrame()
-    return targets.merge(features, on=["date", "country", "maturity_years"], how="inner")
+    return _merge_features(targets, features, ["date", "country", "maturity_years"]).dropna(
+        subset=["residual_z_60", "residual_z_252"]
+    )
 
 
 def _add_state_maturity_features(data: pd.DataFrame, state_columns: list[str]) -> pd.DataFrame:

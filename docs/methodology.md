@@ -638,6 +638,46 @@ tested as model input rather than only as a regime label.
 Learned-state regime diagnostics are secondary diagnostics. The main
 representation comparison is the project research summary.
 
+### Residual RV Robustness
+
+Residual RV validation uses the same target \(\Delta r_{t,h}^{(c,m)}\) and the
+same Nelson-Siegel residual feature vector \(z_t^{(c,m)}\). For each country and
+horizon, the interpretable validation model is:
+
+```math
+\widehat{\Delta r}_{t,h}^{(c,m)}
+=
+\alpha
++
+\beta^\top z_t^{(c,m)} .
+```
+
+The model is estimated with a chronological train/test split. Robustness is
+reported by rate subperiod and by maturity bucket using RMSE, MAE, rank IC, and
+top-minus-bottom realized residual-change spread:
+
+```math
+S_t
+=
+\frac{1}{|T_t|}
+\sum_{m \in T_t}
+\Delta r_{t,h}^{(c,m)}
+-
+\frac{1}{|B_t|}
+\sum_{m \in B_t}
+\Delta r_{t,h}^{(c,m)} .
+```
+
+Feature interpretation is based on standardized ridge coefficients
+\(\beta_j\). Larger \(|\beta_j|\) indicates greater linear contribution after
+standardizing residual features.
+
+```text
+reports/tables/residual_rv_subperiod_results.csv
+reports/tables/residual_rv_maturity_bucket_results.csv
+reports/tables/residual_rv_feature_importance.csv
+```
+
 ### Classification Metrics
 
 Balanced accuracy:

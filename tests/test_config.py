@@ -184,6 +184,15 @@ def test_load_config_reads_project_paths() -> None:
     )
     assert config.research_summary_table_path == Path("reports/tables/research_summary.csv")
     assert config.residual_rv_results_table_path == Path("reports/tables/residual_rv_results.csv")
+    assert config.residual_rv_subperiod_results_table_path == Path(
+        "reports/tables/residual_rv_subperiod_results.csv"
+    )
+    assert config.residual_rv_maturity_bucket_results_table_path == Path(
+        "reports/tables/residual_rv_maturity_bucket_results.csv"
+    )
+    assert config.residual_rv_feature_importance_table_path == Path(
+        "reports/tables/residual_rv_feature_importance.csv"
+    )
     assert config.overlap_sensitivity_table_path == Path("reports/tables/overlap_sensitivity.csv")
     assert config.benchmark_conclusions_table_path == Path(
         "reports/tables/benchmark_conclusions.csv"
